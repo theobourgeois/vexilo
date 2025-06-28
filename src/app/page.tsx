@@ -24,7 +24,9 @@ export default function Home() {
                             className="w-8 h-6 text-black font-bold scale-x-[-1]"
                         />
                     </div>
-                    <h1 className="text-3xl text-black font-bold">Vexilo</h1>
+                    <h1 className="text-3xl text-black font-extrabold">
+                        vexilo
+                    </h1>
 
                     <div className="relative">
                         <Flag

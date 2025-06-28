@@ -3,6 +3,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html {
+    font-family: "Nunito", system-ui, sans-serif;
+}
+
 :root {
     --background: oklch(93.46% 0.0305 255.11);
     --secondary-background: oklch(100% 0 0);
@@ -19,6 +23,9 @@
     --chart-4: #05e17a;
     --chart-5: #7a83ff;
     --chart-active-dot: #000;
+    --font-family-base: var(--font-comic-neue), system-ui, sans-serif;
+    --font-family-heading: var(--font-comic-neue), system-ui, sans-serif;
+    --font-family-mono: var(--font-comic-neue), monospace;
 }
 
 .dark {
@@ -66,6 +73,7 @@
 @layer base {
     body {
         @apply text-foreground font-base bg-background;
+        font-family: var(--font-family-base);
     }
 
     h1,
@@ -75,5 +83,6 @@
     h5,
     h6 {
         @apply font-heading;
+        font-family: var(--font-family-heading);
     }
 }

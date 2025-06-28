@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ExternalLink, Info } from "lucide-react";
+import { ExternalLink, Heart } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -12,8 +12,8 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { useFavoritesStore } from "../store/favorites";
 
 type FlagCardProps = {
     flagName: string;
@@ -22,10 +22,33 @@ type FlagCardProps = {
 };
 
 export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
+    const { isFavorite, toggleFavorite } = useFavoritesStore();
+
+    const handleFavoriteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        toggleFavorite(flagName);
+    };
+
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Card className="cursor-pointer px-8">
+                <Card className="cursor-pointer px-8 relative group">
+                    {/* Favorite Button */}
+                    <Button
+                        variant="neutral"
+                        size="sm"
+                        className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white"
+                        onClick={handleFavoriteClick}
+                    >
+                        <Heart
+                            className={`w-4 h-4 ${
+                                isFavorite(flagName)
+                                    ? "fill-red-500 text-red-500"
+                                    : "text-gray-600"
+                            }`}
+                        />
+                    </Button>
+
                     <div className="relative overflow-hidden">
                         <div className="aspect-[3/2] relative">
                             <Image
@@ -37,25 +60,40 @@ export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
                         </div>
                     </div>
 
-                    <CardContent>
+                    <CardContent className="pb-2">
                         <h3 className="font-semibold text-center">
                             {flagName}
                         </h3>
-                        <Badge className="mt-2">
-                            <Info className="w-4 h-4 mr-1" />
-                            Click for details
-                        </Badge>
                     </CardContent>
                 </Card>
             </DialogTrigger>
 
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{flagName}</DialogTitle>
-                    <DialogDescription>
-                        Click the button below to learn more about this
-                        flag&apos;s history and symbolism
-                    </DialogDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <DialogTitle>{flagName}</DialogTitle>
+                            <DialogDescription>
+                                Click the button below to learn more about this
+                                flag&apos;s history and symbolism
+                            </DialogDescription>
+                        </div>
+                        <Button
+                            variant="neutral"
+                            size="sm"
+                            onClick={() => toggleFavorite(flagName)}
+                            className="flex items-center gap-2"
+                        >
+                            <Heart
+                                className={`w-4 h-4 ${
+                                    isFavorite(flagName)
+                                        ? "fill-red-500 text-red-500"
+                                        : "text-gray-600"
+                                }`}
+                            />
+                            {isFavorite(flagName) ? "Favorited" : "Favorite"}
+                        </Button>
+                    </div>
                 </DialogHeader>
 
                 <div className="space-y-6">
@@ -68,28 +106,6 @@ export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
                                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 60vw"
                             />
                         </div>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <h4 className="font-semibold">Flag Information</h4>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <span className="font-medium">
-                                        Country/Region:
-                                    </span>
-                                    <p>{flagName}</p>
-                                </div>
-                                <div>
-                                    <span className="font-medium">
-                                        Image Source:
-                                    </span>
-                                    <p>Wikimedia Commons</p>
-                                </div>
-                            </div>
-                        </CardContent>
                     </Card>
 
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
