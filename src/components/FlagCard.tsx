@@ -6,7 +6,6 @@ import { ExternalLink, Heart } from "lucide-react";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -73,10 +72,6 @@ export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
                     <div className="flex items-center justify-between">
                         <div>
                             <DialogTitle>{flagName}</DialogTitle>
-                            <DialogDescription>
-                                Click the button below to learn more about this
-                                flag&apos;s history and symbolism
-                            </DialogDescription>
                         </div>
                         <Button
                             variant="neutral"
