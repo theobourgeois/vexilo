@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { Flag } from "lucide-react";
 import allFlags from "../store/all.json";
 import FlagSearch from "../components/FlagSearch";
 
@@ -14,6 +15,29 @@ const flags: Flag[] = allFlags;
 export default function Home() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+            {/* Logo Header */}
+            <div className="max-w-7xl mx-auto px-4 pt-8 pb-6">
+                <div className="flex items-center justify-center space-x-0">
+                    <div className="relative">
+                        <Flag
+                            strokeWidth={3}
+                            className="w-8 h-6 text-black font-bold scale-x-[-1]"
+                        />
+                    </div>
+                    <h1 className="text-3xl text-black font-bold">Vexilo</h1>
+
+                    <div className="relative">
+                        <Flag
+                            strokeWidth={3}
+                            className="w-8 h-6 text-black font-bold "
+                        />
+                    </div>
+                </div>
+                <p className="text-center text-gray-600 mt-2 text-sm">
+                    Discover flags from around the world
+                </p>
+            </div>
+
             {/* Search and Results */}
             <div className="max-w-7xl mx-auto px-4 pb-12">
                 <Suspense
