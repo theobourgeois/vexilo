@@ -3,6 +3,7 @@ import Image from "next/image";
 import allFlags from "../store/all.json";
 import FlagSearch from "../components/FlagSearch";
 import FlagCard from "../components/FlagCard";
+import FlagQuiz from "../components/FlagQuiz";
 import {
     Card,
     CardContent,
@@ -66,24 +67,36 @@ export default function Home() {
                 </p>
             </div>
 
-            {/* Flag of the Day Section */}
-            <Card className="max-w-xs mx-auto px-4 mb-8">
-                <CardHeader className="text-2xl font-bold text-gray-800 mb-4 text-center">
-                    Flag of the Day
-                </CardHeader>
-                <CardContent>
-                    <FlagCard
-                        flagName={flagOfTheDay.flagName}
-                        flagImage={flagOfTheDay.flagImage}
-                        link={flagOfTheDay.link}
-                    />
-                </CardContent>
-                <CardFooter>
-                    <p className="text-center text-gray-600 mt-4 text-sm">
-                        Come back tomorrow for a new flag!
-                    </p>
-                </CardFooter>
-            </Card>
+            {/* Flag Quiz and Flag of the Day Section */}
+            <div className="max-w-7xl mx-auto px-4 mb-8">
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Flag Quiz Section */}
+                    <div className="flex-3 lg:flex-[3]">
+                        <FlagQuiz flags={flags} />
+                    </div>
+
+                    {/* Flag of the Day Section */}
+                    <div className="flex-1 lg:flex-[1]">
+                        <Card className="h-full">
+                            <CardHeader className="text-2xl font-bold text-gray-800 mb-4 text-center">
+                                Flag of the Day
+                            </CardHeader>
+                            <CardContent>
+                                <FlagCard
+                                    flagName={flagOfTheDay.flagName}
+                                    flagImage={flagOfTheDay.flagImage}
+                                    link={flagOfTheDay.link}
+                                />
+                            </CardContent>
+                            <CardFooter>
+                                <p className="text-center text-gray-600 mt-4 text-sm">
+                                    Come back tomorrow for a new flag!
+                                </p>
+                            </CardFooter>
+                        </Card>
+                    </div>
+                </div>
+            </div>
 
             {/* Search and Results */}
             <div className="max-w-7xl mx-auto px-4 pb-12">
