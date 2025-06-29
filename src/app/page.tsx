@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import allFlags from "../store/all.json";
 import FlagSearch from "../components/FlagSearch";
 import FlagCard from "../components/FlagCard";
@@ -38,7 +39,10 @@ export default function Home() {
         <div className="min-h-screen bg-main/10">
             {/* Logo Header */}
             <div className="max-w-7xl mx-auto px-4 flex flex-col items-start justify-start py-4">
-                <div className="flex gap-2 items-center justify-center ">
+                <Link
+                    href="/"
+                    className="flex gap-2 items-center justify-center hover:opacity-80 transition-opacity"
+                >
                     <Image
                         src="/logo.svg"
                         alt="Vexilo Logo"
@@ -61,7 +65,7 @@ export default function Home() {
                     >
                         VEXILO
                     </h1>
-                </div>
+                </Link>
                 <p className="text-center text-gray-600 mt-2 text-sm">
                     Discover flags from around the world
                 </p>
