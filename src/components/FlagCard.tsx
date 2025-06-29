@@ -54,6 +54,7 @@ export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
                                 src={flagImage}
                                 alt={flagName}
                                 fill
+                                className="object-contain"
                                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                             />
                         </div>
@@ -98,6 +99,7 @@ export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
                                 src={flagImage}
                                 alt={flagName}
                                 fill
+                                className="object-contain"
                                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 60vw"
                             />
                         </div>
