@@ -1,10 +1,9 @@
 import { Suspense } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import allFlags from "../store/all.json";
 import FlagSearch from "../components/FlagSearch";
 import FlagCard from "../components/FlagCard";
 import FlagQuiz from "../components/FlagQuiz";
+import Logo from "../components/Logo";
 import {
     Card,
     CardContent,
@@ -39,33 +38,7 @@ export default function Home() {
         <div className="min-h-screen bg-main/10">
             {/* Logo Header */}
             <div className="max-w-7xl mx-auto px-4 flex flex-col items-start justify-start py-4">
-                <Link
-                    href="/"
-                    className="flex gap-2 items-center justify-center hover:opacity-80 transition-opacity"
-                >
-                    <Image
-                        src="/logo.svg"
-                        alt="Vexilo Logo"
-                        width={48}
-                        height={36}
-                        className="object-contain"
-                    />
-                    <h1
-                        className="text-3xl text-black font-extrabold"
-                        style={{
-                            fontFamily: "Times New Roman",
-                            fontWeight: "bold",
-                            fontStyle: "italic",
-                            fontSize: "3rem",
-                            lineHeight: "1.2",
-                            letterSpacing: "0.05em",
-                            textTransform: "uppercase",
-                            textAlign: "center",
-                        }}
-                    >
-                        VEXILO
-                    </h1>
-                </Link>
+                <Logo />
                 <p className="text-center text-gray-600 mt-2 text-sm">
                     Discover flags from around the world
                 </p>
