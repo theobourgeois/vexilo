@@ -92,12 +92,7 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
     // Update URL when debounced query changes
     useEffect(() => {
         const params = new URLSearchParams(searchParams);
-        if (
-            debouncedQuery.trim() !== params.get("q")?.trim() &&
-            debouncedQuery.trim() !== ""
-        ) {
-            params.delete("page");
-        }
+
         if (debouncedQuery.trim()) {
             params.set("q", debouncedQuery);
         } else {
@@ -252,16 +247,39 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
                                     type="text"
                                     placeholder="Search flags..."
                                     value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        const params = new URLSearchParams(
+                                            searchParams
+                                        );
+                                        // set page to 1
+                                        params.set("page", "1");
+                                        router.replace(
+                                            `${
+                                                window.location.pathname
+                                            }?${params.toString()}`,
+                                            { scroll: false }
+                                        );
+                                    }}
                                     className={`pl-10 ${
                                         searchQuery ? "pr-10" : ""
                                     }`}
                                 />
                                 {searchQuery && (
                                     <button
-                                        onClick={() => setSearchQuery("")}
+                                        onClick={() => {
+                                            setSearchQuery("");
+                                            const params = new URLSearchParams(
+                                                searchParams
+                                            );
+                                            params.delete("page");
+                                            router.replace(
+                                                `${
+                                                    window.location.pathname
+                                                }?${params.toString()}`,
+                                                { scroll: false }
+                                            );
+                                        }}
                                         className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                                         type="button"
                                         aria-label="Clear search"
