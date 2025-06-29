@@ -62,7 +62,14 @@ export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
 
                     <CardContent className="pb-2">
                         <h3 className="font-semibold text-center">
-                            {flagName}
+                            <Link
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:underline"
+                            >
+                                {flagName}
+                            </Link>
                         </h3>
                     </CardContent>
                 </Card>
