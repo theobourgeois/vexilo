@@ -92,7 +92,10 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
     // Update URL when debounced query changes
     useEffect(() => {
         const params = new URLSearchParams(searchParams);
-        if (debouncedQuery.trim() !== params.get("q")?.trim()) {
+        if (
+            debouncedQuery.trim() !== params.get("q")?.trim() &&
+            debouncedQuery.trim() !== ""
+        ) {
             params.delete("page");
         }
         if (debouncedQuery.trim()) {
