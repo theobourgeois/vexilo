@@ -48,6 +48,11 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
     const currentPage = parseInt(searchParams.get("page") || "1", 10);
     const [activeTab, setActiveTab] = useState<"all" | "favorites">("all");
 
+    // Window size state for responsive pagination
+    const [windowWidth, setWindowWidth] = useState(
+        typeof window !== "undefined" ? window.innerWidth : 1024
+    );
+
     // Configure Fuse.js for fuzzy search
     const fuse = useMemo(() => {
         return new Fuse(flags, {
@@ -73,6 +78,16 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
 
         return () => clearTimeout(timer);
     }, [searchQuery]);
+
+    // Handle window resize for responsive pagination
+    useEffect(() => {
+        const handleResize = () => {
+            setWindowWidth(window.innerWidth);
+        };
+
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     // Update URL when debounced query changes
     useEffect(() => {
@@ -128,40 +143,68 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
     const displayedFlags = filteredFlags.slice(startIndex, endIndex);
 
     // Generate page numbers for pagination
-    const getPageNumbers = () => {
+    const getPageNumbers = useMemo(() => {
         const pages = [];
-        const maxVisiblePages = 5;
+
+        // Responsive max visible pages based on screen size
+        const getMaxVisiblePages = () => {
+            if (windowWidth < 640) return 2; // sm breakpoint
+            if (windowWidth < 1024) return 4; // lg breakpoint
+            return 5; // default
+        };
+
+        const maxVisiblePages = getMaxVisiblePages();
 
         if (totalPages <= maxVisiblePages) {
             for (let i = 1; i <= totalPages; i++) {
                 pages.push(i);
             }
         } else {
-            if (currentPage <= 3) {
-                for (let i = 1; i <= 4; i++) {
+            if (currentPage <= Math.ceil(maxVisiblePages / 2)) {
+                // Near the beginning
+                for (let i = 1; i <= maxVisiblePages - 1; i++) {
                     pages.push(i);
                 }
                 pages.push("ellipsis");
                 pages.push(totalPages);
-            } else if (currentPage >= totalPages - 2) {
+            } else if (
+                currentPage >=
+                totalPages - Math.floor(maxVisiblePages / 2)
+            ) {
+                // Near the end
                 pages.push(1);
                 pages.push("ellipsis");
-                for (let i = totalPages - 3; i <= totalPages; i++) {
+                for (
+                    let i = totalPages - (maxVisiblePages - 2);
+                    i <= totalPages;
+                    i++
+                ) {
                     pages.push(i);
                 }
             } else {
-                pages.push(1);
-                pages.push("ellipsis");
-                for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+                // In the middle
+                if (windowWidth >= 640) {
+                    pages.push(1);
+                    pages.push("ellipsis");
+                } else {
+                    pages.push(currentPage);
+                }
+                const start =
+                    currentPage - Math.floor((maxVisiblePages - 4) / 2);
+                const end = start + (maxVisiblePages - 4);
+                for (let i = start; i <= end; i++) {
                     pages.push(i);
                 }
-                pages.push("ellipsis");
-                pages.push(totalPages);
+                if (windowWidth >= 640) {
+                    pages.push("ellipsis");
+                    pages.push(totalPages);
+                } else {
+                }
             }
         }
 
         return pages;
-    };
+    }, [currentPage, totalPages, windowWidth]);
 
     return (
         <div className="space-y-6">
@@ -256,7 +299,7 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
                             />
                         </PaginationItem>
 
-                        {getPageNumbers().map((page, index) => (
+                        {getPageNumbers.map((page, index) => (
                             <PaginationItem key={index}>
                                 {page === "ellipsis" ? (
                                     <PaginationEllipsis />
@@ -328,7 +371,7 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
                             />
                         </PaginationItem>
 
-                        {getPageNumbers().map((page, index) => (
+                        {getPageNumbers.map((page, index) => (
                             <PaginationItem key={index}>
                                 {page === "ellipsis" ? (
                                     <PaginationEllipsis />
