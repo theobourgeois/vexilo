@@ -5,7 +5,8 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, CheckCircle, XCircle } from "lucide-react";
+import { RefreshCw, CheckCircle, XCircle, Heart } from "lucide-react";
+import { useFavoritesStore } from "@/store/favorites";
 
 type Flag = {
     flagName: string;
@@ -25,6 +26,8 @@ export default function FlagQuiz({ flags }: FlagQuizProps) {
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
     const [score, setScore] = useState(0);
     const [totalQuestions, setTotalQuestions] = useState(0);
+
+    const { toggleFavorite, isFavorite } = useFavoritesStore();
 
     const generateQuestion = () => {
         // Pick a random flag
@@ -99,7 +102,7 @@ export default function FlagQuiz({ flags }: FlagQuizProps) {
 
             <CardContent className="space-y-6">
                 {/* Flag Image */}
-                <div className="relative aspect-[3/2] w-full max-w-md mx-auto">
+                <div className="relative aspect-[3/2] w-full max-w-md mx-auto group">
                     <Image
                         src={currentQuestion.flagImage}
                         alt="Quiz flag"
@@ -107,6 +110,21 @@ export default function FlagQuiz({ flags }: FlagQuizProps) {
                         className="object-contain border rounded-lg"
                         sizes="(max-width: 768px) 100vw, 400px"
                     />
+                    {/* Favorite Button */}
+                    <Button
+                        variant="neutral"
+                        size="sm"
+                        onClick={() => toggleFavorite(currentQuestion.flagName)}
+                        className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white/90 backdrop-blur-sm"
+                    >
+                        <Heart
+                            className={`w-5 h-5 ${
+                                isFavorite(currentQuestion.flagName)
+                                    ? "fill-red-500 text-red-500"
+                                    : "text-gray-600"
+                            }`}
+                        />
+                    </Button>
                 </div>
 
                 {/* Answer Options */}
