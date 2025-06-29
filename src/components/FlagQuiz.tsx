@@ -75,11 +75,11 @@ export default function FlagQuiz({ flags }: FlagQuizProps) {
     return (
         <Card className="h-full">
             <CardHeader className="text-center">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-wrap items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold text-gray-800">
                         Flag Quiz
                     </h2>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="neutral">
                             Score: {score}/{totalQuestions}
                         </Badge>
