@@ -97,7 +97,7 @@ export default function FlagQuiz({ flags }: FlagQuizProps) {
                         </Button>
                     </div>
                 </div>
-                <p className="text-gray-600">What does this flag belong to?</p>
+                <p className="text-gray-600">Who does this flag belong to?</p>
             </CardHeader>
 
             <CardContent className="space-y-6">
