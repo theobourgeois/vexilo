@@ -39,7 +39,7 @@ export default function Home() {
             <div className="max-w-7xl mx-auto px-4 flex flex-col items-start justify-start py-4">
                 <div className="flex gap-2 items-center justify-center ">
                     <Image
-                        src="/logo.png"
+                        src="/logo.svg"
                         alt="Vexilo Logo"
                         width={48}
                         height={36}
