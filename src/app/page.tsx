@@ -4,6 +4,8 @@ import FlagSearch from "../components/FlagSearch";
 import FlagCard from "../components/FlagCard";
 import FlagQuiz from "../components/FlagQuiz";
 import Logo from "../components/Logo";
+import { Button } from "@/components/ui/button";
+import { Coffee } from "lucide-react";
 import {
     Card,
     CardContent,
@@ -100,6 +102,21 @@ export default function Home() {
             {/* Footer */}
             <div className="text-center py-8 text-gray-500">
                 <p>Explore {allFlags.length} flags from around the world</p>
+                <div className="mt-4">
+                    <Button
+                        asChild
+                        variant="default"
+                    >
+                        <a
+                            href="https://buymeacoffee.com/theobourgeois"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <Coffee className="w-4 h-4" />
+                            Buy me a coffee
+                        </a>
+                    </Button>
+                </div>
             </div>
         </div>
     );
