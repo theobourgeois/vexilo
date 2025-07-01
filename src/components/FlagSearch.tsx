@@ -2,38 +2,71 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Fuse from "fuse.js";
-import { Search, Heart, X } from "lucide-react";
+import { Search, Heart, X, ArrowRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-    Pagination,
-    PaginationContent,
-    PaginationEllipsis,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious,
-} from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
+
 import FlagCard from "./FlagCard";
 import { useFavoritesStore } from "../store/favorites";
-
-type Flag = {
-    flagName: string;
-    flagImage: string;
-    link: string;
-    index: number;
-};
-
-type FlagSearchProps = {
-    flags: Flag[];
-};
+import { useQuery } from "@tanstack/react-query";
+import { getFlags, getFlagsCount } from "@/actions/flags";
 
 const ITEMS_PER_PAGE = 20;
 const DEBOUNCE_DELAY = 300; // 300ms delay
 
-export default function FlagSearch({ flags }: FlagSearchProps) {
+// Flag Card Skeleton Component
+function FlagCardSkeleton() {
+    return (
+        <Card className="px-8 relative">
+            <div className="relative overflow-hidden">
+                <div className="aspect-[3/2] relative">
+                    <Skeleton className="w-full h-full" />
+                </div>
+            </div>
+            <CardContent className="pb-2">
+                <Skeleton className="h-6 w-3/4 mx-auto" />
+            </CardContent>
+        </Card>
+    );
+}
+
+// Simple Pagination Component
+function SimplePagination({ 
+    currentPage, 
+    totalPages, 
+    onPageChange 
+}: { 
+    currentPage: number; 
+    totalPages: number; 
+    onPageChange: (page: number) => void; 
+}) {
+    if (totalPages <= 1) return null;
+    
+    return (
+        <div className="flex items-center justify-center gap-4">
+            <Button
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+            >
+                <ArrowLeft className="w-4 h-4" /> Previous
+            </Button>
+            <span className="text-sm">
+                Page {currentPage} of {totalPages}
+            </span>
+            <Button
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+            >
+                Next <ArrowRight className="w-4 h-4" />
+            </Button>
+        </div>
+    );
+}
+
+export default function FlagSearch() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { favorites } = useFavoritesStore();
@@ -48,27 +81,48 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
     const currentPage = parseInt(searchParams.get("page") || "1", 10);
     const [activeTab, setActiveTab] = useState<"all" | "favorites">("all");
 
-    // Window size state for responsive pagination
-    const [windowWidth, setWindowWidth] = useState(
-        typeof window !== "undefined" ? window.innerWidth : 1024
-    );
+    const { data: flags, isLoading: flagsLoading } = useQuery({
+        queryKey: ["flags", currentPage, debouncedQuery],
+        queryFn: async () => {
+            return await getFlags(currentPage, ITEMS_PER_PAGE, debouncedQuery).then((flags) => {
+                return flags.map((flag) => ({
+                    flagName: flag.name,
+                    flagImage: flag.image,
+                    link: flag.link,
+                    index: flag.index,
+                    tags: flag.tags,
+                    description: flag.description,
+                }));
+            });
+        },
+    });
 
-    // Configure Fuse.js for fuzzy search
-    const fuse = useMemo(() => {
-        return new Fuse(flags, {
-            keys: ["flagName"],
-            threshold: 0.3,
-            includeScore: true,
-        });
-    }, [flags]);
+    const { data: flagsCount } = useQuery({
+        queryKey: ["flagsCount", debouncedQuery],
+        queryFn: async () => {
+            return await getFlagsCount(debouncedQuery);
+        },
+    });
+
+    const {data: totalFlags} = useQuery({
+        queryKey: ["totalFlags"],
+        queryFn: async () => {
+            return await getFlagsCount("");
+        },
+    });
 
     // Get flags based on active tab
     const getFlagsForTab = useCallback(() => {
         if (activeTab === "favorites") {
-            return flags.filter((flag) => favorites.includes(flag.flagName));
+            return favorites;
         }
-        return flags;
+        return flags || [];
     }, [activeTab, flags, favorites]);
+
+    // Get filtered flags for display
+    const filteredFlags = useMemo(() => {
+        return getFlagsForTab() || [];
+    }, [getFlagsForTab]);
 
     // Debounce search query
     useEffect(() => {
@@ -78,16 +132,6 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
 
         return () => clearTimeout(timer);
     }, [searchQuery]);
-
-    // Handle window resize for responsive pagination
-    useEffect(() => {
-        const handleResize = () => {
-            setWindowWidth(window.innerWidth);
-        };
-
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
 
     // Update URL when debounced query changes
     useEffect(() => {
@@ -123,89 +167,7 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
         [router, searchParams]
     );
 
-    // Filter flags based on debounced search query and active tab
-    const filteredFlags = useMemo(() => {
-        const tabFlags = getFlagsForTab();
-        if (!debouncedQuery.trim()) {
-            return tabFlags;
-        }
-        const results = fuse.search(debouncedQuery);
-        return results
-            .map((result) => result.item)
-            .filter((flag) =>
-                tabFlags.some((tabFlag) => tabFlag.flagName === flag.flagName)
-            );
-    }, [debouncedQuery, fuse, getFlagsForTab]);
-
-    // Calculate pagination
-    const totalPages = Math.ceil(filteredFlags.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const displayedFlags = filteredFlags.slice(startIndex, endIndex);
-
-    // Generate page numbers for pagination
-    const getPageNumbers = useMemo(() => {
-        const pages = [];
-
-        // Responsive max visible pages based on screen size
-        const getMaxVisiblePages = () => {
-            if (windowWidth < 640) return 2; // sm breakpoint
-            if (windowWidth < 1024) return 4; // lg breakpoint
-            return 5; // default
-        };
-
-        const maxVisiblePages = getMaxVisiblePages();
-
-        if (totalPages <= maxVisiblePages) {
-            for (let i = 1; i <= totalPages; i++) {
-                pages.push(i);
-            }
-        } else {
-            if (currentPage <= Math.ceil(maxVisiblePages / 2)) {
-                // Near the beginning
-                for (let i = 1; i <= maxVisiblePages - 1; i++) {
-                    pages.push(i);
-                }
-                pages.push("ellipsis");
-                pages.push(totalPages);
-            } else if (
-                currentPage >=
-                totalPages - Math.floor(maxVisiblePages / 2)
-            ) {
-                // Near the end
-                pages.push(1);
-                pages.push("ellipsis");
-                for (
-                    let i = totalPages - (maxVisiblePages - 2);
-                    i <= totalPages;
-                    i++
-                ) {
-                    pages.push(i);
-                }
-            } else {
-                // In the middle
-                if (windowWidth >= 640) {
-                    pages.push(1);
-                    pages.push("ellipsis");
-                } else {
-                    pages.push(currentPage);
-                }
-                const start =
-                    currentPage - Math.floor((maxVisiblePages - 4) / 2);
-                const end = start + (maxVisiblePages - 4);
-                for (let i = start; i <= end; i++) {
-                    pages.push(i);
-                }
-                if (windowWidth >= 640) {
-                    pages.push("ellipsis");
-                    pages.push(totalPages);
-                } else {
-                }
-            }
-        }
-
-        return pages;
-    }, [currentPage, totalPages, windowWidth]);
+    const totalPages = Math.ceil((flagsCount || 0) / ITEMS_PER_PAGE);
 
     return (
         <div className="space-y-6">
@@ -289,8 +251,8 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
                                 )}
                             </div>
                             <div className="text-sm text-gray-500">
-                                {filteredFlags.length} of{" "}
-                                {getFlagsForTab().length} flags
+                                {flagsCount || 0} of{" "}
+                                {totalFlags || 0} flags
                                 {searchQuery !== debouncedQuery && (
                                     <span className="ml-2 text-blue-500">
                                         (searching...)
@@ -303,136 +265,41 @@ export default function FlagSearch({ flags }: FlagSearchProps) {
             </Card>
 
             {/* Top Pagination */}
-            {totalPages > 1 && (
-                <Pagination>
-                    <PaginationContent>
-                        <PaginationItem>
-                            <PaginationPrevious
-                                href="#"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    if (currentPage > 1) {
-                                        updatePage(currentPage - 1);
-                                    }
-                                }}
-                                className={
-                                    currentPage === 1
-                                        ? "pointer-events-none opacity-50"
-                                        : ""
-                                }
-                            />
-                        </PaginationItem>
-
-                        {getPageNumbers.map((page, index) => (
-                            <PaginationItem key={index}>
-                                {page === "ellipsis" ? (
-                                    <PaginationEllipsis />
-                                ) : (
-                                    <PaginationLink
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            updatePage(page as number);
-                                        }}
-                                        isActive={currentPage === page}
-                                    >
-                                        {page}
-                                    </PaginationLink>
-                                )}
-                            </PaginationItem>
-                        ))}
-
-                        <PaginationItem>
-                            <PaginationNext
-                                href="#"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    if (currentPage < totalPages) {
-                                        updatePage(currentPage + 1);
-                                    }
-                                }}
-                                className={
-                                    currentPage === totalPages
-                                        ? "pointer-events-none opacity-50"
-                                        : ""
-                                }
-                            />
-                        </PaginationItem>
-                    </PaginationContent>
-                </Pagination>
-            )}
+            <SimplePagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={updatePage}
+            />
 
             {/* Results Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {displayedFlags.map((flag) => (
-                    <FlagCard
-                        key={flag.index}
-                        flagName={flag.flagName}
-                        flagImage={flag.flagImage}
-                        link={flag.link}
-                    />
-                ))}
+                {flagsLoading ? (
+                    // Show skeleton loading states
+                    Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
+                        <FlagCardSkeleton key={`skeleton-${index}`} />
+                    ))
+                ) : (
+                    // Show actual flags
+                    filteredFlags.map((flag) => (
+                        <FlagCard
+                            key={flag.index}
+                            flagName={flag.flagName}
+                            flagImage={flag.flagImage}
+                            link={flag.link}
+                            index={flag.index}
+                            tags={flag.tags}
+                            description={flag.description}
+                        />
+                    ))
+                )}
             </div>
 
             {/* Bottom Pagination */}
-            {totalPages > 1 && (
-                <Pagination>
-                    <PaginationContent>
-                        <PaginationItem>
-                            <PaginationPrevious
-                                href="#"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    if (currentPage > 1) {
-                                        updatePage(currentPage - 1);
-                                    }
-                                }}
-                                className={
-                                    currentPage === 1
-                                        ? "pointer-events-none opacity-50"
-                                        : ""
-                                }
-                            />
-                        </PaginationItem>
-
-                        {getPageNumbers.map((page, index) => (
-                            <PaginationItem key={index}>
-                                {page === "ellipsis" ? (
-                                    <PaginationEllipsis />
-                                ) : (
-                                    <PaginationLink
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            updatePage(page as number);
-                                        }}
-                                        isActive={currentPage === page}
-                                    >
-                                        {page}
-                                    </PaginationLink>
-                                )}
-                            </PaginationItem>
-                        ))}
-
-                        <PaginationItem>
-                            <PaginationNext
-                                href="#"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    if (currentPage < totalPages) {
-                                        updatePage(currentPage + 1);
-                                    }
-                                }}
-                                className={
-                                    currentPage === totalPages
-                                        ? "pointer-events-none opacity-50"
-                                        : ""
-                                }
-                            />
-                        </PaginationItem>
-                    </PaginationContent>
-                </Pagination>
-            )}
+            <SimplePagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={updatePage}
+            />
 
             {/* No Results */}
             {filteredFlags.length === 0 && debouncedQuery && (

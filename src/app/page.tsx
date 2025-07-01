@@ -1,78 +1,25 @@
 import { Suspense } from "react";
 import allFlags from "../store/all.json";
 import FlagSearch from "../components/FlagSearch";
-import FlagCard from "../components/FlagCard";
 import FlagQuiz from "../components/FlagQuiz";
-import Logo from "../components/Logo";
 import { Button } from "@/components/ui/button";
 import { Coffee } from "lucide-react";
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-} from "@/components/ui/card";
-
-type Flag = {
-    flagName: string;
-    flagImage: string;
-    link: string;
-    index: number;
-};
-
-const flags: Flag[] = allFlags;
-
-// Get flag of the day based on current date
-function getFlagOfTheDay(): Flag {
-    const today = new Date();
-    const dayOfYear = Math.floor(
-        (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) /
-            (1000 * 60 * 60 * 24)
-    );
-    const flagIndex = dayOfYear % flags.length;
-    return flags[flagIndex];
-}
+import { FlagOfTheDay } from "@/components/flag-of-the-day";
 
 export default function Home() {
-    const flagOfTheDay = getFlagOfTheDay();
-
     return (
-        <div className="min-h-screen bg-main/10">
-            {/* Logo Header */}
-            <div className="max-w-7xl mx-auto px-4 flex flex-col items-start justify-start py-4">
-                <Logo />
-                <p className="text-center text-gray-600 mt-2 text-sm">
-                    Discover flags from around the world
-                </p>
-            </div>
-
+        <div className="min-h-screen bg-main/10 pt-4">
             {/* Flag Quiz and Flag of the Day Section */}
             <div className="max-w-7xl mx-auto px-4 mb-8">
                 <div className="flex flex-col lg:flex-row gap-8">
                     {/* Flag Quiz Section */}
                     <div className="flex-3 lg:flex-[3]">
-                        <FlagQuiz flags={flags} />
+                        <FlagQuiz />
                     </div>
 
                     {/* Flag of the Day Section */}
                     <div className="flex-1 lg:flex-[1]">
-                        <Card className="h-full">
-                            <CardHeader className="text-2xl font-bold text-gray-800 mb-4 text-center">
-                                Flag of the Day
-                            </CardHeader>
-                            <CardContent>
-                                <FlagCard
-                                    flagName={flagOfTheDay.flagName}
-                                    flagImage={flagOfTheDay.flagImage}
-                                    link={flagOfTheDay.link}
-                                />
-                            </CardContent>
-                            <CardFooter>
-                                <p className="text-center text-gray-600 mt-4 text-sm">
-                                    Come back tomorrow for a new flag!
-                                </p>
-                            </CardFooter>
-                        </Card>
+                        <FlagOfTheDay />
                     </div>
                 </div>
             </div>
@@ -95,7 +42,7 @@ export default function Home() {
                         </div>
                     }
                 >
-                    <FlagSearch flags={flags} />
+                    <FlagSearch />
                 </Suspense>
             </div>
 

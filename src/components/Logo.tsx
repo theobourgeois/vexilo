@@ -14,7 +14,7 @@ export default function Logo() {
     return (
         <button
             onClick={handleLogoClick}
-            className="flex gap-2 items-center justify-center hover:opacity-80 transition-opacity"
+            className="flex gap-2 cursor-pointer items-center justify-center hover:opacity-80 transition-opacity"
         >
             <Image
                 src="/logo.svg"
