@@ -49,14 +49,11 @@ function buildWhereClause(query?: string) {
   if (!query) {
     return sql`1=1`;
   }
-
-  const useIlike = query.length < 4;
-
-  if (useIlike) {
-    return sql`lower(${flags.name}) LIKE lower(${`%${query}%`})`;
-  }
-
-  return sql`${flags.name} % ${query}`;
+  // Use ILIKE OR trigram similarity above a threshold
+  return sql`
+    lower(${flags.name}) LIKE lower(${`%${query}%`})
+    OR similarity(${flags.name}, ${query}) > 0.2
+  `;
 }
 
 export async function getFlags(page: number, limit: number, query?: string) {
@@ -67,7 +64,7 @@ export async function getFlags(page: number, limit: number, query?: string) {
     .from(flags)
     .where(whereClause)
     .orderBy(
-      query && query.length >= 4
+      query
         ? sql`similarity(${flags.name}, ${query}) DESC`
         : sql`1=1`
     )
