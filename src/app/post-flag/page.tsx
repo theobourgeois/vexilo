@@ -28,7 +28,7 @@ import { createFlagRequest } from "@/actions/requests";
 import Image from "next/image";
 import Link from "next/link";
 
-export async function blobUrlToBase64(blobUrl: string): Promise<string> {
+async function blobUrlToBase64(blobUrl: string): Promise<string> {
   const response = await fetch(blobUrl);
   const blob = await response.blob();
   return new Promise((resolve, reject) => {
