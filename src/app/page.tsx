@@ -64,6 +64,16 @@ export default function Home() {
                         </a>
                     </Button>
                 </div>
+                <div className="mt-2">
+                    <a
+                        href="https://github.com/theobourgeois/vexilo"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-blue-600 transition-colors"
+                    >
+                        View on GitHub: theobourgeois/vexilo
+                    </a>
+                </div>
             </div>
         </div>
     );
