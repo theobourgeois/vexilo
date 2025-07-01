@@ -13,19 +13,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useFavoritesStore } from "../store/favorites";
+import { Flag } from "@/lib/types";
 
-type FlagCardProps = {
-    flagName: string;
-    flagImage: string;
-    link: string;
-};
+type FlagCardProps = Flag;
 
-export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
+export default function FlagCard({ flagName, flagImage, link, index, tags, description }: FlagCardProps) {
     const { isFavorite, toggleFavorite } = useFavoritesStore();
 
     const handleFavoriteClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        toggleFavorite(flagName);
+        const flag: Flag = { flagName, flagImage, link, index, tags, description };
+        toggleFavorite(flag);
     };
 
     return (
@@ -84,7 +82,10 @@ export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
                         <Button
                             variant="neutral"
                             size="sm"
-                            onClick={() => toggleFavorite(flagName)}
+                            onClick={() => {
+                                const flag: Flag = { flagName, flagImage, link, index, tags, description };
+                                toggleFavorite(flag);
+                            }}
                             className="flex items-center gap-2"
                         >
                             <Heart
@@ -120,7 +121,7 @@ export default function FlagCard({ flagName, flagImage, link }: FlagCardProps) {
                                 rel="noopener noreferrer"
                             >
                                 <ExternalLink className="w-4 h-4 mr-2" />
-                                Learn More on Wikipedia
+                                Learn More
                             </Link>
                         </Button>
                         <Button asChild>
