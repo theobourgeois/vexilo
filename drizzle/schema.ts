@@ -20,10 +20,10 @@ export const vexiloSession = pgTable("vexilo_session", {
 }, (table) => [
 	index("session_user_id_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [vexiloUser.id],
-			name: "vexilo_session_user_id_vexilo_user_id_fk"
-		}).onDelete("cascade"),
+		columns: [table.userId],
+		foreignColumns: [vexiloUser.id],
+		name: "vexilo_session_user_id_vexilo_user_id_fk"
+	}).onDelete("cascade"),
 ]);
 
 export const vexiloFlag = pgTable("vexilo_flag", {
@@ -35,7 +35,7 @@ export const vexiloFlag = pgTable("vexilo_flag", {
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 	tags: text().array().default([""]).notNull(),
-	description: text().default(').notNull(),
+	description: text().default('').notNull(),
 }, (table) => [
 	uniqueIndex("index_unique").using("btree", table.index.asc().nullsLast().op("int4_ops")),
 ]);
@@ -49,10 +49,10 @@ export const vexiloFlagRequest = pgTable("vexilo_flag_request", {
 	flagId: varchar("flag_id", { length: 255 }),
 }, (table) => [
 	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [vexiloUser.id],
-			name: "vexilo_flag_request_user_id_vexilo_user_id_fk"
-		}),
+		columns: [table.userId],
+		foreignColumns: [vexiloUser.id],
+		name: "vexilo_flag_request_user_id_vexilo_user_id_fk"
+	}),
 ]);
 
 export const vexiloVerificationToken = pgTable("vexilo_verification_token", {
@@ -60,7 +60,7 @@ export const vexiloVerificationToken = pgTable("vexilo_verification_token", {
 	token: varchar({ length: 255 }).notNull(),
 	expires: timestamp({ mode: 'string' }).notNull(),
 }, (table) => [
-	primaryKey({ columns: [table.identifier, table.token], name: "vexilo_verification_token_identifier_token_pk"}),
+	primaryKey({ columns: [table.identifier, table.token], name: "vexilo_verification_token_identifier_token_pk" }),
 ]);
 
 export const vexiloAccount = pgTable("vexilo_account", {
@@ -78,9 +78,9 @@ export const vexiloAccount = pgTable("vexilo_account", {
 }, (table) => [
 	index("account_user_id_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [vexiloUser.id],
-			name: "vexilo_account_user_id_vexilo_user_id_fk"
-		}),
-	primaryKey({ columns: [table.provider, table.providerAccountId], name: "vexilo_account_provider_provider_account_id_pk"}),
+		columns: [table.userId],
+		foreignColumns: [vexiloUser.id],
+		name: "vexilo_account_user_id_vexilo_user_id_fk"
+	}),
+	primaryKey({ columns: [table.provider, table.providerAccountId], name: "vexilo_account_provider_provider_account_id_pk" }),
 ]);
