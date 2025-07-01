@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 import { createFlagRequest } from "@/actions/requests";
 import Image from "next/image";
 import Link from "next/link";
+import { SvgLogo } from "@/components/svg-logo";
 
 async function blobUrlToBase64(blobUrl: string): Promise<string> {
   const response = await fetch(blobUrl);
@@ -183,15 +184,7 @@ export default function PostFlagPage() {
             <div className="max-w-4xl mx-auto px-4 py-12">
                 <Card className="w-full max-w-md mx-auto">
                     <CardHeader className="text-center">
-                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
-                            <Image
-                                src="/logo.svg"
-                                alt="Vexilo Logo"
-                                width={120}
-                                height={120}
-                                className="object-contain w-44 h-44"
-                            />
-                        </div>
+                      <SvgLogo className="w-16 h-16 mx-auto" />
                         <CardTitle className="text-2xl">
                             Sign in to Post a Flag
                         </CardTitle>

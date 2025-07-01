@@ -31,7 +31,7 @@ export function FlagOfTheDay() {
 
     return (
             <Card className="h-full">
-                <CardHeader className="text-2xl font-bold text-gray-800 mb-4 text-center">
+                <CardHeader className="text-2xl font-bold mb-4 text-center">
                     Flag of the Day
                 </CardHeader>
                 <CardContent>
@@ -46,7 +46,7 @@ export function FlagOfTheDay() {
                     />
                 </CardContent>
                 <CardFooter>
-                    <p className="text-center text-gray-600 mt-4 text-sm">
+                    <p className="text-center mt-4 text-sm">
                         Come back tomorrow for a new flag!
                     </p>
                 </CardFooter>

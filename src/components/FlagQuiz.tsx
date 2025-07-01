@@ -87,7 +87,7 @@ export default function FlagQuiz() {
             <Card className="h-full">
                 <CardHeader className="text-center">
                     <div className="flex flex-wrap items-center justify-between mb-4">
-                        <h2 className="text-2xl font-bold text-gray-800">
+                        <h2 className="text-2xl font-bold ">
                             Flag Quiz
                         </h2>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -105,7 +105,7 @@ export default function FlagQuiz() {
                             </Button>
                         </div>
                     </div>
-                    <p className="text-gray-600">Who does this flag belong to?</p>
+                    <p className="">Who does this flag belong to?</p>
                 </CardHeader>
 
                 <CardContent className="space-y-6">
@@ -143,7 +143,7 @@ export default function FlagQuiz() {
         <Card className="h-full">
             <CardHeader className="text-center">
                 <div className="flex flex-wrap items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-gray-800">
+                    <h2 className="text-2xl font-bold ">
                         Flag Quiz
                     </h2>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -161,7 +161,7 @@ export default function FlagQuiz() {
                         </Button>
                     </div>
                 </div>
-                <p className="text-gray-600">Who does this flag belong to?</p>
+                <p className="">Who does this flag belong to?</p>
             </CardHeader>
 
             <CardContent className="space-y-6">

@@ -30,12 +30,12 @@ export default function Home() {
                     fallback={
                         <div className="space-y-6">
                             <div className="animate-pulse">
-                                <div className="h-20 bg-gray-200 rounded-lg mb-6"></div>
+                                <div className="h-20 bg-secondary-background rounded-lg mb-6"></div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {Array.from({ length: 8 }).map((_, i) => (
                                     <div key={i} className="animate-pulse">
-                                        <div className="h-48 bg-gray-200 rounded-lg"></div>
+                                        <div className="h-48 bg-secondary-background rounded-lg"></div>
                                     </div>
                                 ))}
                             </div>
@@ -47,7 +47,7 @@ export default function Home() {
             </div>
 
             {/* Footer */}
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-foreground/60">
                 <p>Explore {allFlags.length} flags from around the world</p>
                 <div className="mt-4">
                     <Button
@@ -69,7 +69,7 @@ export default function Home() {
                         href="https://github.com/theobourgeois/vexilo"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline hover:text-blue-600 transition-colors"
+                        className="underline hover:text-main transition-colors"
                     >
                         View on GitHub: theobourgeois/vexilo
                     </a>

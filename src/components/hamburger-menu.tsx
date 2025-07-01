@@ -9,6 +9,7 @@ import {
 } from "./ui/drawer";
 import { AuthHeader } from "./auth-header";
 import { PostFlagButton } from "./post-flag-button";
+import { ThemeToggle } from "./theme-toggle";
 import Logo from "./Logo";
 
 export function HamburgerMenu() {
@@ -23,6 +24,7 @@ export function HamburgerMenu() {
         <div className="p-4 space-y-4">
           <div className="flex flex-col gap-4 justify-start">
             <Logo showText />
+            <ThemeToggle />
             <AuthHeader />
             <PostFlagButton />
           </div>

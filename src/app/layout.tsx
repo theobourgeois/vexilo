@@ -7,6 +7,7 @@ import { AuthHeader } from "@/components/auth-header";
 import { Toaster } from "@/components/ui/sonner";
 import { PostFlagButton } from "@/components/post-flag-button";
 import { HamburgerMenu } from "@/components/hamburger-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const nunito = Nunito({
     variable: "--font-nunito",
@@ -37,12 +38,13 @@ export default function RootLayout({
                         <div className="w-full flex justify-between items-start">
                             <div>
                                 <Logo />
-                                <p className="text-center text-gray-600 mt-2 text-sm hidden md:block">
+                                <p className="text-center text-foreground/60 mt-2 text-sm hidden md:block">
                                     Discover flags from around the world
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="hidden md:flex items-center gap-4">
+                                    <ThemeToggle />
                                     <PostFlagButton />
                                     <AuthHeader />
                                 </div>
