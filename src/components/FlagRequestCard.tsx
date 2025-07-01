@@ -1,6 +1,6 @@
 "use client";
 
-import { approveFlagRequest, declineFlagRequest } from "@/actions/requests";
+import { approveFlagEditRequest, approveFlagRequest, declineFlagRequest } from "@/actions/requests";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,15 +22,21 @@ function isValidUrl(string: string): boolean {
 interface FlagRequestCardProps {
     flagRequest: typeof flagRequests.$inferSelect;
     page: number;
+    isEdit: boolean;
 }
 
-export function FlagRequestCard({ flagRequest, page }: FlagRequestCardProps) {
+export function FlagRequestCard({ flagRequest, page, isEdit }: FlagRequestCardProps) {
     const queryClient = useQueryClient();
 
     const handleApprove = async () => {
         try {
             toast.loading("Approving flag request...");
-            const result = await approveFlagRequest(flagRequest.id);
+            let result;
+            if(isEdit) {
+                result = await approveFlagEditRequest(flagRequest.id);
+            } else {
+                result = await approveFlagRequest(flagRequest.id);
+            }
             
             if (result === true) {
                 toast.dismiss();
@@ -77,7 +83,7 @@ export function FlagRequestCard({ flagRequest, page }: FlagRequestCardProps) {
         <Card className="w-full">
             <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                    <span>{flagRequest.flag.flagName}</span>
+                    <span>{flagRequest.flag.flagName} {isEdit ? <Badge variant="neutral">Edit</Badge> : ""}</span>
                     <div className="flex gap-2">
                         <Button 
                             onClick={handleApprove}

@@ -40,9 +40,12 @@ export async function declineFlagRequest(flagRequestId: string) {
     return false;
   }
 
-  const flagImage = flagRequest.flag.flagImage;
-  if (flagImage.includes(CLOUD_FRONT_URL)) {
-    await deleteFileFromUrl(flagImage);
+  // only delete the flag image if it's a new flag
+  if (!flagRequest.flagId) {
+    const flagImage = flagRequest.flag.flagImage;
+    if (flagImage.includes(CLOUD_FRONT_URL)) {
+      await deleteFileFromUrl(flagImage);
+    }
   }
 
   await db.delete(flagRequests).where(eq(flagRequests.id, flagRequestId));
@@ -87,9 +90,57 @@ export async function approveFlagRequest(flagRequestId: string) {
   return true;
 }
 
+export async function approveFlagEditRequest(flagRequestId: string) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const flagRequest = await db
+    .select()
+    .from(flagRequests)
+    .where(eq(flagRequests.id, flagRequestId))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!flagRequest) {
+    return false;
+  }
+
+  const flag = await db
+    .select()
+    .from(flags)
+    .where(eq(flags.id, flagRequest.flagId ?? ""))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!flag) {
+    return false;
+  }
+
+  await db
+    .update(flags)
+    .set({
+      name: flagRequest.flag.flagName,
+      image: flagRequest.flag.flagImage,
+      link: flagRequest.flag.link,
+      description: flagRequest.flag.description,
+      tags: flagRequest.flag.tags,
+      updatedAt: new Date(),
+    })
+    .where(eq(flags.id, flagRequest.flagId ?? ""));
+
+  await db.delete(flagRequests).where(eq(flagRequests.id, flagRequestId));
+
+  return true;
+}
+
 const MAX_FLAG_REQUESTS = 10;
 
-export async function createFlagRequest(flag: Omit<Flag, "index">) {
+export async function createFlagRequest(
+  flag: Omit<Flag, "index" | "id">,
+  flagId?: string
+) {
   const session = await getServerAuthSession();
   if (!session?.user) {
     return {
@@ -110,7 +161,6 @@ export async function createFlagRequest(flag: Omit<Flag, "index">) {
     };
   }
 
-
   // check if the source is a valid url
   if (!flag.link.startsWith("http")) {
     return {
@@ -121,12 +171,16 @@ export async function createFlagRequest(flag: Omit<Flag, "index">) {
 
   let imageUrl = flag.flagImage;
 
-  if (flag.flagImage.startsWith("data:image") || flag.flagImage.startsWith("blob:")) {
+  if (
+    flag.flagImage.startsWith("data:image") ||
+    flag.flagImage.startsWith("blob:")
+  ) {
     imageUrl = await base64ImageToS3URI(flag.flagImage);
   }
 
   await db.insert(flagRequests).values({
     userId: session.user.id,
+    flagId: flagId ?? null,
     flag: {
       ...flag,
       index: -1,

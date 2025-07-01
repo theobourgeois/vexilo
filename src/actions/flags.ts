@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { flags } from "@/db/schema";
 import { getServerAuthSession } from "@/lib/auth";
 import { Flag } from "@/lib/types";
-import { count, eq, sql } from "drizzle-orm";
+import { asc, count, desc, eq, sql } from "drizzle-orm";
 
 export async function getRandomFlag() {
   const flagCount = await getFlagsCount("");
@@ -56,17 +56,31 @@ function buildWhereClause(query?: string) {
   `;
 }
 
-export async function getFlags(page: number, limit: number, query?: string) {
+export async function getFlags(
+  page: number,
+  limit: number,
+  query?: string,
+  orderBy: keyof typeof flags.$inferSelect = "updatedAt",
+  orderDirection: "asc" | "desc" = "desc"
+) {
   const whereClause = buildWhereClause(query);
+
+  const orderByClause = () => {
+    if (orderDirection === "asc") {
+      return asc(flags[orderBy]);
+    }
+    return desc(flags[orderBy]);
+  };
 
   return await db
     .select()
     .from(flags)
     .where(whereClause)
     .orderBy(
-      query
-        ? sql`similarity(${flags.name}, ${query}) DESC`
-        : sql`1=1`
+      orderByClause()
+      // query
+      //   ? sql`similarity(${flags.name}, ${query}) DESC`
+      //   : sql`1=1`
     )
     .limit(limit)
     .offset((page - 1) * limit);
@@ -82,7 +96,6 @@ export async function getFlagsCount(query?: string) {
 
   return cnt[0].count;
 }
-
 
 export async function createAdminFlags(flagList: Flag[]) {
   const session = await getServerAuthSession();

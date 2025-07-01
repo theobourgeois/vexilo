@@ -180,6 +180,7 @@ export default function FlagQuiz() {
                         size="sm"
                         onClick={() => {
                             const flag: Flag = {
+                                id: currentQuestion.id,
                                 flagName: currentQuestion.name,
                                 flagImage: currentQuestion.image,
                                 link: currentQuestion.link,

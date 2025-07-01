@@ -119,10 +119,19 @@ export const flagRequests = createTable("flag_request", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
-  flag: jsonb("flag").$type<Flag>().notNull(),
+  flag: jsonb("flag").$type<Omit<Flag, "id">>().notNull(),
   flagId: varchar("flag_id", { length: 255 }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const bannedUsers = createTable("banned_user", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  reason: varchar("reason", { length: 255 }).notNull().default(""),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 

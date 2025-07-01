@@ -17,6 +17,7 @@ export function FlagOfTheDay() {
                     index: flag.index,
                     tags: flag.tags,
                     description: flag.description,
+                    id: flag.id,
                 };
             });
         },
@@ -35,6 +36,7 @@ export function FlagOfTheDay() {
                 </CardHeader>
                 <CardContent>
                     <FlagCard
+                        id={flagOfTheDay.id}
                         tags={flagOfTheDay.tags}
                         description={flagOfTheDay.description}
                         flagName={flagOfTheDay.flagName}

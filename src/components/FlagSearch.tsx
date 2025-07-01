@@ -92,6 +92,7 @@ export default function FlagSearch() {
                     index: flag.index,
                     tags: flag.tags,
                     description: flag.description,
+                    id: flag.id,
                 }));
             });
         },
@@ -282,6 +283,7 @@ export default function FlagSearch() {
                     // Show actual flags
                     filteredFlags.map((flag) => (
                         <FlagCard
+                            id={flag.id}
                             key={flag.index}
                             flagName={flag.flagName}
                             flagImage={flag.flagImage}

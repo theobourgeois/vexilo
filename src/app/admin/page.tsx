@@ -23,6 +23,7 @@ function Requests({ page }: { page: number }) {
         <div className="flex flex-col gap-2">
             {flagRequests?.map((flagRequest) => (
                 <FlagRequestCard
+                    isEdit={flagRequest.flagId !== null}
                     key={flagRequest.id}
                     flagRequest={flagRequest}
                     page={page}

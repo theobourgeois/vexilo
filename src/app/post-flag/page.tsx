@@ -135,7 +135,6 @@ export default function PostFlagPage() {
             if (flag.flagImage.startsWith("blob:")) {
                 flag.flagImage = await blobUrlToBase64(flag.flagImage);
             }
-            console.log(flag.flagImage)
 
             const result = await createFlagRequest(flag);
             if (result.success) {

@@ -1,4 +1,5 @@
 export type Flag = {
+  id: string;
   flagName: string;
   flagImage: string;
   link: string;
