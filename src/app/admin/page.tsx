@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Suspense } from "react";
 
 function Requests({ page }: { page: number }) {
     const { data: flagRequests } = useQuery({
@@ -63,11 +64,11 @@ function Pagination({ page }: { page: number }) {
     );
 }
 
-export default function AdminPage() {
+function AdminContent() {
     const auth = useSession();
     const isAdmin = auth.data?.user?.isAdmin;
-
-    const page = Number(useSearchParams().get("page")) || 1;
+    const searchParams = useSearchParams();
+    const page = Number(searchParams.get("page")) || 1;
 
     if (!isAdmin) {
         return <div>Unauthorized</div>;
@@ -127,5 +128,13 @@ export default function AdminPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function AdminPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <AdminContent />
+        </Suspense>
     );
 }
