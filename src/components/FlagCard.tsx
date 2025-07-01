@@ -29,7 +29,7 @@ export default function FlagCard({
     index,
     tags,
     description,
-}: FlagCardProps ) {
+}: FlagCardProps) {
     const { isFavorite, toggleFavorite } = useFavoritesStore();
     const { data: session } = useSession();
     const [editMode, setEditMode] = React.useState(false);
@@ -54,7 +54,7 @@ export default function FlagCard({
     };
 
     return (
-        <Dialog >
+        <Dialog>
             <DialogTrigger asChild>
                 <Card className="cursor-pointer px-8 relative group">
                     {/* Favorite Button */}
@@ -74,12 +74,15 @@ export default function FlagCard({
                     </Button>
 
                     <div className="relative overflow-hidden">
-                        <div className="aspect-[3/2] relative">
+                        <div className="aspect-[3/2] relative shadow-shadow">
                             <Image
+                                style={{
+                                    boxShadow: "8px upx 0px 0px var(--border)",
+                                }}
                                 src={flagImage}
                                 alt={flagName}
                                 fill
-                                className="object-contain"
+                                className="drop-shadow-shadow object-contain text-main-foreground bg-main/70 border-4 border-border shadow-shadow hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none p-2 rounded-base"
                                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                             />
                         </div>
@@ -96,12 +99,17 @@ export default function FlagCard({
                                 {flagName}
                             </Link>
                         </h3>
-                        
                     </CardContent>
                 </Card>
             </DialogTrigger>
 
-            <DialogContent className={editMode ? "md:max-w-2xl h-11/12 overflow-y-auto" : undefined}>
+            <DialogContent
+                className={
+                    editMode
+                        ? "md:max-w-2xl h-11/12 overflow-y-auto"
+                        : undefined
+                }
+            >
                 <DialogHeader>
                     <div className="flex items-center justify-between">
                         <div>
