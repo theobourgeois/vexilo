@@ -77,7 +77,7 @@ export async function getFlags(
     .from(flags)
     .where(whereClause)
     .orderBy(
-      orderByClause()
+      query ? sql`similarity(${flags.name}, ${query}) DESC` : orderByClause()
       // query
       //   ? sql`similarity(${flags.name}, ${query}) DESC`
       //   : sql`1=1`
