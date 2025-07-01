@@ -135,7 +135,7 @@ export async function approveFlagEditRequest(flagRequestId: string) {
   return true;
 }
 
-const MAX_FLAG_REQUESTS = 10;
+const MAX_FLAG_REQUESTS = 50;
 
 export async function createFlagRequest(
   flag: Omit<Flag, "index" | "id">,
