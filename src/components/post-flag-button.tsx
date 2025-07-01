@@ -4,8 +4,8 @@ import Link from "next/link";
 
 export function PostFlagButton() {
     return (
-        <Link href="/post-flag" className="px-2">
-            <Button>
+        <Link href="/post-flag" className="">
+            <Button className="">
                 <Plus className="w-4 h-4" />
                 Post Flag
             </Button>

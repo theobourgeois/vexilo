@@ -1,9 +1,10 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-export default function Logo() {
+export default function Logo({ showText = false }: { showText?: boolean }) {
     const router = useRouter();
 
     const handleLogoClick = () => {
@@ -24,7 +25,10 @@ export default function Logo() {
                 className="object-contain"
             />
             <h1
-                className="text-3xl text-black font-extrabold"
+                className={cn(
+                    "text-3xl text-black font-extrabold hidden md:block",
+                    showText && "block"
+                )}
                 style={{
                     fontFamily: "Times New Roman",
                     fontWeight: "bold",
