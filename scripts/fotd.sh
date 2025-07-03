@@ -3,6 +3,7 @@
 # get key from env and set it to key
 key=$FOTD_KEY
 
-curl -X POST "https://vexilo.org/api/fotd" -H "Content-Type: application/json" -d '{"key": "'$key'"}'
+# url="http://localhost:3001/api/fotd"
+url="https://vexilo.org/api/fotd"
 
-echo "Flag of the day generated"
+curl -X POST "$url" -H "Content-Type: application/json" -d '{"key": "'$key'"}'
