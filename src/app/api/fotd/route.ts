@@ -3,7 +3,12 @@ import { flagOfTheDay, flags } from "@/db/schema";
 import { count, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function POST(request: Request) {
+  const body = await request.json();
+  if (body.key !== process.env.FOTD_KEY) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const flagCount = (await db.select({ count: count() }).from(flags))?.[0]
       .count;
