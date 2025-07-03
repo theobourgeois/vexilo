@@ -197,7 +197,7 @@ export default function FlagCard({
 
                         {/* Description */}
                         {description && (
-                            <p className="text-gray-700 text-center px-2">
+                            <p className="text-center px-2">
                                 {description}
                             </p>
                         )}

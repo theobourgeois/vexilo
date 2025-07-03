@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { flags } from "@/db/schema";
+import { flagOfTheDay, flags } from "@/db/schema";
 import { getServerAuthSession } from "@/lib/auth";
 import { Flag } from "@/lib/types";
 import { asc, count, desc, eq, sql } from "drizzle-orm";
@@ -28,21 +28,32 @@ export async function getRandomFlagsForQuiz() {
 }
 
 export async function getFlagOfTheDay() {
-  const flagCount = await getFlagsCount("");
-  const today = new Date();
-  const dayOfYear = Math.floor(
-    (today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) /
-    (1000 * 60 * 60 * 24)
-  );
-  const flagIndex = dayOfYear % flagCount;
-
-  const flagOfTheDay = await db
+  const fotd = await db
     .select()
-    .from(flags)
-    .where(eq(flags.index, flagIndex))
+    .from(flagOfTheDay)
+    .orderBy(desc(flagOfTheDay.createdAt))
     .limit(1);
 
-  return flagOfTheDay?.[0];
+  let fotdId = fotd?.[0]?.flagId;
+
+  if (!fotdId) {
+    await generateFlagOfTheDay();
+    fotdId = (
+      await db
+        .select({ flagId: flagOfTheDay.flagId })
+        .from(flagOfTheDay)
+        .orderBy(desc(flagOfTheDay.createdAt))
+        .limit(1)
+    )?.[0]?.flagId;
+  }
+
+  const flag = await db
+    .select()
+    .from(flags)
+    .where(eq(flags.id, fotdId))
+    .limit(1);
+
+  return flag?.[0];
 }
 
 function buildWhereClause(query?: string) {
@@ -77,7 +88,9 @@ export async function getFlags(
     .from(flags)
     .where(whereClause)
     .orderBy(
-      query ? sql`similarity(${flags.name}, ${query}) DESC` : orderByClause()
+      query
+        ? sql`similarity(${flags.name}, ${query}) DESC`
+        : orderByClause()
       // query
       //   ? sql`similarity(${flags.name}, ${query}) DESC`
       //   : sql`1=1`
@@ -140,4 +153,18 @@ export async function createAdminFlags(flagList: Flag[]) {
       }`
     );
   }
+}
+
+export async function generateFlagOfTheDay() {
+  const flagCount = await getFlagsCount("");
+  const randomIndex = Math.floor(Math.random() * flagCount);
+  const fotd = await db
+    .select()
+    .from(flags)
+    .where(eq(flags.index, randomIndex))
+    .limit(1);
+
+  await db.insert(flagOfTheDay).values({
+    flagId: fotd[0].id,
+  });
 }

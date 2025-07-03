@@ -134,4 +134,10 @@ export const bannedUsers = createTable("banned_user", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
-
+export const flagOfTheDay = createTable("flag_of_the_day", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  flagId: uuid("flag_id")
+    .notNull()
+    .references(() => flags.id),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
