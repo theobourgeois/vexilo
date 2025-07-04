@@ -21,13 +21,16 @@ export const users = createTable("user", {
   id: uuid("id").primaryKey().defaultRandom(),
   isAdmin: boolean("is_admin").notNull().default(false),
   name: varchar("name", { length: 255 }),
+  userNumber: uuid("user_number").defaultRandom().notNull().unique(),
   email: varchar("email", { length: 255 }).notNull(),
   emailVerified: timestamp("email_verified", {
     mode: "date",
     precision: 3,
   }).default(sql`CURRENT_TIMESTAMP(3)`),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   image: varchar("image", { length: 255 }),
   hashedPassword: text("hashed_password"),
+  isAnonymous: boolean("is_anonymous").notNull().default(false),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -119,8 +122,11 @@ export const flagRequests = createTable("flag_request", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
+  oldFlag: jsonb("old_flag").$type<Omit<Flag, "id">>(),
+  approved: boolean("approved").notNull().default(false),
   flag: jsonb("flag").$type<Omit<Flag, "id">>().notNull(),
   flagId: varchar("flag_id", { length: 255 }),
+  isEdit: boolean("is_edit").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
@@ -140,4 +146,15 @@ export const flagOfTheDay = createTable("flag_of_the_day", {
     .notNull()
     .references(() => flags.id),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+
+export const leaderboard = createTable("leaderboard", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  contributions: integer("contributions").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

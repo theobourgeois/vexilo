@@ -1,10 +1,8 @@
 import { Suspense } from "react";
-import allFlags from "../store/all.json";
 import FlagSearch from "../components/FlagSearch";
 import FlagQuiz from "../components/FlagQuiz";
-import { Button } from "@/components/ui/button";
-import { Coffee } from "lucide-react";
 import { FlagOfTheDay } from "@/components/flag-of-the-day";
+import { Leaderboard } from "@/components/leaderboard";
 
 export default function Home() {
     return (
@@ -22,6 +20,10 @@ export default function Home() {
                         <FlagOfTheDay />
                     </div>
                 </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 mb-8">
+                <Leaderboard />
             </div>
 
             {/* Search and Results */}
@@ -46,35 +48,7 @@ export default function Home() {
                 </Suspense>
             </div>
 
-            {/* Footer */}
-            <div className="text-center py-8 text-foreground/60">
-                <p>Explore {allFlags.length} flags from around the world</p>
-                <div className="mt-4">
-                    <Button
-                        asChild
-                        variant="default"
-                    >
-                        <a
-                            href="https://buymeacoffee.com/theobourgeois"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            <Coffee className="w-4 h-4" />
-                            Buy me a coffee
-                        </a>
-                    </Button>
-                </div>
-                <div className="mt-2">
-                    <a
-                        href="https://github.com/theobourgeois/vexilo"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-main transition-colors"
-                    >
-                        View on GitHub: theobourgeois/vexilo
-                    </a>
-                </div>
-            </div>
+           
         </div>
     );
 }

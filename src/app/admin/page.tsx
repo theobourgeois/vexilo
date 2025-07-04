@@ -1,7 +1,7 @@
 "use client";
 
 import { createAdminFlags } from "@/actions/flags";
-import { getFlagRequests } from "@/actions/requests";
+import { getPendingFlagRequests } from "@/actions/requests";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FlagRequestCard } from "@/components/FlagRequestCard";
@@ -15,7 +15,7 @@ function Requests({ page }: { page: number }) {
     const { data: flagRequests } = useQuery({
         queryKey: ["flagRequests", page],
         queryFn: async () => {
-            return getFlagRequests(page, 10);
+            return getPendingFlagRequests(page, 10);
         },
     });
 

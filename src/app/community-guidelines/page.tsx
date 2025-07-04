@@ -173,6 +173,34 @@ export default function CommunityGuidelinesPage() {
                     </CardContent>
                 </Card>
 
+                <Card className="border-blue-200 bg-blue-50/50">
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 rounded-lg">
+                                <Users className="h-6 w-6 text-blue-600" />
+                            </div>
+                            <CardTitle>Leaderboard Participation</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                                When you post a flag, you may appear on our community leaderboard, which displays your username and profile picture. 
+                                This helps showcase active contributors and celebrate our community members.
+                            </p>
+                            <div className="flex items-start gap-3 p-3 bg-blue-100/50 rounded-lg">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                <div>
+                                    <p className="text-sm font-medium">Want to update your display name?</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        You can edit your username anytime in your <a href="/settings" className="text-blue-600 hover:underline">settings page</a>.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-3">

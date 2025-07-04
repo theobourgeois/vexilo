@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { PostFlagButton } from "@/components/post-flag-button";
 import { HamburgerMenu } from "@/components/hamburger-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Footer } from "@/components/footer";
 
 const nunito = Nunito({
     variable: "--font-nunito",
@@ -55,6 +56,7 @@ export default function RootLayout({
                     <div className="w-full bg-main/10 min-h-screen">
                         {children}
                     </div>
+                    <Footer />
                 </Providers>
             </body>
         </html>

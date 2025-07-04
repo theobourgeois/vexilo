@@ -1,14 +1,14 @@
 "use server";
 
 import { db } from "@/db";
-import { flagRequests, flags } from "@/db/schema";
+import { flagRequests, flags, leaderboard, users } from "@/db/schema";
 import { getServerAuthSession } from "@/lib/auth";
 import { Flag } from "@/lib/types";
-import { count, eq, max } from "drizzle-orm";
+import { and, count, desc, eq, max, sql } from "drizzle-orm";
 import { base64ImageToS3URI, deleteFileFromUrl } from "./s3";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
 
-export async function getFlagRequests(page: number, limit: number) {
+export async function getPendingFlagRequests(page: number, limit: number) {
   const session = await getServerAuthSession();
   if (!session?.user?.isAdmin) {
     return null;
@@ -18,6 +18,7 @@ export async function getFlagRequests(page: number, limit: number) {
     .select()
     .from(flagRequests)
     .limit(limit)
+    .where(eq(flagRequests.approved, false))
     .offset((page - 1) * limit);
 
   return flagReqs;
@@ -53,6 +54,45 @@ export async function declineFlagRequest(flagRequestId: string) {
   return true;
 }
 
+async function updateLeaderboard(userId: string) {
+  // Verify user exists before updating leaderboard
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    console.warn(
+      `User ${userId} not found in database, skipping leaderboard update`
+    );
+    return;
+  }
+
+  const leaderboardEntry = await db
+    .select()
+    .from(leaderboard)
+    .where(eq(leaderboard.userId, userId))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (leaderboardEntry) {
+    await db
+      .update(leaderboard)
+      .set({
+        contributions: sql`contributions + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(leaderboard.userId, userId));
+  } else {
+    await db.insert(leaderboard).values({
+      userId: userId,
+      contributions: 1,
+    });
+  }
+}
+
 export async function approveFlagRequest(flagRequestId: string) {
   const session = await getServerAuthSession();
   if (!session?.user?.isAdmin) {
@@ -75,17 +115,28 @@ export async function approveFlagRequest(flagRequestId: string) {
     .from(flags)
     .then((res) => (res[0].maxIndex ?? 0) + 1);
 
-  await db.insert(flags).values({
-    name: flagRequest.flag.flagName,
-    image: flagRequest.flag.flagImage,
-    link: flagRequest.flag.link,
-    index: index,
-    description: flagRequest.flag.description,
-    tags: flagRequest.flag.tags,
-  });
+  const flag = await db
+    .insert(flags)
+    .values({
+      name: flagRequest.flag.flagName,
+      image: flagRequest.flag.flagImage,
+      link: flagRequest.flag.link,
+      index: index,
+      description: flagRequest.flag.description,
+      tags: flagRequest.flag.tags,
+    })
+    .returning({ id: flags.id })
+    .then((res) => res[0]);
 
-  // delete the flag request
-  await db.delete(flagRequests).where(eq(flagRequests.id, flagRequestId));
+  await updateLeaderboard(flagRequest.userId);
+
+  await db
+    .update(flagRequests)
+    .set({
+      approved: true,
+      flagId: flag.id,
+    })
+    .where(eq(flagRequests.id, flagRequestId));
 
   return true;
 }
@@ -130,7 +181,15 @@ export async function approveFlagEditRequest(flagRequestId: string) {
     })
     .where(eq(flags.id, flagRequest.flagId ?? ""));
 
-  await db.delete(flagRequests).where(eq(flagRequests.id, flagRequestId));
+  await updateLeaderboard(flagRequest.userId);
+
+  await db
+    .update(flagRequests)
+    .set({
+      approved: true,
+      isEdit: true,
+    })
+    .where(eq(flagRequests.id, flagRequestId));
 
   return true;
 }
@@ -146,6 +205,20 @@ export async function createFlagRequest(
     return {
       success: false,
       message: "You must be logged in to create a flag request.",
+    };
+  }
+
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    return {
+      success: false,
+      message: "User not found in database. Please try logging in again.",
     };
   }
 
@@ -178,9 +251,31 @@ export async function createFlagRequest(
     imageUrl = await base64ImageToS3URI(flag.flagImage);
   }
 
+  let oldFlag = null;
+
+  if (flagId) {
+    const oldFlagDb = await db
+      .select()
+      .from(flags)
+      .where(eq(flags.id, flagId ?? ""))
+      .limit(1)
+      .then((res) => res[0]);
+    oldFlag = oldFlagDb
+      ? {
+        flagName: oldFlagDb.name,
+        flagImage: oldFlagDb.image,
+        link: oldFlagDb.link,
+        description: oldFlagDb.description,
+        tags: oldFlagDb.tags,
+        index: oldFlagDb.index,
+      }
+      : null;
+  }
+
   await db.insert(flagRequests).values({
     userId: session.user.id,
     flagId: flagId ?? null,
+    oldFlag: oldFlag ?? null,
     flag: {
       ...flag,
       index: -1,
@@ -191,5 +286,94 @@ export async function createFlagRequest(
   return {
     success: true,
     message: "Flag request created successfully.",
+  };
+}
+
+const REQUESTS_PER_PAGE = 12;
+
+export async function getUserFlags(userNumber: string, page: number) {
+  const session = await getServerAuthSession();
+  if (!session?.user) {
+    return null;
+  }
+
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.userNumber, userNumber))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    return {
+      success: false,
+      message: "User not found.",
+    };
+  }
+
+  if (session.user.id !== user.id && user.isAnonymous) {
+    return {
+      success: false,
+      message: "You are not authorized to view this user's requests.",
+    };
+  }
+
+  const userFlags = await db
+    .select({
+      flagName: flags.name,
+      flagImage: flags.image,
+      link: flags.link,
+      description: flags.description,
+      tags: flags.tags,
+      index: flags.index,
+    })
+    .from(flags)
+    .innerJoin(
+      flagRequests,
+      eq(flags.id, sql`${flagRequests.flagId}::uuid`)
+    )
+    .where(
+      and(
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, false)
+      )
+    )
+    .orderBy(desc(flagRequests.createdAt))
+    .limit(REQUESTS_PER_PAGE)
+    .offset((page - 1) * REQUESTS_PER_PAGE);
+
+  const totalFlagCount = await db
+    .select({ count: count() })
+    .from(flagRequests)
+    .where(
+      and(
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, false)
+      )
+    );
+
+  const totalEditCount = await db
+    .select({ count: count() })
+    .from(flagRequests)
+    .where(
+      and(
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, true)
+      )
+    );
+
+  if (user.isAnonymous) {
+    user.name = "Anonymous User";
+    user.image = "/logo.svg";
+  }
+
+  return {
+    flags: userFlags,
+    user: user,
+    totalFlagCount: totalFlagCount[0].count,
+    totalEditCount: totalEditCount[0].count,
   };
 }
