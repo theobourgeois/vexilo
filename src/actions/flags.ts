@@ -18,9 +18,21 @@ export async function getRandomFlag() {
 }
 
 export async function getRandomFlagsForQuiz() {
-  // Get 4 random flags directly from the database
+  // Get 4 random flags directly from the database with favorites info
   const randomFlags = await db
-    .select()
+    .select({
+      id: flags.id,
+      name: flags.name,
+      image: flags.image,
+      link: flags.link,
+      index: flags.index,
+      tags: flags.tags,
+      description: flags.description,
+      createdAt: flags.createdAt,
+      updatedAt: flags.updatedAt,
+      favorites: flags.favorites,
+      isFavorite: await isFavorite(),
+    })
     .from(flags)
     .orderBy(sql`RANDOM()`)
     .limit(4);
@@ -243,7 +255,7 @@ export async function toggleFavoriteFlag(flagId: string) {
       })
       .where(eq(flags.id, flagId));
 
-    return false;
+    return true;
   }
 
   await db.insert(favorites).values({
@@ -257,6 +269,8 @@ export async function toggleFavoriteFlag(flagId: string) {
       favorites: sql`favorites + 1`,
     })
     .where(eq(flags.id, flagId));
+
+  return true;
 }
 
 export async function getFavouriteFlags(
