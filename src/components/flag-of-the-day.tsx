@@ -18,6 +18,8 @@ export function FlagOfTheDay() {
                     tags: flag.tags,
                     description: flag.description,
                     id: flag.id,
+                    isFavorite: flag.isFavorite,
+                    favorites: flag.favorites,
                 };
             });
         },
@@ -43,6 +45,8 @@ export function FlagOfTheDay() {
                         flagImage={flagOfTheDay.flagImage}
                         link={flagOfTheDay.link}
                         index={flagOfTheDay.index}
+                        isFavorite={flagOfTheDay.isFavorite}
+                        favorites={flagOfTheDay.favorites}
                     />
                 </CardContent>
                 <CardFooter>

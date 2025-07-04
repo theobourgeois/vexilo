@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Heart, X, ArrowRight } from "lucide-react";
+import { Search, X, ArrowRight, Heart, Flag } from "lucide-react";
 import { ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import FlagCard from "./FlagCard";
-import { useFavoritesStore } from "../store/favorites";
 import { useQuery } from "@tanstack/react-query";
-import { getFlags, getFlagsCount } from "@/actions/flags";
+import { getFavoriteFlagsCount, getFavouriteFlags, getFlags, getFlagsCount } from "@/actions/flags";
 
 const ITEMS_PER_PAGE = 20;
 const DEBOUNCE_DELAY = 300; // 300ms delay
@@ -69,7 +68,6 @@ function SimplePagination({
 export default function FlagSearch() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { favorites } = useFavoritesStore();
 
     // Local state for search query with debouncing
     const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
@@ -77,15 +75,18 @@ export default function FlagSearch() {
         searchParams.get("q") || ""
     );
 
+    const isFavorites = searchParams.get("favorites") === "true";
+
     // Pagination controlled by URL
     const currentPage = parseInt(searchParams.get("page") || "1", 10);
-    const [activeTab, setActiveTab] = useState<"all" | "favorites">("all");
 
     const { data: flags, isLoading: flagsLoading } = useQuery({
-        queryKey: ["flags", currentPage, debouncedQuery],
+        queryKey: ["flags", currentPage, debouncedQuery, isFavorites],
         queryFn: async () => {
-            return await getFlags(currentPage, ITEMS_PER_PAGE, debouncedQuery).then((flags) => {
+            const fetchFn = isFavorites ? getFavouriteFlags : getFlags;
+            return await fetchFn(currentPage, ITEMS_PER_PAGE, debouncedQuery).then((flags) => {
                 return flags.map((flag) => ({
+                    favorites: flag.favorites,
                     flagName: flag.name,
                     flagImage: flag.image,
                     link: flag.link,
@@ -93,37 +94,27 @@ export default function FlagSearch() {
                     tags: flag.tags,
                     description: flag.description,
                     id: flag.id,
+                    isFavorite: flag.isFavorite,
                 }));
             });
         },
     });
 
     const { data: flagsCount } = useQuery({
-        queryKey: ["flagsCount", debouncedQuery],
+        queryKey: ["flagsCount", debouncedQuery, isFavorites],
         queryFn: async () => {
-            return await getFlagsCount(debouncedQuery);
+            const fetchFn = isFavorites ? getFavoriteFlagsCount : getFlagsCount;
+            return await fetchFn(debouncedQuery);
         },
     });
 
     const {data: totalFlags} = useQuery({
-        queryKey: ["totalFlags"],
+        queryKey: ["totalFlags", isFavorites],
         queryFn: async () => {
-            return await getFlagsCount("");
+            const fetchFn = isFavorites ? getFavoriteFlagsCount : getFlagsCount;
+            return await fetchFn("");
         },
     });
-
-    // Get flags based on active tab
-    const getFlagsForTab = useCallback(() => {
-        if (activeTab === "favorites") {
-            return favorites;
-        }
-        return flags || [];
-    }, [activeTab, flags, favorites]);
-
-    // Get filtered flags for display
-    const filteredFlags = useMemo(() => {
-        return getFlagsForTab() || [];
-    }, [getFlagsForTab]);
 
     // Debounce search query
     useEffect(() => {
@@ -170,39 +161,28 @@ export default function FlagSearch() {
 
     const totalPages = Math.ceil((flagsCount || 0) / ITEMS_PER_PAGE);
 
+    const handleViewModeChange = useCallback((newViewMode: boolean) => {
+        const params = new URLSearchParams(searchParams);
+        params.set("favorites", newViewMode ? "true" : "false");
+        router.replace(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+    }, [router, searchParams]);
+
     return (
         <div className="space-y-6">
             {/* Search Header */}
             <Card>
                 <CardHeader>
                     <div className="space-y-4">
-                        {/* Tabs */}
-                        <div className="flex gap-2">
-                            <Button
-                                variant={
-                                    activeTab === "all" ? "default" : "neutral"
-                                }
-                                size="sm"
-                                onClick={() => setActiveTab("all")}
-                            >
-                                All Flags
-                            </Button>
-                            <Button
-                                variant={
-                                    activeTab === "favorites"
-                                        ? "default"
-                                        : "neutral"
-                                }
-                                size="sm"
-                                onClick={() => setActiveTab("favorites")}
-                                className="flex items-center gap-2"
-                            >
-                                <Heart className="w-4 h-4" />
-                                Favorites ({favorites.length})
-                            </Button>
-                        </div>
-
-                        {/* Search Bar */}
+                            <div className="flex gap-2">
+                                <Button variant={isFavorites ? "neutral" : "default"} onClick={() => handleViewModeChange(false)}>
+                                    <Flag className="w-4 h-4" />
+                                    All Flags
+                                </Button>
+                                <Button variant={isFavorites ? "default" : "neutral"} onClick={() => handleViewModeChange(true)}>
+                                    <Heart className="w-4 h-4" />
+                                    Favorites
+                                </Button>
+                            </div>
                         <div className="flex flex-col sm:flex-row gap-4 items-center">
                             <div className="relative flex-1 max-w-md">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -251,6 +231,7 @@ export default function FlagSearch() {
                                     </button>
                                 )}
                             </div>
+                         
                             <div className="text-sm text-gray-500">
                                 {flagsCount || 0} of{" "}
                                 {totalFlags || 0} flags
@@ -272,16 +253,33 @@ export default function FlagSearch() {
                 onPageChange={updatePage}
             />
 
+            {/* No Results Message */}
+            {!flagsLoading && flags && flags.length === 0 && (
+                <Card>
+                    <CardContent className="text-center py-12">
+                        <p className="text-gray-500 text-lg">
+                            {debouncedQuery 
+                                ? `No ${isFavorites ? 'favorite ' : ''}flags found matching "${debouncedQuery}"`
+                                : `No ${isFavorites ? 'favorite ' : ''}flags found`
+                            }
+                        </p>
+                        {debouncedQuery && (
+                            <Button
+                                variant="default"
+                                onClick={() => setSearchQuery("")}
+                                className="mt-4"
+                            >
+                                Clear Search
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Results Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {flagsLoading ? (
-                    // Show skeleton loading states
-                    Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
-                        <FlagCardSkeleton key={`skeleton-${index}`} />
-                    ))
-                ) : (
-                    // Show actual flags
-                    filteredFlags.map((flag) => (
+            {!flagsLoading && flags && flags.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {flags.map((flag) => (
                         <FlagCard
                             id={flag.id}
                             key={flag.index}
@@ -291,10 +289,21 @@ export default function FlagSearch() {
                             index={flag.index}
                             tags={flag.tags}
                             description={flag.description}
+                            favorites={flag.favorites}
+                            isFavorite={flag.isFavorite}
                         />
-                    ))
-                )}
-            </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Loading Skeleton */}
+            {flagsLoading && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
+                        <FlagCardSkeleton key={`skeleton-${index}`} />
+                    ))}
+                </div>
+            )}
 
             {/* Bottom Pagination */}
             <SimplePagination 
@@ -302,48 +311,6 @@ export default function FlagSearch() {
                 totalPages={totalPages}
                 onPageChange={updatePage}
             />
-
-            {/* No Results */}
-            {filteredFlags.length === 0 && debouncedQuery && (
-                <Card>
-                    <CardContent className="text-center py-12">
-                        <p className="text-gray-500 text-lg">
-                            No flags found matching &quot;{debouncedQuery}&quot;
-                        </p>
-                        <Button
-                            variant="default"
-                            onClick={() => setSearchQuery("")}
-                            className="mt-4"
-                        >
-                            Clear Search
-                        </Button>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* No Favorites */}
-            {filteredFlags.length === 0 &&
-                !debouncedQuery &&
-                activeTab === "favorites" && (
-                    <Card>
-                        <CardContent className="text-center py-12">
-                            <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                            <p className="text-gray-500 text-lg mb-2">
-                                No favorites yet
-                            </p>
-                            <p className="text-gray-400 text-sm mb-4">
-                                Start exploring flags and click the heart icon
-                                to add them to your favorites
-                            </p>
-                            <Button
-                                variant="default"
-                                onClick={() => setActiveTab("all")}
-                            >
-                                Browse All Flags
-                            </Button>
-                        </CardContent>
-                    </Card>
-                )}
         </div>
     );
 }

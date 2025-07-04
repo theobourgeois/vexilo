@@ -6,4 +6,6 @@ export type Flag = {
   index: number;
   tags: string[];
   description: string;
+  favorites?: number;
+  isFavorite?: boolean;
 };

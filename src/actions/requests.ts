@@ -293,9 +293,6 @@ const REQUESTS_PER_PAGE = 12;
 
 export async function getUserFlags(userNumber: string, page: number) {
   const session = await getServerAuthSession();
-  if (!session?.user) {
-    return null;
-  }
 
   const user = await db
     .select()
@@ -311,21 +308,17 @@ export async function getUserFlags(userNumber: string, page: number) {
     };
   }
 
-  if (session.user.id !== user.id && user.isAnonymous) {
-    return {
-      success: false,
-      message: "You are not authorized to view this user's requests.",
-    };
-  }
-
   const userFlags = await db
     .select({
+      id: flags.id,
       flagName: flags.name,
       flagImage: flags.image,
       link: flags.link,
       description: flags.description,
       tags: flags.tags,
       index: flags.index,
+      favorites: flags.favorites,
+      isFavorite: session ? sql<boolean>`EXISTS (SELECT 1 FROM vexilo_favorite WHERE vexilo_favorite.flag_id = vexilo_flag.id AND vexilo_favorite.user_id = ${session.user.id})` : sql<boolean>`false`
     })
     .from(flags)
     .innerJoin(
