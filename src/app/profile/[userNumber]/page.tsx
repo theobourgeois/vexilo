@@ -183,7 +183,7 @@ export default function ProfilePage() {
                                     </h1>
                                 </div>
 
-                                <div className="flex items-center justify-center sm:justify-start space-x-6 text-sm text-muted-foreground">
+                                <div className="flex flex-wrap items-center justify-center sm:justify-start space-x-6 text-sm text-muted-foreground">
                                     <div className="flex items-center space-x-2">
                                         <Flag className="w-4 h-4" />
                                         <span>

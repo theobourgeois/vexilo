@@ -71,16 +71,14 @@ export async function getUserData() {
 }
 
 export async function getUserByUserNumber(userNumber: string) {
-  const session = await getServerAuthSession();
-  if (!session?.user) {
-    return {
-      success: false,
-      message: "You must be logged in to get user data.",
-    };
-  }
-
   const user = await db
-    .select()
+    .select({
+      id: users.id,
+      name: users.name,
+      image: users.image,
+      isAnonymous: users.isAnonymous,
+      createdAt: users.createdAt,
+    })
     .from(users)
     .where(eq(users.userNumber, userNumber))
     .limit(1)

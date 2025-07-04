@@ -19,6 +19,7 @@ import React from "react";
 import FlagFieldsForm from "./FlagFieldsForm";
 import {  toggleFavoriteFlag } from "@/actions/flags";
 import {  useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 type FlagCardProps = Flag;
 
@@ -39,8 +40,12 @@ export default function FlagCard({
     const queryClient = useQueryClient();
     const [isFavorite, setIsFavorite] = React.useState(initialIsFavorite || false);
 
-    const handleFavoriteToggle = (e: React.MouseEvent) => {
+    const handleFavoriteToggle = async (e: React.MouseEvent) => {
         e.stopPropagation();
+        if (!session?.user) {
+            toast.error("You must be logged in to favorite a flag");
+            return;
+        }
         if (isFavorite) {
             setFavoriteCount((prev) => prev - 1);
             setIsFavorite(false);
@@ -48,8 +53,13 @@ export default function FlagCard({
             setFavoriteCount((prev) => prev + 1);
             setIsFavorite(true);
         }
-        toggleFavoriteFlag(id);
-        queryClient.invalidateQueries({ queryKey: ["flags"] });
+        toggleFavoriteFlag(id).then((isSuccess) => {
+            queryClient.invalidateQueries({ queryKey: ["flags"] });
+            if(!isSuccess) {
+                setFavoriteCount((prev) => prev - 1);
+                setIsFavorite(false);
+            }
+        });
     };
 
     const handleEditClick = (e: React.MouseEvent) => {
