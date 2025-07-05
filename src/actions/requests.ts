@@ -18,18 +18,28 @@ export async function getPendingFlagRequests(page: number, limit: number) {
     .select()
     .from(flagRequests)
     .limit(limit)
-    .where(and(eq(flagRequests.approved, false), eq(flagRequests.deleted, false)))
+    .where(
+      and(
+        eq(flagRequests.approved, false),
+        eq(flagRequests.deleted, false)
+      )
+    )
     .offset((page - 1) * limit);
 
   const total = await db
     .select({ count: count() })
     .from(flagRequests)
-    .where(and(eq(flagRequests.approved, false), eq(flagRequests.deleted, false)));
+    .where(
+      and(
+        eq(flagRequests.approved, false),
+        eq(flagRequests.deleted, false)
+      )
+    );
 
   return {
     flagRequests: flagReqs,
     total: total[0].count,
-  }
+  };
 }
 
 export async function declineFlagRequest(flagRequestId: string) {
@@ -185,11 +195,27 @@ export async function approveFlagEditRequest(flagRequestId: string) {
   await db
     .update(flags)
     .set({
-      name: flagRequest.flag.flagName,
-      image: flagRequest.flag.flagImage,
-      link: flagRequest.flag.link,
-      description: flagRequest.flag.description,
-      tags: flagRequest.flag.tags,
+      name:
+        flagRequest.flag.flagName === flagRequest.oldFlag?.flagName
+          ? flag.name
+          : flagRequest.flag.flagName,
+      image:
+        flagRequest.flag.flagImage === flagRequest.oldFlag?.flagImage
+          ? flag.image
+          : flagRequest.flag.flagImage,
+      link:
+        flagRequest.flag.link === flagRequest.oldFlag?.link
+          ? flag.link
+          : flagRequest.flag.link,
+      description:
+        flagRequest.flag.description ===
+          flagRequest.oldFlag?.description
+          ? flag.description
+          : flagRequest.flag.description,
+      tags:
+        flagRequest.flag.tags.every((tag) => flagRequest.oldFlag?.tags.includes(tag))
+          ? flag.tags
+          : flagRequest.flag.tags,
       updatedAt: new Date(),
     })
     .where(eq(flags.id, flagRequest.flagId ?? ""));
@@ -238,7 +264,12 @@ export async function createFlagRequest(
   const numFlagRequests = await db
     .select({ count: count() })
     .from(flagRequests)
-    .where(and(eq(flagRequests.userId, session.user.id), eq(flagRequests.approved, false)));
+    .where(
+      and(
+        eq(flagRequests.userId, session.user.id),
+        eq(flagRequests.approved, false)
+      )
+    );
 
   if (numFlagRequests[0].count >= MAX_FLAG_REQUESTS) {
     return {
