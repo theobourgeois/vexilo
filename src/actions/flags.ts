@@ -167,10 +167,7 @@ export async function getUserFavorites(
     .then((res) => res[0]);
 
   if (!user) {
-    return {
-      success: false,
-      message: "User not found.",
-    };
+    return [];
   }
 
   const boundedLimit = Math.min(limit, 100);
