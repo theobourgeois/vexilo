@@ -24,7 +24,7 @@ export async function getPendingFlagRequests(page: number, limit: number) {
   const total = await db
     .select({ count: count() })
     .from(flagRequests)
-    .where(eq(flagRequests.approved, false));
+    .where(and(eq(flagRequests.approved, false), eq(flagRequests.deleted, false)));
 
   return {
     flagRequests: flagReqs,

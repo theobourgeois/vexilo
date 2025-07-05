@@ -9,6 +9,8 @@ import { PostFlagButton } from "@/components/post-flag-button";
 import { HamburgerMenu } from "@/components/hamburger-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Footer } from "@/components/footer";
+import { Analytics } from "@vercel/analytics/next"
+
 
 const nunito = Nunito({
     variable: "--font-nunito",
@@ -33,6 +35,7 @@ export default function RootLayout({
         <html lang="en">
             <body className={`${nunito.variable} antialiased`}>
                 <Toaster />
+                <Analytics />
                 <Providers>
                     {/* Logo Header */}
                     <header className="max-w-7xl mx-auto px-4 flex flex-col items-start justify-start py-4">
