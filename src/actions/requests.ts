@@ -194,7 +194,7 @@ export async function approveFlagEditRequest(flagRequestId: string) {
   return true;
 }
 
-const MAX_FLAG_REQUESTS = Infinity;
+const MAX_FLAG_REQUESTS = 100;
 
 export async function createFlagRequest(
   flag: Omit<Flag, "index" | "id">,
@@ -225,7 +225,7 @@ export async function createFlagRequest(
   const numFlagRequests = await db
     .select({ count: count() })
     .from(flagRequests)
-    .where(eq(flagRequests.userId, session.user.id));
+    .where(and(eq(flagRequests.userId, session.user.id), eq(flagRequests.approved, false)));
 
   if (numFlagRequests[0].count >= MAX_FLAG_REQUESTS) {
     return {
