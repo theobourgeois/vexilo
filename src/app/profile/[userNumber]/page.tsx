@@ -154,9 +154,6 @@ export default function ProfilePage() {
                         <h2 className="text-2xl font-bold text-foreground">
                             Oops! Something went wrong
                         </h2>
-                        <p className="text-muted-foreground">
-                            {requestsError.message}
-                        </p>
                         <Button asChild>
                             <Link href="/">Go Home</Link>
                         </Button>

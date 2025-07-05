@@ -215,7 +215,7 @@ export default function FlagQuiz() {
                         variant="neutral"
                         size="sm"
                         onClick={handleFavoriteToggle}
-                        className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white/90 backdrop-blur-sm"
+                        className="absolute top-0 right-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white/90 backdrop-blur-sm"
                     >
                         <Heart
                             className={`w-5 h-5 ${

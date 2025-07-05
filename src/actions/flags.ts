@@ -405,8 +405,14 @@ export async function getUserFlags(userNumber: string, page: number) {
 
   const totalFlagsCount = await db
     .select({ count: count() })
-    .from(flags)
-    .where(eq(flags.id, userFlags[0].id));
+    .from(flagRequests)
+    .where(
+      and(
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, false)
+      )
+    );
 
   return {
     flags: userFlags,
