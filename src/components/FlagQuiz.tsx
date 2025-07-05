@@ -7,9 +7,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RefreshCw, CheckCircle, XCircle, Heart } from "lucide-react";
-import { useFavoritesStore } from "@/store/favorites";
+import { useSession } from "next-auth/react";
 import { getRandomFlagsForQuiz } from "@/actions/flags";
-import { Flag } from "@/lib/types";
+import { toggleFavoriteFlag } from "@/actions/flags";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
 
 type DbFlag = {
     id: string;
@@ -19,6 +22,8 @@ type DbFlag = {
     index: number;
     createdAt: Date;
     updatedAt: Date;
+    favorites?: number;
+    isFavorite?: boolean;
 };
 
 export default function FlagQuiz() {
@@ -29,8 +34,37 @@ export default function FlagQuiz() {
     const [score, setScore] = useState(0);
     const [totalQuestions, setTotalQuestions] = useState(0);
     const [loading, setLoading] = useState(true);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_, setFavoriteCount] = useState(0);
+    const [isFavorite, setIsFavorite] = useState(false);
 
-    const { toggleFavorite, isFavorite } = useFavoritesStore();
+    const { data: session } = useSession();
+    const queryClient = useQueryClient();
+
+    const handleFavoriteToggle = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!session?.user) {
+            toast.error("You must be logged in to favorite a flag");
+            return;
+        }
+        if (!currentQuestion) return;
+
+        if (isFavorite) {
+            setFavoriteCount((prev) => prev - 1);
+            setIsFavorite(false);
+        } else {
+            setFavoriteCount((prev) => prev + 1);
+            setIsFavorite(true);
+        }
+
+        toggleFavoriteFlag(currentQuestion.id).then((isSuccess) => {
+            queryClient.invalidateQueries({ queryKey: ["flags"] });
+            if(!isSuccess) {
+                setFavoriteCount((prev) => prev - 1);
+                setIsFavorite(false);
+            }
+        });
+    };
 
     const generateQuestion = async () => {
         setLoading(true);
@@ -54,6 +88,8 @@ export default function FlagQuiz() {
             setOptions(shuffledOptions);
             setSelectedAnswer(null);
             setIsCorrect(null);
+            setFavoriteCount(correctFlag.favorites || 0);
+            setIsFavorite(correctFlag.isFavorite || false);
         } catch (error) {
             console.error("Error generating question:", error);
         } finally {
@@ -178,28 +214,18 @@ export default function FlagQuiz() {
                     <Button
                         variant="neutral"
                         size="sm"
-                        onClick={() => {
-                            const flag: Flag = {
-                                id: currentQuestion.id,
-                                flagName: currentQuestion.name,
-                                flagImage: currentQuestion.image,
-                                link: currentQuestion.link,
-                                index: currentQuestion.index,
-                                tags: [],
-                                description: ""
-                            };
-                            toggleFavorite(flag);
-                        }}
+                        onClick={handleFavoriteToggle}
                         className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white/90 backdrop-blur-sm"
                     >
                         <Heart
                             className={`w-5 h-5 ${
-                                isFavorite(currentQuestion.name)
+                                isFavorite
                                     ? "fill-red-500 text-red-500"
                                     : "text-gray-600"
                             }`}
                         />
                     </Button>
+                   
                 </div>
 
                 {/* Answer Options */}

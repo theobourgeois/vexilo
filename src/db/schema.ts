@@ -113,6 +113,7 @@ export const flags = createTable("flag", {
   description: text("description").notNull().default(""),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  favorites: integer("favorites").notNull().default(0),
 }, (table) => ({
   indexUnique: uniqueIndex("index_unique").on(table.index),
 }));
@@ -158,3 +159,19 @@ export const leaderboard = createTable("leaderboard", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+export const favorites = createTable("favorite", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  flagId: uuid("flag_id")
+    .notNull()
+    .references(() => flags.id),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const favoritesRelations = relations(favorites, ({ one }) => ({
+  user: one(users, { fields: [favorites.userId], references: [users.id] }),
+  flag: one(flags, { fields: [favorites.flagId], references: [flags.id] }),
+}));

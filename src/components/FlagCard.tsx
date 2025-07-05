@@ -12,12 +12,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useFavoritesStore } from "../store/favorites";
 import { Flag } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { useSession } from "next-auth/react";
 import React from "react";
 import FlagFieldsForm from "./FlagFieldsForm";
+import {  toggleFavoriteFlag } from "@/actions/flags";
+import {  useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 type FlagCardProps = Flag;
 
@@ -29,23 +31,35 @@ export default function FlagCard({
     index,
     tags,
     description,
+    favorites,
+    isFavorite: initialIsFavorite,
 }: FlagCardProps) {
-    const { isFavorite, toggleFavorite } = useFavoritesStore();
     const { data: session } = useSession();
     const [editMode, setEditMode] = React.useState(false);
+    const [favoriteCount, setFavoriteCount] = React.useState(favorites || 0);
+    const queryClient = useQueryClient();
+    const [isFavorite, setIsFavorite] = React.useState(initialIsFavorite || false);
 
-    const handleFavoriteClick = (e: React.MouseEvent) => {
+    const handleFavoriteToggle = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        const flag: Flag = {
-            id: "",
-            flagName,
-            flagImage,
-            link,
-            index,
-            tags,
-            description,
-        };
-        toggleFavorite(flag);
+        if (!session?.user) {
+            toast.error("You must be logged in to favorite a flag");
+            return;
+        }
+        if (isFavorite) {
+            setFavoriteCount((prev) => prev - 1);
+            setIsFavorite(false);
+        } else {
+            setFavoriteCount((prev) => prev + 1);
+            setIsFavorite(true);
+        }
+        toggleFavoriteFlag(id).then((isSuccess) => {
+            queryClient.invalidateQueries({ queryKey: ["flags"] });
+            if(!isSuccess) {
+                setFavoriteCount((prev) => prev - 1);
+                setIsFavorite(false);
+            }
+        });
     };
 
     const handleEditClick = (e: React.MouseEvent) => {
@@ -57,21 +71,35 @@ export default function FlagCard({
         <Dialog>
             <DialogTrigger asChild>
                 <Card className="cursor-pointer px-8 relative group">
-                    {/* Favorite Button */}
-                    <Button
-                        variant="neutral"
-                        size="sm"
-                        className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white"
-                        onClick={handleFavoriteClick}
-                    >
-                        <Heart
-                            className={`w-4 h-4 ${
-                                isFavorite(flagName)
-                                    ? "fill-red-500 text-red-500"
-                                    : "text-gray-600"
-                            }`}
-                        />
-                    </Button>
+                    {/* Favorite Button - Only visible on hover */}
+                   
+                        <Button
+                            variant="neutral"
+                            size="sm"
+                            className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white shadow-md border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                            onClick={handleFavoriteToggle}
+                        >
+                            <Heart
+                                className={`w-4 h-4 ${
+                                    isFavorite
+                                        ? "fill-red-500 text-red-500"
+                                        : "text-gray-600"
+                                }`}
+                            />
+                        </Button>
+
+                    {/* Favorites Count Badge */}
+                    {Boolean(favoriteCount) && (
+                        <div className="absolute top-2 left-2 z-10">
+                            <Badge
+                                variant="neutral"
+                                className="bg-white/90 text-gray-700 border border-gray-200"
+                            >
+                                <Heart className="w-3 h-3 mr-1 fill-red-500 text-red-500" />
+                                {favoriteCount}
+                            </Badge>
+                        </div>
+                    )}
 
                     <div className="relative overflow-hidden">
                         <div className="aspect-[3/2] relative shadow-shadow">
@@ -119,30 +147,17 @@ export default function FlagCard({
                             <Button
                                 variant="neutral"
                                 size="sm"
-                                onClick={() => {
-                                    const flag: Flag = {
-                                        id: "",
-                                        flagName,
-                                        flagImage,
-                                        link,
-                                        index,
-                                        tags,
-                                        description,
-                                    };
-                                    toggleFavorite(flag);
-                                }}
+                                onClick={handleFavoriteToggle}
                                 className="flex items-center gap-2"
                             >
                                 <Heart
                                     className={`w-4 h-4 ${
-                                        isFavorite(flagName)
+                                        isFavorite
                                             ? "fill-red-500 text-red-500"
                                             : "text-gray-600"
                                     }`}
                                 />
-                                {isFavorite(flagName)
-                                    ? "Favorited"
-                                    : "Favorite"}
+                                {isFavorite ? "Favorited" : "Favorite"}
                             </Button>
                             {session && (
                                 <Button
@@ -197,9 +212,7 @@ export default function FlagCard({
 
                         {/* Description */}
                         {description && (
-                            <p className="text-center px-2">
-                                {description}
-                            </p>
+                            <p className="text-center px-2">{description}</p>
                         )}
 
                         {/* Tags */}
