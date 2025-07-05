@@ -2,16 +2,25 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X, ArrowRight, Heart, Flag } from "lucide-react";
+import { Search, X, ArrowRight, Heart, Flag, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import FlagCard from "./FlagCard";
 import { useQuery } from "@tanstack/react-query";
 import { getFavoriteFlagsCount, getFavouriteFlags, getFlags, getFlagsCount } from "@/actions/flags";
+import { flags } from "@/db/schema";
+
+type OrderBy = keyof typeof flags.$inferSelect;
 
 const ITEMS_PER_PAGE = 20;
 const DEBOUNCE_DELAY = 300; // 300ms delay
@@ -80,11 +89,14 @@ export default function FlagSearch() {
     // Pagination controlled by URL
     const currentPage = parseInt(searchParams.get("page") || "1", 10);
 
+    const orderBy = (searchParams.get("orderBy") as OrderBy) || "updatedAt";
+    const orderDirection = (searchParams.get("orderDirection") as "asc" | "desc") || "desc";
+
     const { data: flags, isLoading: flagsLoading } = useQuery({
-        queryKey: ["flags", currentPage, debouncedQuery, isFavorites],
+        queryKey: ["flags", currentPage, debouncedQuery, isFavorites, orderBy, orderDirection],
         queryFn: async () => {
             const fetchFn = isFavorites ? getFavouriteFlags : getFlags;
-            return await fetchFn(currentPage, ITEMS_PER_PAGE, debouncedQuery).then((flags) => {
+            return await fetchFn(currentPage, ITEMS_PER_PAGE, debouncedQuery, orderBy, orderDirection).then((flags) => {
                 return flags.map((flag) => ({
                     favorites: flag.favorites,
                     flagName: flag.name,
@@ -167,6 +179,20 @@ export default function FlagSearch() {
         router.replace(`${window.location.pathname}?${params.toString()}`, { scroll: false });
     }, [router, searchParams]);
 
+    const handleSortChange = useCallback((newOrderBy: OrderBy, newOrderDirection: "asc" | "desc") => {
+        const params = new URLSearchParams(searchParams);
+        params.set("orderBy", newOrderBy);
+        params.set("orderDirection", newOrderDirection);
+        // Reset to first page when sorting changes
+        params.set("page", "1");
+        router.replace(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+    }, [router, searchParams]);
+
+    const getSortIcon = (field: OrderBy) => {
+        if (orderBy !== field) return <ArrowUpDown className="w-4 h-4" />;
+        return orderDirection === "asc" ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />;
+    };
+
     return (
         <div className="space-y-6">
             {/* Search Header */}
@@ -231,6 +257,32 @@ export default function FlagSearch() {
                                     </button>
                                 )}
                             </div>
+                            
+                            {/* Sort Dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="neutral" className="flex items-center gap-2">
+                                        {getSortIcon(orderBy)}
+                                        Sort by {orderBy === "name" ? "Name" : "Date"}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-background text-black dark:text-white">
+                                    <DropdownMenuItem 
+                                        onClick={() => handleSortChange("name", orderBy === "name" && orderDirection === "asc" ? "desc" : "asc")}
+                                        className="flex items-center gap-2 bg-white dark:bg-background"
+                                    >
+                                        {orderBy === "name" ? (orderDirection === "asc" ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4" />}
+                                        Name
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                        onClick={() => handleSortChange("updatedAt", orderBy === "updatedAt" && orderDirection === "desc" ? "asc" : "desc")}
+                                        className="flex items-center gap-2 bg-white dark:bg-background"
+                                    >
+                                        {orderBy === "updatedAt" ? (orderDirection === "desc" ? <ArrowDown className="w-4 h-4" /> : <ArrowUp className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4" />}
+                                        Date
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                          
                             <div className="text-sm text-gray-500">
                                 {flagsCount || 0} of{" "}

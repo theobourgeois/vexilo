@@ -1,7 +1,13 @@
 "use server";
 
 import { db } from "@/db";
-import { favorites, flagOfTheDay, flags } from "@/db/schema";
+import {
+  favorites,
+  flagOfTheDay,
+  flagRequests,
+  flags,
+  users,
+} from "@/db/schema";
 import { getServerAuthSession } from "@/lib/auth";
 import { Flag } from "@/lib/types";
 import { and, asc, count, desc, eq, ilike, sql } from "drizzle-orm";
@@ -39,12 +45,16 @@ export async function getRandomFlagsForQuiz() {
   return randomFlags;
 }
 
-async function isFavorite() {
-  const session = await getServerAuthSession();
-  if (!session?.user) {
-    return sql<boolean>`false`;
+async function isFavorite(userId?: string) {
+  let user = userId;
+  if (!user) {
+    const session = await getServerAuthSession();
+    if (!session?.user) {
+      return sql<boolean>`false`;
+    }
+    user = user ?? session.user.id;
   }
-  return sql<boolean>`EXISTS (SELECT 1 FROM vexilo_favorite WHERE vexilo_favorite.flag_id = vexilo_flag.id AND vexilo_favorite.user_id = ${session.user.id})`;
+  return sql<boolean>`EXISTS (SELECT 1 FROM vexilo_favorite WHERE vexilo_favorite.flag_id = vexilo_flag.id AND vexilo_favorite.user_id = ${user})`;
 }
 
 export async function getFlagOfTheDay() {
@@ -97,6 +107,16 @@ function buildWhereClause(query?: string) {
   `;
 }
 
+function orderByClause(
+  orderBy: keyof typeof flags.$inferSelect,
+  orderDirection: "asc" | "desc"
+) {
+  if (orderDirection === "asc") {
+    return asc(flags[orderBy]);
+  }
+  return desc(flags[orderBy]);
+}
+
 export async function getFlags(
   page: number,
   limit: number,
@@ -105,13 +125,6 @@ export async function getFlags(
   orderDirection: "asc" | "desc" = "desc"
 ) {
   const whereClause = buildWhereClause(query);
-
-  const orderByClause = () => {
-    if (orderDirection === "asc") {
-      return asc(flags[orderBy]);
-    }
-    return desc(flags[orderBy]);
-  };
 
   const boundedLimit = Math.min(limit, 100);
 
@@ -132,10 +145,81 @@ export async function getFlags(
     .orderBy(
       query
         ? sql`similarity(${flags.name}, ${query}) DESC`
-        : orderByClause()
+        : orderByClause(orderBy, orderDirection)
     )
     .limit(boundedLimit)
     .offset((page - 1) * boundedLimit);
+}
+
+export async function getUserFavorites(
+  userId: string,
+  page: number,
+  limit: number,
+  query?: string,
+  orderBy: keyof typeof flags.$inferSelect = "updatedAt",
+  orderDirection: "asc" | "desc" = "desc"
+) {
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    return {
+      success: false,
+      message: "User not found.",
+    };
+  }
+
+  const boundedLimit = Math.min(limit, 100);
+
+  const flgs = await db
+    .select({
+      id: flags.id,
+      favorites: flags.favorites,
+      name: flags.name,
+      image: flags.image,
+      link: flags.link,
+      index: flags.index,
+      tags: flags.tags,
+      description: flags.description,
+      isFavorite: await isFavorite()
+    })
+    .from(flags)
+    .where(and(ilike(flags.name, `%${query}%`), await isFavorite(userId)))
+    .orderBy(
+      query
+        ? sql`similarity(${flags.name}, ${query}) DESC`
+        : orderByClause(orderBy, orderDirection)
+    )
+    .limit(boundedLimit)
+    .offset((page - 1) * boundedLimit);
+
+  return flgs;
+}
+
+export async function getFavouriteFlags(
+  page: number,
+  limit: number,
+  query?: string,
+  orderBy: keyof typeof flags.$inferSelect = "updatedAt",
+  orderDirection: "asc" | "desc" = "desc"
+) {
+  const session = await getServerAuthSession();
+  if (!session?.user) {
+    return [];
+  }
+
+  return await getUserFavorites(
+    session.user.id,
+    page,
+    limit,
+    query,
+    orderBy,
+    orderDirection
+  );
 }
 
 export async function getFlagsCount(query?: string) {
@@ -158,12 +242,7 @@ export async function getFavoriteFlagsCount(query?: string) {
   const cnt = await db
     .select({ count: count() })
     .from(flags)
-    .where(
-      and(
-        ilike(flags.name, `%${query}%`),
-        await isFavorite()
-      )
-    );
+    .where(and(ilike(flags.name, `%${query}%`), await isFavorite()));
 
   return cnt[0].count;
 }
@@ -273,44 +352,141 @@ export async function toggleFavoriteFlag(flagId: string) {
   return true;
 }
 
-export async function getFavouriteFlags(
-  page: number,
-  limit: number,
-  query?: string
-) {
+const REQUESTS_PER_PAGE = 12;
+
+export async function getUserFlags(userNumber: string, page: number) {
   const session = await getServerAuthSession();
-  if (!session?.user) {
-    return [];
+
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.userNumber, userNumber))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    return {
+      success: false,
+      message: "User not found.",
+    };
   }
 
-  const boundedLimit = Math.min(limit, 100);
-
-  const flgs = await db
+  const userFlags = await db
     .select({
       id: flags.id,
-      favorites: flags.favorites,
-      name: flags.name,
-      image: flags.image,
+      flagName: flags.name,
+      flagImage: flags.image,
       link: flags.link,
-      index: flags.index,
-      tags: flags.tags,
       description: flags.description,
-      isFavorite: sql<boolean>`true`,
+      tags: flags.tags,
+      index: flags.index,
+      favorites: flags.favorites,
+      isFavorite: session
+        ? sql<boolean>`EXISTS (SELECT 1 FROM vexilo_favorite WHERE vexilo_favorite.flag_id = vexilo_flag.id AND vexilo_favorite.user_id = ${session.user.id})`
+        : sql<boolean>`false`,
     })
     .from(flags)
+    .innerJoin(
+      flagRequests,
+      eq(flags.id, sql`${flagRequests.flagId}::uuid`)
+    )
     .where(
       and(
-        ilike(flags.name, `%${query}%`),
-        await isFavorite()
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, false)
       )
     )
-    .orderBy(
-      query
-        ? sql`similarity(${flags.name}, ${query}) DESC`
-        : desc(flags.updatedAt)
-    )
-    .limit(boundedLimit)
-    .offset((page - 1) * boundedLimit);
+    .orderBy(desc(flagRequests.createdAt))
+    .limit(REQUESTS_PER_PAGE)
+    .offset((page - 1) * REQUESTS_PER_PAGE);
 
-  return flgs;
+  if (user.isAnonymous) {
+    user.name = "Anonymous User";
+    user.image = "/logo.svg";
+  }
+
+  const totalFlagsCount = await db
+    .select({ count: count() })
+    .from(flags)
+    .where(eq(flags.id, userFlags[0].id));
+
+  return {
+    flags: userFlags,
+    count: totalFlagsCount[0].count,
+  };
+}
+
+export async function getUserContributionCounts(userNumber: string) {
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.userNumber, userNumber))
+    .limit(1)
+    .then((res) => res[0]);
+
+  const totalFlagCount = await db
+    .select({ count: count() })
+    .from(flagRequests)
+    .where(
+      and(
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, false)
+      )
+    );
+
+  const totalEditCount = await db
+    .select({ count: count() })
+    .from(flagRequests)
+    .where(
+      and(
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, true)
+      )
+    );
+
+  return {
+    totalFlagCount: totalFlagCount[0].count,
+    totalEditCount: totalEditCount[0].count,
+  };
+}
+
+export async function getProfileUserFavorites(
+  userNumber: string,
+  page: number
+) {
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.userNumber, userNumber))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    return {
+      success: false,
+      message: "User not found.",
+    };
+  }
+
+  const userFlags = await getUserFavorites(
+    user.id,
+    page,
+    REQUESTS_PER_PAGE,
+    "",
+    "updatedAt",
+    "desc"
+  )
+
+  const totalFlagsCount = await db
+    .select({ count: count() })
+    .from(flags)
+    .where(await isFavorite(user.id))
+
+  return {
+    flags: userFlags,
+    count: totalFlagsCount[0].count,
+  };
 }

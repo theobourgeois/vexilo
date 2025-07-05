@@ -1,6 +1,10 @@
 "use client";
 
-import { getUserFlags } from "@/actions/requests";
+import {
+    getUserFlags,
+    getUserContributionCounts,
+    getProfileUserFavorites,
+} from "@/actions/flags";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
 import FlagCard from "@/components/FlagCard";
@@ -9,9 +13,18 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Flag, User, ArrowLeft, ArrowRight, Edit } from "lucide-react";
+import {
+    Flag,
+    User,
+    ArrowLeft,
+    ArrowRight,
+    Edit,
+    Loader2,
+    Heart,
+} from "lucide-react";
 import Link from "next/link";
 import { getUserByUserNumber } from "@/actions/users";
+import { useCallback } from "react";
 
 export default function ProfilePage() {
     const params = useParams();
@@ -19,24 +32,73 @@ export default function ProfilePage() {
     const userNumber = params.userNumber as string;
     const page = parseInt(searchParams.get("page") || "1");
     const router = useRouter();
-    
-    const {data: userData, isLoading: userLoading, error: userError} = useQuery({
+    const isFavorites = searchParams.get("favorites") === "true";
+
+    const {
+        data: userData,
+        isLoading: userLoading,
+        error: userError,
+    } = useQuery({
         queryKey: ["user", userNumber],
         queryFn: () => getUserByUserNumber(userNumber),
     });
 
     const {
-        data: userFlags,
+        data: userFlagsData,
         isLoading: requestsLoading,
         error: requestsError,
     } = useQuery({
-        queryKey: ["flags", userNumber, page],
-        queryFn: () => getUserFlags(userNumber, page),
+        queryKey: ["flags", userNumber, page, isFavorites],
+        queryFn: async () => {
+            const fetchFn = isFavorites
+                ? getProfileUserFavorites
+                : getUserFlags;
+            const result = await fetchFn(userNumber, page);
+
+            // Handle error responses
+            if (
+                result &&
+                typeof result === "object" &&
+                "success" in result &&
+                !result.success
+            ) {
+                throw new Error(result.message || "Failed to fetch flags");
+            }
+
+            return result;
+        },
     });
 
-    const flags = userFlags?.flags;
-    const totalFlagCount = userFlags?.totalFlagCount;
-    const totalEditCount = userFlags?.totalEditCount;
+    const userFlags = userFlagsData?.flags;
+    const totalFlagsCount = userFlagsData?.count || 0;
+
+    const {
+        data: userContributionCounts,
+        isLoading: contributionCountsLoading,
+    } = useQuery({
+        queryKey: ["contributionCounts", userNumber],
+        queryFn: () => getUserContributionCounts(userNumber),
+    });
+
+    const totalContributionsCount = userContributionCounts?.totalFlagCount || 0;
+    const totalEditCount = userContributionCounts?.totalEditCount || 0;
+
+    const handleViewModeChange = useCallback(
+        (newViewMode: boolean) => {
+            const params = new URLSearchParams(searchParams);
+            if (newViewMode) {
+                params.set("favorites", "true");
+            } else {
+                params.delete("favorites");
+            }
+            // Reset to first page when switching modes
+            params.set("page", "1");
+            router.replace(`/profile/${userNumber}?${params.toString()}`, {
+                scroll: false,
+            });
+        },
+        [router, searchParams, userNumber]
+    );
 
     // Skeletons
     function UserInfoSkeleton() {
@@ -105,7 +167,7 @@ export default function ProfilePage() {
     }
 
     // User not found
-    if (!userLoading && (!userData?.user)) {
+    if (!userLoading && !userData?.user) {
         return (
             <div className="container mx-auto px-4 py-8 max-w-7xl">
                 <Card className="p-6">
@@ -128,25 +190,33 @@ export default function ProfilePage() {
     }
 
     const user = userData?.user;
-    const totalPages = Math.ceil((totalFlagCount || 0) / 12);
+    const totalPages = Math.ceil((totalFlagsCount || 0) / 12);
 
     const handlePageChange = (page: number) => {
         const params = new URLSearchParams(searchParams);
         params.set("page", page.toString());
-        router.replace(`/profile/${userNumber}?${params.toString()}`, { scroll: false });
-    }
+        router.replace(`/profile/${userNumber}?${params.toString()}`, {
+            scroll: false,
+        });
+    };
 
     function PaginationComponent() {
         if (totalPages > 1) {
             return (
                 <div className="flex items-center justify-center gap-4">
-                    <Button disabled={page === 1} onClick={() => handlePageChange(page - 1)}>
+                    <Button
+                        disabled={page === 1}
+                        onClick={() => handlePageChange(page - 1)}
+                    >
                         <ArrowLeft className="w-4 h-4" /> Previous
                     </Button>
                     <span className="text-sm">
                         Page {page} of {totalPages}
                     </span>
-                    <Button disabled={page === totalPages} onClick={() => handlePageChange(page + 1)}>
+                    <Button
+                        disabled={page === totalPages}
+                        onClick={() => handlePageChange(page + 1)}
+                    >
                         Next <ArrowRight className="w-4 h-4" />
                     </Button>
                 </div>
@@ -184,18 +254,26 @@ export default function ProfilePage() {
                                 </div>
 
                                 <div className="flex flex-wrap items-center justify-center sm:justify-start space-x-6 text-sm text-muted-foreground">
-                                    <div className="flex items-center space-x-2">
-                                        <Flag className="w-4 h-4" />
-                                        <span>
-                                            {totalFlagCount} flags contributed
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <Edit className="w-4 h-4" />
-                                        <span>
-                                            {totalEditCount} edits contributed
-                                        </span>
-                                    </div>
+                                    {contributionCountsLoading ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center space-x-2">
+                                                <Flag className="w-4 h-4" />
+                                                <span>
+                                                    {totalContributionsCount}{" "}
+                                                    flags contributed
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <Edit className="w-4 h-4" />
+                                                <span>
+                                                    {totalEditCount} edits
+                                                    contributed
+                                                </span>
+                                            </div>
+                                        </>
+                                    )}
                                     <div className="flex items-center space-x-2">
                                         <User className="w-4 h-4" />
                                         <span>
@@ -217,9 +295,33 @@ export default function ProfilePage() {
                         <h2 className="text-2xl font-bold text-foreground">
                             Flag Collection
                         </h2>
-                        <Badge variant="neutral" className="text-sm">
-                            {totalFlagCount} flags
-                        </Badge>
+                        <div className="flex items-center gap-4">
+                            <div className="flex gap-2">
+                                <Button
+                                    variant={
+                                        isFavorites ? "neutral" : "default"
+                                    }
+                                    onClick={() => handleViewModeChange(false)}
+                                >
+                                    <Flag className="w-4 h-4" />
+                                    All Flags
+                                </Button>
+                                <Button
+                                    variant={
+                                        isFavorites ? "default" : "neutral"
+                                    }
+                                    onClick={() => handleViewModeChange(true)}
+                                >
+                                    <Heart className="w-4 h-4" />
+                                    Favorites
+                                </Button>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Badge variant="neutral" className="text-sm">
+                                    {totalFlagsCount} flags
+                                </Badge>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Pagination */}
@@ -227,7 +329,7 @@ export default function ProfilePage() {
 
                     {requestsLoading ? (
                         <FlagsSkeleton />
-                    ) : totalFlagCount === 0 ? (
+                    ) : Array.isArray(userFlags) && userFlags.length === 0 ? (
                         <Card className="p-12">
                             <div className="text-center space-y-4">
                                 <div className="text-6xl">🏳️</div>
@@ -240,23 +342,35 @@ export default function ProfilePage() {
                                 </p>
                             </div>
                         </Card>
-                    ) : flags ? (
+                    ) : userFlags && Array.isArray(userFlags) ? (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {flags.map((flag, index) => (
-                                    <FlagCard
-                                        key={`${flag.flagName}-${index}`}
-                                        id={flag.id}
-                                        flagName={flag.flagName}
-                                        flagImage={flag.flagImage}
-                                        link={flag.link}
-                                        index={flag.index}
-                                        tags={flag.tags || []}
-                                        description={flag.description || ""}
-                                        favorites={flag.favorites}
-                                        isFavorite={flag.isFavorite}
-                                    />
-                                ))}
+                                {userFlags.map((flag, index) => {
+                                    // Handle different property names based on the data source
+                                    const flagName =
+                                        "flagName" in flag
+                                            ? flag.flagName
+                                            : flag.name;
+                                    const flagImage =
+                                        "flagImage" in flag
+                                            ? flag.flagImage
+                                            : flag.image;
+
+                                    return (
+                                        <FlagCard
+                                            key={`${flagName}-${index}`}
+                                            id={flag.id}
+                                            flagName={flagName}
+                                            flagImage={flagImage}
+                                            link={flag.link}
+                                            index={flag.index}
+                                            tags={flag.tags || []}
+                                            description={flag.description || ""}
+                                            favorites={flag.favorites}
+                                            isFavorite={flag.isFavorite}
+                                        />
+                                    );
+                                })}
                             </div>
                             <PaginationComponent />
                         </>

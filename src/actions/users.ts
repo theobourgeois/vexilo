@@ -84,6 +84,11 @@ export async function getUserByUserNumber(userNumber: string) {
     .limit(1)
     .then((res) => res[0])
 
+  if (user.isAnonymous) {
+    user.name = "Anonymous User";
+    user.image = "/logo.svg";
+  }
+
   return {
     success: true,
     user,

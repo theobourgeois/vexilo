@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { flagRequests, flags, leaderboard, users } from "@/db/schema";
 import { getServerAuthSession } from "@/lib/auth";
 import { Flag } from "@/lib/types";
-import { and, count, desc, eq, max, sql } from "drizzle-orm";
+import { and, count, eq, max, sql } from "drizzle-orm";
 import { base64ImageToS3URI, deleteFileFromUrl } from "./s3";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
 
@@ -286,87 +286,5 @@ export async function createFlagRequest(
   return {
     success: true,
     message: "Flag request created successfully.",
-  };
-}
-
-const REQUESTS_PER_PAGE = 12;
-
-export async function getUserFlags(userNumber: string, page: number) {
-  const session = await getServerAuthSession();
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(eq(users.userNumber, userNumber))
-    .limit(1)
-    .then((res) => res[0]);
-
-  if (!user) {
-    return {
-      success: false,
-      message: "User not found.",
-    };
-  }
-
-  const userFlags = await db
-    .select({
-      id: flags.id,
-      flagName: flags.name,
-      flagImage: flags.image,
-      link: flags.link,
-      description: flags.description,
-      tags: flags.tags,
-      index: flags.index,
-      favorites: flags.favorites,
-      isFavorite: session ? sql<boolean>`EXISTS (SELECT 1 FROM vexilo_favorite WHERE vexilo_favorite.flag_id = vexilo_flag.id AND vexilo_favorite.user_id = ${session.user.id})` : sql<boolean>`false`
-    })
-    .from(flags)
-    .innerJoin(
-      flagRequests,
-      eq(flags.id, sql`${flagRequests.flagId}::uuid`)
-    )
-    .where(
-      and(
-        eq(flagRequests.userId, user.id),
-        eq(flagRequests.approved, true),
-        eq(flagRequests.isEdit, false)
-      )
-    )
-    .orderBy(desc(flagRequests.createdAt))
-    .limit(REQUESTS_PER_PAGE)
-    .offset((page - 1) * REQUESTS_PER_PAGE);
-
-  const totalFlagCount = await db
-    .select({ count: count() })
-    .from(flagRequests)
-    .where(
-      and(
-        eq(flagRequests.userId, user.id),
-        eq(flagRequests.approved, true),
-        eq(flagRequests.isEdit, false)
-      )
-    );
-
-  const totalEditCount = await db
-    .select({ count: count() })
-    .from(flagRequests)
-    .where(
-      and(
-        eq(flagRequests.userId, user.id),
-        eq(flagRequests.approved, true),
-        eq(flagRequests.isEdit, true)
-      )
-    );
-
-  if (user.isAnonymous) {
-    user.name = "Anonymous User";
-    user.image = "/logo.svg";
-  }
-
-  return {
-    flags: userFlags,
-    user: user,
-    totalFlagCount: totalFlagCount[0].count,
-    totalEditCount: totalEditCount[0].count,
   };
 }
