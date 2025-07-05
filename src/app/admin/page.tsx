@@ -10,17 +10,27 @@ import { useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Suspense } from "react";
+import { Badge } from "@/components/ui/badge";
 
 function Requests({ page }: { page: number }) {
-    const { data: flagRequests } = useQuery({
+    const { data: flagRequestsData } = useQuery({
         queryKey: ["flagRequests", page],
         queryFn: async () => {
             return getPendingFlagRequests(page, 10);
         },
     });
 
+    const flagRequests = flagRequestsData?.flagRequests;
+    const total = flagRequestsData?.total;
+
     return (
         <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Pending Flag Requests</h2>
+                <Badge variant="neutral" className="text-sm">
+                    {total} Pending Requests
+                </Badge>
+            </div>
             {flagRequests?.map((flagRequest) => (
                 <FlagRequestCard
                     isEdit={flagRequest.flagId !== null}

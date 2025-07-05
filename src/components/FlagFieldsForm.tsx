@@ -8,23 +8,7 @@ import { Flag } from "@/lib/types";
 import { toast } from "sonner";
 import { createFlagRequest } from "@/actions/requests";
 import { Textarea } from "./ui/textarea";
-
-// Helper for blob to base64
-async function blobUrlToBase64(blobUrl: string): Promise<string> {
-    const response = await fetch(blobUrl);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64String = reader.result as string;
-            const base64 =
-                "data:image/jpeg;base64," + base64String.split(",")[1];
-            resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
+import { blobUrlToBase64 } from "@/lib/blob-to-url";
 
 type FlagFieldsFormProps = {
     initialFlag: Omit<Flag, "index"> & { index?: number };
@@ -45,6 +29,7 @@ export default function FlagFieldsForm({
     const [flagImage, setFlagImage] = useState(initialFlag.flagImage || "");
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState(initialFlag.flagImage || "");
+    const [fileType, setFileType] = useState<string | null>(null);
 
     const addTag = (tag: string) => {
         const trimmedTag = tag.trim();
@@ -68,6 +53,8 @@ export default function FlagFieldsForm({
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] || null;
         if (file) {
+            console.log(file.type);
+            setFileType(file.type);
             const url = URL.createObjectURL(file);
             setPreviewUrl(url);
             setFlagImage(url);
@@ -79,6 +66,7 @@ export default function FlagFieldsForm({
         e.preventDefault();
         const file = e.dataTransfer.files[0];
         if (file && file.type.startsWith("image/")) {
+            setFileType(file.type);
             setImageFile(file);
             const url = URL.createObjectURL(file);
             setPreviewUrl(url);
@@ -113,7 +101,8 @@ export default function FlagFieldsForm({
                 description: description,
             };
             if (flag.flagImage.startsWith("blob:")) {
-                flag.flagImage = await blobUrlToBase64(flag.flagImage);
+                const contentType = fileType || "image/jpeg";
+                flag.flagImage = await blobUrlToBase64(flag.flagImage, contentType);
             }
 
             const result = await createFlagRequest(flag, initialFlag.id);

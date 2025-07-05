@@ -28,22 +28,7 @@ import { createFlagRequest } from "@/actions/requests";
 import Image from "next/image";
 import Link from "next/link";
 import { SvgLogo } from "@/components/svg-logo";
-
-async function blobUrlToBase64(blobUrl: string): Promise<string> {
-  const response = await fetch(blobUrl);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-          const base64String = reader.result as string;
-          // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
-          const base64 = "data:image/jpeg;base64," + base64String.split(",")[1];
-          resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-  });
-}
+import { blobUrlToBase64 } from "@/lib/blob-to-url";
 
 export default function PostFlagPage() {
     const { data: session, status } = useSession();
@@ -58,6 +43,7 @@ export default function PostFlagPage() {
     const [previewUrl, setPreviewUrl] = useState("");
     const [description, setDescription] = useState("");
     const router = useRouter();
+    const [fileType, setFileType] = useState<string | null>(null);
 
     // Check if all required fields are filled
     const isFormValid =
@@ -88,6 +74,7 @@ export default function PostFlagPage() {
         const file = e.target.files?.[0] || null;
         // get url from file
         if (file) {
+            setFileType(file.type);
             const url = URL.createObjectURL(file);
             setPreviewUrl(url);
             setImageUrl(url);
@@ -99,6 +86,7 @@ export default function PostFlagPage() {
         e.preventDefault();
         const file = e.dataTransfer.files[0];
         if (file && file.type.startsWith("image/")) {
+            setFileType(file.type);
             setImage(file);
             const url = URL.createObjectURL(file);
             setPreviewUrl(url);
@@ -134,7 +122,8 @@ export default function PostFlagPage() {
                 description: description,
             };
             if (flag.flagImage.startsWith("blob:")) {
-                flag.flagImage = await blobUrlToBase64(flag.flagImage);
+                const contentType = fileType || "image/jpeg";
+                flag.flagImage = await blobUrlToBase64(flag.flagImage, contentType);
             }
 
             const result = await createFlagRequest(flag);

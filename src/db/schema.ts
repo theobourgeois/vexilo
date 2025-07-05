@@ -130,6 +130,7 @@ export const flagRequests = createTable("flag_request", {
   isEdit: boolean("is_edit").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  deleted: boolean("deleted").notNull().default(false),
 });
 
 export const bannedUsers = createTable("banned_user", {

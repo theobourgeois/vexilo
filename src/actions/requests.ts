@@ -18,10 +18,18 @@ export async function getPendingFlagRequests(page: number, limit: number) {
     .select()
     .from(flagRequests)
     .limit(limit)
-    .where(eq(flagRequests.approved, false))
+    .where(and(eq(flagRequests.approved, false), eq(flagRequests.deleted, false)))
     .offset((page - 1) * limit);
 
-  return flagReqs;
+  const total = await db
+    .select({ count: count() })
+    .from(flagRequests)
+    .where(eq(flagRequests.approved, false));
+
+  return {
+    flagRequests: flagReqs,
+    total: total[0].count,
+  }
 }
 
 export async function declineFlagRequest(flagRequestId: string) {
@@ -49,7 +57,12 @@ export async function declineFlagRequest(flagRequestId: string) {
     }
   }
 
-  await db.delete(flagRequests).where(eq(flagRequests.id, flagRequestId));
+  await db
+    .update(flagRequests)
+    .set({
+      deleted: true,
+    })
+    .where(eq(flagRequests.id, flagRequestId));
 
   return true;
 }

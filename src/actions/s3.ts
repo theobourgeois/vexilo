@@ -22,7 +22,7 @@ export const uploadFile = async (
   file: string | Buffer,
   bucketName: string,
   key: string,
-  contentType = "image/jpeg"
+  contentType: string
 ) => {
   const session = await getServerAuthSession();
   if (!session) {
@@ -70,7 +70,11 @@ export async function base64ImageToS3URI(base64Image: string): Promise<string> {
 
   const contentType = header.split(':')[1].split(';')[0];
   const imageBuffer = Buffer.from(base64Data, 'base64');
-  const fileName = `images/image-${Date.now()}.${contentType.split('/')[1]}`;
+  let fileExtension = contentType.split('/')[1];
+  if (fileExtension === "svg+xml") {
+    fileExtension = "svg";
+  }
+  const fileName = `images/image-${Date.now()}.${fileExtension}`;
 
   await uploadFile(imageBuffer, bucketName, fileName, contentType);
 
