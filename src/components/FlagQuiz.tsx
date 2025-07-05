@@ -250,8 +250,8 @@ export default function FlagQuiz() {
                             onClick={() => handleAnswerSelect(option)}
                             disabled={selectedAnswer !== null}
                         >
-                            <div className="flex items-center gap-2 w-full">
-                                <span className="font-medium">{option}</span>
+                            <div className="flex items-center gap-2 w-full" title={option}>
+                                <span className="font-medium truncate">{option}</span>
                                 {selectedAnswer === option && (
                                     <>
                                         {isCorrect ? (
