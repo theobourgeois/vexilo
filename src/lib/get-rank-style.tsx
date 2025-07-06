@@ -1,4 +1,4 @@
-import { Trophy, Medal, Star, Award, Zap, ArrowLeft } from "lucide-react";
+import { Trophy, Medal, Star, Award, Zap } from "lucide-react";
 
 export const getRankStyle = (index: number ) => {
   switch (index) {
