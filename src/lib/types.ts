@@ -9,3 +9,18 @@ export type Flag = {
   favorites?: number;
   isFavorite?: boolean;
 };
+
+export type FlagRequestWithUser = {
+  id: string;
+  userId: string;
+  oldFlag: Omit<Flag, "id"> | null;
+  approved: boolean;
+  flag: Omit<Flag, "id">;
+  flagId: string | null;
+  isEdit: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  deleted: boolean;
+  userMessage: string;
+  userName: string | null;
+};

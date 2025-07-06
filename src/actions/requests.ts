@@ -15,8 +15,22 @@ export async function getPendingFlagRequests(page: number, limit: number) {
   }
 
   const flagReqs = await db
-    .select()
+    .select({
+      id: flagRequests.id,
+      userId: flagRequests.userId,
+      oldFlag: flagRequests.oldFlag,
+      approved: flagRequests.approved,
+      flag: flagRequests.flag,
+      flagId: flagRequests.flagId,
+      isEdit: flagRequests.isEdit,
+      createdAt: flagRequests.createdAt,
+      updatedAt: flagRequests.updatedAt,
+      deleted: flagRequests.deleted,
+      userMessage: flagRequests.userMessage,
+      userName: users.name,
+    })
     .from(flagRequests)
+    .leftJoin(users, eq(flagRequests.userId, users.id))
     .limit(limit)
     .where(
       and(
@@ -190,6 +204,12 @@ export async function approveFlagEditRequest(flagRequestId: string) {
 
   if (!flag) {
     return false;
+  }
+
+  const isImageChanged = flagRequest.flag.flagImage !== flagRequest.oldFlag?.flagImage;
+
+  if (isImageChanged && flagRequest.oldFlag?.flagImage?.includes(CLOUD_FRONT_URL)) {
+    await deleteFileFromUrl(flagRequest.oldFlag?.flagImage ?? "");
   }
 
   await db

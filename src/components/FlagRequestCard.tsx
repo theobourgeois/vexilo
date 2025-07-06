@@ -4,7 +4,7 @@ import { approveFlagEditRequest, approveFlagRequest, declineFlagRequest } from "
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { flagRequests } from "@/db/schema";
+import { FlagRequestWithUser } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -26,7 +26,7 @@ function arraysEqual(a: string[], b: string[]): boolean {
 }
 
 interface FlagRequestCardProps {
-    flagRequest: typeof flagRequests.$inferSelect;
+    flagRequest: FlagRequestWithUser;
     page: number;
     isEdit: boolean;
 }
@@ -264,7 +264,7 @@ export function FlagRequestCard({ flagRequest, page, isEdit }: FlagRequestCardPr
                 <div className="pt-4 border-t">
                     <div className="text-sm text-gray-500">
                         <div>Request ID: {flagRequest.id}</div>
-                        <div>User ID: {flagRequest.userId}</div>
+                        <div>User: {flagRequest.userName || 'Anonymous'} ({flagRequest.userId})</div>
                         <div>Created: {new Date(flagRequest.createdAt).toLocaleString()}</div>
                         <div>Updated: {new Date(flagRequest.updatedAt).toLocaleString()}</div>
                     </div>

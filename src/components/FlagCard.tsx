@@ -134,12 +134,12 @@ export default function FlagCard({
             <DialogContent
                 className={
                     editMode
-                        ? "md:max-w-2xl h-11/12 overflow-y-auto"
+                        ? "md:max-w-2xl max-h-11/12 overflow-y-auto"
                         : undefined
                 }
             >
                 <DialogHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-2">
                         <div>
                             <DialogTitle>{flagName}</DialogTitle>
                         </div>
