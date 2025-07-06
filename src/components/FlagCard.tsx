@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ExternalLink, Heart, Edit, X } from "lucide-react";
+import { ExternalLink, Heart, Edit, X, Trash2 } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSession } from "next-auth/react";
 import React from "react";
 import FlagFieldsForm from "./FlagFieldsForm";
-import {  toggleFavoriteFlag } from "@/actions/flags";
+import {  toggleFavoriteFlag, deleteFlag } from "@/actions/flags";
 import {  useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -67,6 +67,22 @@ export default function FlagCard({
         setEditMode(!editMode);
     };
 
+    const handleDeleteClick = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!session?.user?.isAdmin) {
+            toast.error("You must be an admin to delete flags");
+            return;
+        }
+        
+        const isSuccess = await deleteFlag(id);
+        if (isSuccess) {
+            toast.success("Flag deleted successfully");
+            queryClient.invalidateQueries({ queryKey: ["flags"] });
+        } else {
+            toast.error("Failed to delete flag");
+        }
+    };
+
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -76,7 +92,7 @@ export default function FlagCard({
                         <Button
                             variant="neutral"
                             size="sm"
-                            className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white shadow-md border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                            className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white shadow-md border border-gray-200 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                             onClick={handleFavoriteToggle}
                         >
                             <Heart
@@ -177,6 +193,17 @@ export default function FlagCard({
                                             Edit
                                         </>
                                     )}
+                                </Button>
+                            )}
+                            {session?.user?.isAdmin && (
+                                <Button
+                                    variant="neutral"
+                                    size="sm"
+                                    onClick={handleDeleteClick}
+                                    className="flex items-center gap-2 ml-2 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete
                                 </Button>
                             )}
                         </div>

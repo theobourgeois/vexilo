@@ -169,7 +169,7 @@ export const favorites = createTable("favorite", {
     .references(() => users.id),
   flagId: uuid("flag_id")
     .notNull()
-    .references(() => flags.id),
+    .references(() => flags.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 

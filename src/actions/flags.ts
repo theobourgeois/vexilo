@@ -157,7 +157,6 @@ export async function getUserFavorites(
   limit: number,
   query?: string,
   orderBy: keyof typeof flags.$inferSelect = "updatedAt",
-  orderDirection: "asc" | "desc" = "desc"
 ) {
   const user = await db
     .select()
@@ -172,6 +171,13 @@ export async function getUserFavorites(
 
   const boundedLimit = Math.min(limit, 100);
 
+  function orderByClause(orderBy: keyof typeof flags.$inferSelect) {
+    if (orderBy === "updatedAt") {
+      return desc(favorites.createdAt);
+    }
+    return desc(flags[orderBy]);
+  }
+
   const flgs = await db
     .select({
       id: flags.id,
@@ -185,11 +191,18 @@ export async function getUserFavorites(
       isFavorite: await isFavorite()
     })
     .from(flags)
+    .leftJoin(
+      favorites,
+      and(
+        eq(favorites.flagId, flags.id),
+        eq(favorites.userId, userId)
+      )
+    )
     .where(and(ilike(flags.name, `%${query}%`), await isFavorite(userId)))
     .orderBy(
       query
         ? sql`similarity(${flags.name}, ${query}) DESC`
-        : orderByClause(orderBy, orderDirection)
+        : orderByClause(orderBy)
     )
     .limit(boundedLimit)
     .offset((page - 1) * boundedLimit);
@@ -202,7 +215,6 @@ export async function getFavouriteFlags(
   limit: number,
   query?: string,
   orderBy: keyof typeof flags.$inferSelect = "updatedAt",
-  orderDirection: "asc" | "desc" = "desc"
 ) {
   const session = await getServerAuthSession();
   if (!session?.user) {
@@ -215,7 +227,6 @@ export async function getFavouriteFlags(
     limit,
     query,
     orderBy,
-    orderDirection
   );
 }
 
@@ -480,7 +491,6 @@ export async function getProfileUserFavorites(
     REQUESTS_PER_PAGE,
     "",
     "updatedAt",
-    "desc"
   )
 
   const totalFlagsCount = await db
@@ -492,4 +502,40 @@ export async function getProfileUserFavorites(
     flags: userFlags,
     count: totalFlagsCount[0].count,
   };
+}
+
+export async function deleteFlag(flagId: string) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return false;
+  }
+
+  await db.delete(flags).where(eq(flags.id, flagId));
+  return true;
+}
+
+export async function updateFlag(
+  flagId: string,
+  data: {
+    name?: string;
+    image?: string;
+    link?: string;
+    description?: string;
+    tags?: string[];
+  }
+) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    throw new Error("Unauthorized");
+  }
+
+  await db
+    .update(flags)
+    .set({
+      ...data,
+      updatedAt: new Date(),
+    })
+    .where(eq(flags.id, flagId));
+
+  return true;
 }
