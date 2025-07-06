@@ -29,6 +29,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { SvgLogo } from "@/components/svg-logo";
 import { blobUrlToBase64 } from "@/lib/blob-to-url";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function PostFlagPage() {
     const { data: session, status } = useSession();
@@ -44,6 +45,7 @@ export default function PostFlagPage() {
     const [description, setDescription] = useState("");
     const router = useRouter();
     const [fileType, setFileType] = useState<string | null>(null);
+    const [userMessage, setUserMessage] = useState("");
 
     // Check if all required fields are filled
     const isFormValid =
@@ -126,7 +128,7 @@ export default function PostFlagPage() {
                 flag.flagImage = await blobUrlToBase64(flag.flagImage, contentType);
             }
 
-            const result = await createFlagRequest(flag);
+            const result = await createFlagRequest(flag, null, userMessage);
             if (result.success) {
                 setIsPosted(true);
                 toast.success("Flag posted successfully!", {
@@ -245,19 +247,13 @@ export default function PostFlagPage() {
                 </div>
 
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Flag Details</CardTitle>
-                        <CardDescription>
-                            Fill in the details about the flag you want to share
-                        </CardDescription>
-                    </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="space-y-2">
                             <label
                                 htmlFor="title"
                                 className="text-sm font-semibold"
                             >
-                                Flag Title
+                                Flag Title *
                             </label>
                             <Input
                                 id="title"
@@ -289,7 +285,7 @@ export default function PostFlagPage() {
                                 htmlFor="source"
                                 className="text-sm font-semibold"
                             >
-                                Source
+                                Source *
                             </label>
                             <Input
                                 id="source"
@@ -356,7 +352,7 @@ export default function PostFlagPage() {
                                 htmlFor="image"
                                 className="text-sm font-semibold"
                             >
-                                Flag Image
+                                Flag Image *
                             </label>
                             <Alert className="mb-4 mt-2">
                                 <Info />
@@ -453,6 +449,21 @@ export default function PostFlagPage() {
                                         )}
                                     </div>
                                 </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="userMessage"
+                                    className="text-sm font-semibold"
+                                >
+                                    Message
+                                </label>
+                                <Textarea
+                                    id="userMessage"
+                                    placeholder="Enter a message for the admin..."
+                                    value={userMessage}
+                                    onChange={(e) => setUserMessage(e.target.value)}
+                                    className="w-full"
+                                />
                             </div>
                         </div>
 

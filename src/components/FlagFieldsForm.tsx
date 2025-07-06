@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ export default function FlagFieldsForm({
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState(initialFlag.flagImage || "");
     const [fileType, setFileType] = useState<string | null>(null);
+    const [userMessage, setUserMessage] = useState("");
 
     const addTag = (tag: string) => {
         const trimmedTag = tag.trim();
@@ -105,7 +106,7 @@ export default function FlagFieldsForm({
                 flag.flagImage = await blobUrlToBase64(flag.flagImage, contentType);
             }
 
-            const result = await createFlagRequest(flag, initialFlag.id);
+            const result = await createFlagRequest(flag, initialFlag.id, userMessage);
             if (result.success) {
                 toast.success("Flag update request sent! Please wait for approval.");
             } else {
@@ -117,6 +118,16 @@ export default function FlagFieldsForm({
             toast.error("An error occurred while posting the flag.");
         }
     };
+
+    const isChangeMade = useMemo(() => {
+        return flagName !== initialFlag.flagName ||
+            description !== initialFlag.description ||
+            link !== initialFlag.link ||
+            tags !== initialFlag.tags ||
+            flagImage !== initialFlag.flagImage;
+            
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flagName, description, link, tags, flagImage]);
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -219,57 +230,58 @@ export default function FlagFieldsForm({
                     Flag Image
                 </label>
                 <div className="space-y-4">
-                    <div
-                        className="border-2 border-dashed border-main rounded-lg p-6 text-center bg-secondary-background hover:bg-secondary-background/80 transition-colors"
-                        onDrop={handleDrop}
-                        onDragOver={handleDragOver}
-                    >
-                        <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <div className="mt-4">
-                            <input
-                                type="file"
-                                id="file-upload"
-                                accept="image/*,.svg"
-                                onChange={handleImageChange}
-                                className="hidden"
-                            />
-                            <label
-                                htmlFor="file-upload"
-                                className="cursor-pointer inline-block"
-                            >
-                                <Button
-                                    variant="neutral"
-                                    className="mb-2"
-                                    asChild
-                                >
-                                    <span>Choose File</span>
-                                </Button>
-                            </label>
-                            {imageFile && (
-                                <p className="text-sm text-green-600 mb-2">
-                                    ✓ {imageFile.name}
-                                </p>
-                            )}
-                            <p className="text-sm text-muted-foreground">
-                                Drag and drop an image here, or click to browse
-                            </p>
-                        </div>
-                    </div>
-                    {previewUrl && (
-                        <div className="space-y-2">
-                            <p className="text-sm font-semibold">Preview</p>
-                            <div className="border rounded-lg p-4 bg-secondary-background">
-                                <Image
-                                    width={100}
-                                    height={100}
-                                    src={previewUrl}
-                                    alt="Flag preview"
-                                    className="max-w-full h-auto max-h-64 mx-auto rounded"
-                                    onError={() => setPreviewUrl("")}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div
+                            className="border-2 border-dashed border-main rounded-lg p-6 text-center bg-secondary-background hover:bg-secondary-background/80 transition-colors"
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                        >
+                            <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                            <div className="mt-4">
+                                <input
+                                    type="file"
+                                    id="file-upload"
+                                    accept="image/*,.svg"
+                                    onChange={handleImageChange}
+                                    className="hidden"
                                 />
+                                <label
+                                    htmlFor="file-upload"
+                                    className="cursor-pointer inline-block"
+                                >
+                                    <Button
+                                        variant="neutral"
+                                        className="mb-2"
+                                        asChild
+                                    >
+                                        <span>Choose File</span>
+                                    </Button>
+                                </label>
+                                {imageFile && (
+                                    <p className="text-sm truncate text-green-600 mb-2" title={imageFile.name}>
+                                        ✓ {imageFile.name}
+                                    </p>
+                                )}
+                                <p className="text-sm text-muted-foreground">
+                                    Drag and drop an image here, or click to browse
+                                </p>
                             </div>
                         </div>
-                    )}
+                        {previewUrl && (
+                            <div className="space-y-2 flex-col h-full">
+                                <div className="border rounded-lg p-4 bg-secondary-background flex-1 h-full flex items-center justify-center">
+                                    <Image
+                                        width={100}
+                                        height={100}
+                                        src={previewUrl}
+                                        alt="Flag preview"
+                                        className="max-w-full h-auto max-h-64 mx-auto rounded"
+                                        onError={() => setPreviewUrl("")}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     <div className="space-y-2">
                         <p className="text-sm text-muted-foreground text-center">
                             - or -
@@ -285,8 +297,23 @@ export default function FlagFieldsForm({
                     </div>
                 </div>
             </div>
+            <div className="space-y-2">
+                <label
+                    htmlFor="userMessage"
+                    className="text-sm font-semibold"
+                >
+                    Message
+                </label>
+                <Textarea
+                    id="userMessage"
+                    placeholder="Enter a message for the admin..."
+                    value={userMessage}
+                    onChange={(e) => setUserMessage(e.target.value)}
+                    className="w-full"
+                />
+            </div>
             <div className="flex gap-4 pt-4">
-                <Button className="flex-1" type="submit">
+                <Button className="flex-1" type="submit" disabled={!isChangeMade}>
                     Save
                 </Button>
                 <Button

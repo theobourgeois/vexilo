@@ -237,7 +237,8 @@ const MAX_FLAG_REQUESTS = 100;
 
 export async function createFlagRequest(
   flag: Omit<Flag, "index" | "id">,
-  flagId?: string
+  flagId?: string,
+  userMessage?: string
 ) {
   const session = await getServerAuthSession();
   if (!session?.user) {
@@ -320,6 +321,7 @@ export async function createFlagRequest(
     userId: session.user.id,
     flagId: flagId ?? null,
     oldFlag: oldFlag ?? null,
+    userMessage: userMessage ?? "",
     flag: {
       ...flag,
       index: -1,

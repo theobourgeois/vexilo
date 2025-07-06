@@ -2,18 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X, ArrowRight, Heart, Flag, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, X, ArrowRight, Heart, Flag } from "lucide-react";
 import { ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 
 import FlagCard from "./FlagCard";
 import { useQuery } from "@tanstack/react-query";
@@ -188,11 +183,6 @@ export default function FlagSearch() {
         router.replace(`${window.location.pathname}?${params.toString()}`, { scroll: false });
     }, [router, searchParams]);
 
-    const getSortIcon = (field: OrderBy) => {
-        if (orderBy !== field) return <ArrowUpDown className="w-4 h-4" />;
-        return orderDirection === "asc" ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />;
-    };
-
     return (
         <div className="space-y-6">
             {/* Search Header */}
@@ -258,31 +248,21 @@ export default function FlagSearch() {
                                 )}
                             </div>
                             
-                            {/* Sort Dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="neutral" className="flex items-center gap-2">
-                                        {getSortIcon(orderBy)}
-                                        Sort by {orderBy === "name" ? "Name" : "Date"}
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-background text-black dark:text-white">
-                                    <DropdownMenuItem 
-                                        onClick={() => handleSortChange("name", orderBy === "name" && orderDirection === "asc" ? "desc" : "asc")}
-                                        className="flex items-center gap-2 bg-white dark:bg-background"
-                                    >
-                                        {orderBy === "name" ? (orderDirection === "asc" ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4" />}
-                                        Name
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                        onClick={() => handleSortChange("updatedAt", orderBy === "updatedAt" && orderDirection === "desc" ? "asc" : "desc")}
-                                        className="flex items-center gap-2 bg-white dark:bg-background"
-                                    >
-                                        {orderBy === "updatedAt" ? (orderDirection === "desc" ? <ArrowDown className="w-4 h-4" /> : <ArrowUp className="w-4 h-4" />) : <ArrowUpDown className="w-4 h-4" />}
-                                        Date
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            {/* Sort Buttons */}
+                            <div className="flex gap-2">
+                                <Button 
+                                    variant={orderBy === "updatedAt" && orderDirection === "desc" ? "default" : "neutral"}
+                                    onClick={() => handleSortChange("updatedAt", "desc")}
+                                >
+                                    Latest
+                                </Button>
+                                <Button 
+                                    variant={orderBy === "favorites" && orderDirection === "desc" ? "default" : "neutral"}
+                                    onClick={() => handleSortChange("favorites", "desc")}
+                                >
+                                    Popular
+                                </Button>
+                            </div>
                          
                             <div className="text-sm text-gray-500">
                                 {flagsCount || 0} of{" "}

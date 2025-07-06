@@ -32,12 +32,21 @@ function Requests({ page }: { page: number }) {
                 </Badge>
             </div>
             {flagRequests?.map((flagRequest) => (
-                <FlagRequestCard
-                    isEdit={flagRequest.flagId !== null}
-                    key={flagRequest.id}
-                    flagRequest={flagRequest}
-                    page={page}
-                />
+                <div key={flagRequest.id} className="space-y-4">
+                    {flagRequest.userMessage && (
+                        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                            <div className="flex items-start gap-2">
+                                <div className="text-blue-600 font-semibold">User Message:</div>
+                                <div className="text-blue-800">{flagRequest.userMessage}</div>
+                            </div>
+                        </div>
+                    )}
+                    <FlagRequestCard
+                        isEdit={flagRequest.flagId !== null}
+                        flagRequest={flagRequest}
+                        page={page}
+                    />
+                </div>
             ))}
         </div>
     );
