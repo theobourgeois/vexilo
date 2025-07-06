@@ -128,7 +128,7 @@ export default function PostFlagPage() {
                 flag.flagImage = await blobUrlToBase64(flag.flagImage, contentType);
             }
 
-            const result = await createFlagRequest(flag, null, userMessage);
+            const result = await createFlagRequest(flag, undefined, userMessage);
             if (result.success) {
                 setIsPosted(true);
                 toast.success("Flag posted successfully!", {
