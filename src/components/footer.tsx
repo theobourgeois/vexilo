@@ -4,9 +4,9 @@ import { Button } from "./ui/button";
 
 export function Footer() {
     return (
-        <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <footer className="border-t border-main bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
  {/* Footer */}
-            <div className="text-center py-8 text-foreground/60">
+            <div className="text-center py-4 text-foreground/60">
                 <div className="mt-4">
                     <Button
                         asChild
@@ -104,7 +104,7 @@ export function Footer() {
                     </div>
                 </div>
 
-                <div className="border-t mt-8 pt-6">
+                <div className="border-t mt-8 pt-6 border-main/20">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <p className="text-sm text-muted-foreground">
                             © {new Date().getFullYear()} Vexilo. All rights reserved.
