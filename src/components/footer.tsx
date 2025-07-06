@@ -22,16 +22,6 @@ export function Footer() {
                         </a>
                     </Button>
                 </div>
-                <div className="mt-2">
-                    <a
-                        href="https://github.com/theobourgeois/vexilo"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-main transition-colors"
-                    >
-                        View on GitHub: theobourgeois/vexilo
-                    </a>
-                </div>
             </div>
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid gap-8 md:grid-cols-4">
@@ -119,9 +109,7 @@ export function Footer() {
                         <p className="text-sm text-muted-foreground">
                             © {new Date().getFullYear()} Vexilo. All rights reserved.
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                            Built for flag enthusiasts, by flag enthusiasts.
-                        </p>
+                       
                     </div>
                 </div>
             </div>
