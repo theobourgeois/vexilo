@@ -58,6 +58,7 @@ export async function getUserData() {
       image: users.image,
       isAdmin: users.isAdmin,
       isAnonymous: users.isAnonymous,
+      userNumber: users.userNumber,
     })
     .from(users)
     .where(eq(users.id, session.user.id))

@@ -4,7 +4,7 @@ import { useSession, signOut, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { FcGoogle } from "react-icons/fc";
-import { LogOut, Loader2, Shield, Settings } from "lucide-react";
+import { LogOut, Loader2, Shield, Settings, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
     DropdownMenu,
@@ -73,6 +73,13 @@ export function AuthHeader() {
                 <div className="px-2 py-1.5 text-sm font-medium text-gray-900 border-b border-gray-200">
                     {userData?.user?.name || session.user?.name || "User"}
                 </div>
+                <DropdownMenuItem
+                    onClick={() => router.push(`/profile/${userData?.user?.userNumber || "me"}`)}
+                    className="bg-white"
+                >
+                    <User className="h-4 w-4" />
+                    Profile
+                </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={() => router.push("/settings")}
                     className="bg-white"

@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, CheckCircle, XCircle, Heart } from "lucide-react";
+import { RefreshCw, CheckCircle, XCircle, Heart, Eye } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { getRandomFlagsForQuiz } from "@/actions/flags";
 import { toggleFavoriteFlag } from "@/actions/flags";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import FlagDetailsDialog from "./FlagDetailsDialog";
 
 
 type DbFlag = {
@@ -37,6 +38,7 @@ export default function FlagQuiz() {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [_, setFavoriteCount] = useState(0);
     const [isFavorite, setIsFavorite] = useState(false);
+    const [showFlagDialog, setShowFlagDialog] = useState(false);
 
     const { data: session } = useSession();
     const queryClient = useQueryClient();
@@ -283,13 +285,43 @@ export default function FlagQuiz() {
                     </div>
                 )}
 
-                {/* Next Question Button */}
+                {/* Show Flag and Next Question Buttons */}
                 {selectedAnswer && (
-                    <div className="text-center">
-                        <Button onClick={handleNextQuestion} className="mt-2">
-                            Next Question
-                        </Button>
+                    <div className="text-center space-y-2">
+                        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                            <Button 
+                                variant="neutral" 
+                                onClick={() => setShowFlagDialog(true)}
+                                className="flex items-center gap-2"
+                            >
+                                <Eye className="w-4 h-4" />
+                                Show Flag Details
+                            </Button>
+                            <Button onClick={handleNextQuestion}>
+                                Next Question
+                            </Button>
+                        </div>
                     </div>
+                )}
+
+                {/* Flag Details Dialog */}
+                {currentQuestion && (
+                    <FlagDetailsDialog
+                        open={showFlagDialog}
+                        showEditControls
+                        onOpenChange={setShowFlagDialog}
+                        flag={{
+                            id: currentQuestion.id,
+                            flagName: currentQuestion.name,
+                            flagImage: currentQuestion.image,
+                            link: currentQuestion.link,
+                            index: currentQuestion.index,
+                            tags: [],
+                            description: "",
+                            favorites: currentQuestion.favorites,
+                            isFavorite: currentQuestion.isFavorite,
+                        }}
+                    />
                 )}
             </CardContent>
         </Card>
