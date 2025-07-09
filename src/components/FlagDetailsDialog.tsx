@@ -94,11 +94,11 @@ export default function FlagDetailsDialog({
                 className={
                     editMode
                         ? "md:max-w-2xl max-h-11/12 overflow-y-auto"
-                        : undefined
+                        :"md:max-w-2xl max-h-11/12 overflow-y-auto" 
                 }
             >
                 <DialogHeader>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-4">
                         <div>
                             <DialogTitle>{flag.flagName}</DialogTitle>
                         </div>
@@ -206,7 +206,7 @@ export default function FlagDetailsDialog({
                                     rel="noopener noreferrer"
                                 >
                                     <ExternalLink className="w-4 h-4 mr-2" />
-                                    Learn More
+                                    View Source
                                 </Link>
                             </Button>
                             <Button asChild>
@@ -215,7 +215,18 @@ export default function FlagDetailsDialog({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
+                                    <ExternalLink className="w-4 h-4 mr-2" />
                                     View Full Size Image
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <Link
+                                    href={`https://krikienoid.github.io/flagwaver/#?src=${encodeURIComponent(flag.flagImage)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <ExternalLink className="w-4 h-4 mr-2" />
+                                    View on Flag Waver
                                 </Link>
                             </Button>
                         </div>
