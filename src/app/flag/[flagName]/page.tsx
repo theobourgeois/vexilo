@@ -8,12 +8,51 @@ import { Badge } from "@/components/ui/badge";
 import { notFound } from "next/navigation";
 import FlagActions from "./FlagActions";
 import FlagCard from "@/components/FlagCard";
+import { Metadata } from "next";
 
 export type RelatedFlag = {
     name: string;
     image: string;
     link: string;
 };
+
+type Props = {
+    params: Promise<{ flagName: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const flagName = decodeURIComponent((await params).flagName);
+  const flag = await getFlagFromName(flagName);
+  if (flag) {
+      return {
+          title: `${flag.name} - Vexilo`,
+          description: flag.description,
+          keywords: [
+              flag.name,
+              ...flag.tags,
+              "Vexilo",
+              "Flags",
+              "World Flags",
+              "Flag Collection",
+              "Flag Search",
+              "Flag Collection",
+          ],
+      };
+  }
+
+  return {
+      title: "Flag Not Found - Vexilo",
+      description:
+          "The flag you're looking for doesn't exist. Please check the flag name and try again.",
+      keywords: [
+          "Vexilo",
+          "Flags",
+          "World Flags",
+          "Flag Collection",
+          "Flag Search",
+      ],
+  };
+}
 
 export default async function FlagPage({
     params,
