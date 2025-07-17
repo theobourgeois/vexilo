@@ -150,6 +150,7 @@ export async function approveFlagRequest(flagRequestId: string) {
 		.insert(flags)
 		.values({
 			name: flagRequest.flag.flagName,
+			relatedFlags: flagRequest.flag.relatedFlags?.map((flag) => flag.id),
 			image: flagRequest.flag.flagImage,
 			link: flagRequest.flag.link,
 			index: index,

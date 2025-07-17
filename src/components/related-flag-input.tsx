@@ -100,7 +100,7 @@ export default function RelatedFlagInput({
 								<div className="space-y-0">
 									{recommendations
 										.map((flag) => {
-											const isSelected = isFlagSelected(flag.name);
+											const isSelected = isFlagSelected(flag.id);
 											return (
 												<div
 													key={flag.id}
