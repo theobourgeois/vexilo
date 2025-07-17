@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Search, Save, X, Trash2 } from "lucide-react";
+import Image from "next/image";
 
 function Requests({ page }: { page: number }) {
     const { data: flagRequestsData } = useQuery({
@@ -269,13 +270,15 @@ function EditFlags({ page }: { page: number }) {
                                             <div className="flex-1">
                                                 <div className="flex gap-4">
                                                     <div className="flex-shrink-0">
-                                                        <img 
+                                                        <Image
                                                             src={flag.image} 
                                                             alt={flag.name}
                                                             className="w-24 h-16 object-cover rounded border"
                                                             onError={(e) => {
                                                                 e.currentTarget.src = "/logo.svg";
                                                             }}
+                                                            width={96}
+                                                            height={64}
                                                         />
                                                     </div>
                                                     <div className="flex-1">

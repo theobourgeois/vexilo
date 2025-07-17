@@ -13,7 +13,7 @@ import { toggleFavoriteFlag } from "@/actions/flags";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import FlagDetailsDialog from "./FlagDetailsDialog";
-
+import { useRouter } from "next/navigation";
 
 type DbFlag = {
     id: string;
@@ -28,6 +28,7 @@ type DbFlag = {
 };
 
 export default function FlagQuiz() {
+    const router = useRouter();
     const [currentQuestion, setCurrentQuestion] = useState<DbFlag | null>(null);
     const [options, setOptions] = useState<string[]>([]);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -291,7 +292,7 @@ export default function FlagQuiz() {
                         <div className="flex flex-col sm:flex-row gap-2 justify-center">
                             <Button 
                                 variant="neutral" 
-                                onClick={() => setShowFlagDialog(true)}
+                                onClick={() => router.push(`/flag/${encodeURIComponent(currentQuestion.name)}`)}
                                 className="flex items-center gap-2"
                             >
                                 <Eye className="w-4 h-4" />
