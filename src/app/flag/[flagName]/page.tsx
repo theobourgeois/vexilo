@@ -39,6 +39,16 @@ export default async function FlagPage({
                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
                     {flag.name}
                 </h1>
+                {/* Tags before description */}
+                {flag.tags && flag.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 justify-center mb-2">
+                        {flag.tags.map((tag: string) => (
+                            <Badge key={tag} variant="neutral">
+                                {tag}
+                            </Badge>
+                        ))}
+                    </div>
+                )}
                 {flag.description && (
                     <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
                         {flag.description}
