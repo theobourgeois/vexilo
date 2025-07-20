@@ -21,6 +21,7 @@ import {
 import { flags } from "@/db/schema";
 import Tag from "./Tag";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 type OrderBy = keyof typeof flags.$inferSelect;
 
@@ -247,7 +248,7 @@ export default function FlagSearch() {
 							</Button>
 						</div>
 						<div className="flex flex-col sm:flex-row gap-4 items-center">
-							<div className="relative flex-1 max-w-md">
+							<div className="relative flex-1 md:max-w-md w-full">
 								<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
 								<Input
 									type="text"
@@ -263,7 +264,10 @@ export default function FlagSearch() {
 											{ scroll: false },
 										);
 									}}
-									className={`pl-10 ${searchQuery ? "pr-10" : ""}`}
+									className={cn(
+										"w-full pl-10",
+										searchQuery && "pr-10"
+									)}
 								/>
 								{searchQuery && (
 									<button

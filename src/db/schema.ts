@@ -196,3 +196,17 @@ export const flagTags = createTable("flag_tag", {
 export const flagTagsRelations = relations(flagTags, ({ many }) => ({
 	flags: many(flags),
 }));
+
+export const reports = 
+	createTable("report", {
+	id: uuid("id").primaryKey().defaultRandom(),
+	userId: uuid("user_id")
+		.notNull()
+		.references(() => users.id),
+	flagId: uuid("flag_id").notNull().references(() => flags.id),
+	reason: varchar("reason", { length: 255 }).notNull(),
+	description: text("description").notNull().default(""),
+	createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+	resolved: boolean("resolved").notNull().default(false),
+	resolvedAt: timestamp("resolved_at", { mode: "date" }),
+});

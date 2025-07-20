@@ -36,24 +36,23 @@ export default function RelatedFlagInput({
 	// Handle clicking outside to close dropdown
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
-			if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+			if (
+				dropdownRef.current &&
+				!dropdownRef.current.contains(event.target as Node)
+			) {
 				setIsDropdownOpen(false);
 			}
 		};
 
-		document.addEventListener('mousedown', handleClickOutside);
+		document.addEventListener("mousedown", handleClickOutside);
 		return () => {
-			document.removeEventListener('mousedown', handleClickOutside);
+			document.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, []);
 
-	const handleSelect = (flag: {
-		id: string;
-		name: string;
-		image: string;
-	}) => {
-		const isAlreadySelected = relatedFlags.some(f => f.id === flag.id);
-		
+	const handleSelect = (flag: { id: string; name: string; image: string }) => {
+		const isAlreadySelected = relatedFlags.some((f) => f.id === flag.id);
+
 		if (isAlreadySelected) {
 			onRemove(flag.id);
 		} else {
@@ -70,7 +69,7 @@ export default function RelatedFlagInput({
 	};
 
 	const isFlagSelected = (id: string) => {
-		return relatedFlags.some(f => f.id === id);
+		return relatedFlags.some((f) => f.id === id);
 	};
 
 	return (
@@ -98,32 +97,31 @@ export default function RelatedFlagInput({
 								</div>
 							) : recommendations && recommendations.length > 0 ? (
 								<div className="space-y-0">
-									{recommendations
-										.map((flag) => {
-											const isSelected = isFlagSelected(flag.id);
-											return (
-												<div
-													key={flag.id}
-													className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary-background transition-colors cursor-pointer"
-													onClick={() => handleSelect(flag)}
-												>
-													<div className="flex-shrink-0 w-4 h-4 border-2 border-border rounded flex items-center justify-center bg-background">
-														{isSelected && (
-															<Check className="h-3 w-3 text-primary" />
-														)}
-													</div>
-													<div className="relative w-8 h-6 rounded overflow-hidden border border-border flex-shrink-0">
-														<Image
-															src={flag.image}
-															alt={flag.name}
-															fill
-															className="object-cover"
-														/>
-													</div>
-													<span className="font-medium text-sm">{flag.name}</span>
+									{recommendations.map((flag) => {
+										const isSelected = isFlagSelected(flag.id);
+										return (
+											<div
+												key={flag.id}
+												className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary-background transition-colors cursor-pointer"
+												onClick={() => handleSelect(flag)}
+											>
+												<div className="flex-shrink-0 w-4 h-4 border-2 border-border rounded flex items-center justify-center bg-background">
+													{isSelected && (
+														<Check className="h-3 w-3 text-primary" />
+													)}
 												</div>
-											);
-										})}
+												<div className="relative w-8 h-6 rounded overflow-hidden border border-border flex-shrink-0">
+													<Image
+														src={flag.image}
+														alt={flag.name}
+														fill
+														className="object-cover"
+													/>
+												</div>
+												<span className="font-medium text-sm">{flag.name}</span>
+											</div>
+										);
+									})}
 								</div>
 							) : (
 								<div className="text-center py-4 text-muted-foreground text-sm">

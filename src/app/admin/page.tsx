@@ -5,6 +5,7 @@ import { getPendingFlagRequests } from "@/actions/requests";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FlagRequestCard } from "@/components/FlagRequestCard";
+import { Reports } from "@/components/Reports";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
@@ -430,12 +431,18 @@ function AdminContent() {
                     <Tabs defaultValue="requests" className="w-full">
                         <TabsList>
                             <TabsTrigger value="requests">Flag Requests</TabsTrigger>
+                            <TabsTrigger value="reports">Reports</TabsTrigger>
                             <TabsTrigger value="edit">Edit Flags</TabsTrigger>
                             <TabsTrigger value="misc">Misc</TabsTrigger>
                         </TabsList>
                         
                         <TabsContent value="requests" className="space-y-4">
                             <Requests page={page} />
+                            <Pagination page={page} />
+                        </TabsContent>
+                        
+                        <TabsContent value="reports" className="space-y-4">
+                            <Reports page={page} />
                             <Pagination page={page} />
                         </TabsContent>
                         

@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, Edit, Trash2 } from "lucide-react";
+import { Heart, Edit, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toggleFavoriteFlag, deleteFlag } from "@/actions/flags";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import FlagFieldsForm from "@/components/FlagFieldsForm";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { ReportDialog } from "@/components/ReportDialog";
 import { RelatedFlag } from "@/lib/types";
 
 type FlagActionsProps = {
@@ -96,6 +97,18 @@ export default function FlagActions({ flag }: FlagActionsProps) {
                 />
                 {isFavorite ? "Favorited" : "Favorite"}
             </Button>
+            
+            <ReportDialog flagId={flag.id} flagName={flag.name}>
+                <Button
+                    variant="neutral"
+                    size="sm"
+                    className="flex items-center gap-2"
+                >
+                    <AlertTriangle className="w-4 h-4" />
+                    Report
+                </Button>
+            </ReportDialog>
+            
             {session && (
                 <Dialog
                     open={isDialogOpen}

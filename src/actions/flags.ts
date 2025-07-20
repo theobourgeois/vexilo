@@ -362,6 +362,7 @@ export async function getUserFavorites(
 	limit: number,
 	query?: string,
 	orderBy: keyof typeof flags.$inferSelect = "updatedAt",
+	orderDirection: "asc" | "desc" = "desc",
 	tag?: string,
 ) {
 	const user = await db
@@ -381,7 +382,9 @@ export async function getUserFavorites(
 		if (orderBy === "updatedAt") {
 			return desc(favorites.createdAt);
 		}
-		return desc(flags[orderBy]);
+		return orderDirection === "asc"
+			? asc(flags[orderBy])
+			: desc(flags[orderBy]);
 	}
 
 	const flgs = await db
@@ -424,6 +427,7 @@ export async function getFavouriteFlags(
 	limit: number,
 	query?: string,
 	orderBy: keyof typeof flags.$inferSelect = "updatedAt",
+	orderDirection: "asc" | "desc" = "desc",
 	tag?: string,
 ) {
 	const session = await getServerAuthSession();
@@ -437,6 +441,7 @@ export async function getFavouriteFlags(
 		limit,
 		query,
 		orderBy,
+		orderDirection,
 		tag,
 	);
 }
