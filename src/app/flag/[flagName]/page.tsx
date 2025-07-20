@@ -1,4 +1,4 @@
-import { getFlagFromName } from "@/actions/flags";
+import { getFlagFromName, getRelatedFlags } from "@/actions/flags";
 import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Flag, Star, Eye } from "lucide-react";
@@ -10,6 +10,7 @@ import FlagActions from "./FlagActions";
 import FlagCard from "@/components/FlagCard";
 import { Metadata } from "next";
 import Tag from "@/components/Tag";
+import { Suspense } from "react";
 
 export type RelatedFlag = {
 	name: string;
@@ -53,6 +54,44 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 			"Flag Search",
 		],
 	};
+}
+
+// Separate component for related flags to enable streaming
+async function RelatedFlagsSection({ flagId }: { flagId: string }) {
+	const relatedFlags = await getRelatedFlags(flagId);
+
+	if (!relatedFlags || relatedFlags.length === 0) {
+		return null;
+	}
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle className="flex items-center gap-2">
+					<Star className="w-5 h-5" />
+					Related Flags
+				</CardTitle>
+			</CardHeader>
+			<CardContent>
+				<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+					{relatedFlags.map((relatedFlag) => (
+						<FlagCard
+							key={relatedFlag.id}
+							id={relatedFlag.id}
+							flagName={relatedFlag.name}
+							flagImage={relatedFlag.image}
+							favorites={relatedFlag.favorites}
+							isFavorite={relatedFlag.isFavorite}
+							link={relatedFlag.link}
+							index={relatedFlag.index}
+							tags={relatedFlag.tags}
+							description={relatedFlag.description}
+						/>
+					))}
+				</div>
+			</CardContent>
+		</Card>
+	);
 }
 
 export default async function FlagPage({
@@ -99,11 +138,7 @@ export default async function FlagPage({
 				<FlagActions
 					flag={{
 						...flag,
-						relatedFlags: flag.relatedFlags?.map((flag) => ({
-							id: flag.id,
-							name: flag.name,
-							image: flag.image,
-						})),
+						relatedFlags: [], // We'll load related flags separately
 					}}
 				/>
 			</div>
@@ -161,35 +196,31 @@ export default async function FlagPage({
 				</CardContent>
 			</Card>
 
-			{/* Related Flags */}
-			{flag.relatedFlags && flag.relatedFlags.length > 0 && (
-				<Card>
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2">
-							<Star className="w-5 h-5" />
-							Related Flags
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-							{flag.relatedFlags.map((relatedFlag) => (
-								<FlagCard
-									key={relatedFlag.id}
-									id={relatedFlag.id}
-									flagName={relatedFlag.name}
-									flagImage={relatedFlag.image}
-									favorites={relatedFlag.favorites}
-									isFavorite={relatedFlag.isFavorite}
-									link={relatedFlag.link}
-									index={relatedFlag.index}
-									tags={relatedFlag.tags}
-									description={relatedFlag.description}
-								/>
-							))}
-						</div>
-					</CardContent>
-				</Card>
-			)}
+			{/* Related Flags - Loaded separately for better performance */}
+			<Suspense
+				fallback={
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<Star className="w-5 h-5" />
+								Related Flags
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+								{Array.from({ length: 4 }, (_, i) => (
+									<div
+										key={`skeleton-${Date.now()}-${i}`}
+										className="h-48 bg-muted animate-pulse rounded-lg"
+									/>
+								))}
+							</div>
+						</CardContent>
+					</Card>
+				}
+			>
+				<RelatedFlagsSection flagId={flag.id} />
+			</Suspense>
 		</div>
 	);
 }

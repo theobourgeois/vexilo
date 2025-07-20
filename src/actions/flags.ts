@@ -13,10 +13,6 @@ import { getServerAuthSession } from "@/lib/auth";
 import { Flag } from "@/lib/types";
 import { and, asc, count, desc, eq, ilike, sql, inArray } from "drizzle-orm";
 
-type FlagWithRelatedFlags = Omit<typeof flags.$inferSelect, "relatedFlags"> & {
-	relatedFlags: (typeof flags.$inferSelect & { isFavorite: boolean })[];
-};
-
 // Helper function to update tag counts when tags are added or removed
 async function updateTagCounts(oldTags: string[], newTags: string[]) {
 	console.log("Updating tag counts", oldTags, newTags);
@@ -152,6 +148,9 @@ export async function getAllFlagTags(search?: string) {
 }
 
 export async function getFlagFromName(flagName: string) {
+	const session = await getServerAuthSession();
+	const userId = session?.user?.id;
+
 	const flag = await db
 		.select({
 			id: flags.id,
@@ -163,7 +162,13 @@ export async function getFlagFromName(flagName: string) {
 			description: flags.description,
 			favorites: flags.favorites,
 			relatedFlags: flags.relatedFlags,
-			isFavorite: await isFavorite(),
+			isFavorite: userId
+				? sql<boolean>`EXISTS (
+				SELECT 1 FROM vexilo_favorite 
+				WHERE vexilo_favorite.flag_id = vexilo_flag.id 
+				AND vexilo_favorite.user_id = ${userId}
+			)`
+				: sql<boolean>`false`,
 		})
 		.from(flags)
 		.where(eq(flags.name, flagName))
@@ -173,47 +178,70 @@ export async function getFlagFromName(flagName: string) {
 		return null;
 	}
 
-	const flagData = flag[0];
+	return flag[0];
+}
 
-	// If there are related flags, fetch them as full entities
+export async function getRelatedFlags(flagId: string) {
+	const session = await getServerAuthSession();
+	const userId = session?.user?.id;
+
+	// Get the flag data to extract related flags
+	const flagData = await db
+		.select({
+			id: flags.id,
+			relatedFlags: flags.relatedFlags,
+		})
+		.from(flags)
+		.where(eq(flags.id, flagId))
+		.limit(1);
+
+	if (!flagData?.[0]) {
+		return [];
+	}
+
+	// Find flags that have this flag in their related flags
 	const relatedToThisFlag = (
 		await db
 			.select({ id: flags.id })
 			.from(flags)
-			.where(sql`related_flags @> ${JSON.stringify([flagData.id])}::jsonb`)
+			.where(sql`related_flags @> ${JSON.stringify([flagId])}::jsonb`)
 	).map((flag) => flag.id);
 
 	// Extract IDs from relatedFlags - handle both string IDs and objects with id property
 	const relatedFlagIds = Array.from(
-		new Set(flagData.relatedFlags.concat(relatedToThisFlag).filter(Boolean)),
+		new Set(flagData[0].relatedFlags.concat(relatedToThisFlag).filter(Boolean)),
 	);
 
-	if (relatedFlagIds.length > 0) {
-		const relatedFlags =
-			(await db
-				.select({
-					id: flags.id,
-					name: flags.name,
-					image: flags.image,
-					link: flags.link,
-					index: flags.index,
-					tags: flags.tags,
-					description: flags.description,
-					createdAt: flags.createdAt,
-					updatedAt: flags.updatedAt,
-					favorites: flags.favorites,
-					relatedFlags: flags.relatedFlags,
-					isFavorite: await isFavorite(),
-				})
-				.from(flags)
-				.where(inArray(flags.id, relatedFlagIds))) || [];
-
-		return {
-			...flagData,
-			relatedFlags: relatedFlags,
-		};
+	if (relatedFlagIds.length === 0) {
+		return [];
 	}
-	return flagData as unknown as FlagWithRelatedFlags;
+
+	// Fetch the full related flag data
+	const relatedFlags = await db
+		.select({
+			id: flags.id,
+			name: flags.name,
+			image: flags.image,
+			link: flags.link,
+			index: flags.index,
+			tags: flags.tags,
+			description: flags.description,
+			createdAt: flags.createdAt,
+			updatedAt: flags.updatedAt,
+			favorites: flags.favorites,
+			relatedFlags: flags.relatedFlags,
+			isFavorite: userId
+				? sql<boolean>`EXISTS (
+				SELECT 1 FROM vexilo_favorite 
+				WHERE vexilo_favorite.flag_id = vexilo_flag.id 
+				AND vexilo_favorite.user_id = ${userId}
+			)`
+				: sql<boolean>`false`,
+		})
+		.from(flags)
+		.where(inArray(flags.id, relatedFlagIds));
+
+	return relatedFlags;
 }
 
 export async function getRandomFlag() {

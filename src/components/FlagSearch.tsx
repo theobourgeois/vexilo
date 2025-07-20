@@ -101,7 +101,9 @@ export default function FlagSearch() {
 		queryFn: async () => {
 			return await getTopFlagTags(20);
 		},
+		staleTime: 10 * 60 * 1000, // 10 minutes
 	});
+
 	const tag = searchParams.get("tag") || "";
 
 	const { data: flags, isLoading: flagsLoading } = useQuery({
@@ -137,6 +139,7 @@ export default function FlagSearch() {
 				}));
 			});
 		},
+		staleTime: 2 * 60 * 1000, // 2 minutes
 	});
 
 	const { data: flagsCount } = useQuery({
@@ -145,6 +148,7 @@ export default function FlagSearch() {
 			const fetchFn = isFavorites ? getFavoriteFlagsCount : getFlagsCount;
 			return await fetchFn(debouncedQuery, tag);
 		},
+		staleTime: 2 * 60 * 1000, // 2 minutes
 	});
 
 	const { data: totalFlags } = useQuery({
@@ -153,6 +157,7 @@ export default function FlagSearch() {
 			const fetchFn = isFavorites ? getFavoriteFlagsCount : getFlagsCount;
 			return await fetchFn("", tag);
 		},
+		staleTime: 5 * 60 * 1000, // 5 minutes
 	});
 
 	// Debounce search query
@@ -264,10 +269,7 @@ export default function FlagSearch() {
 											{ scroll: false },
 										);
 									}}
-									className={cn(
-										"w-full pl-10",
-										searchQuery && "pr-10"
-									)}
+									className={cn("w-full pl-10", searchQuery && "pr-10")}
 								/>
 								{searchQuery && (
 									<button
