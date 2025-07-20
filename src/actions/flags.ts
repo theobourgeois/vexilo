@@ -176,41 +176,43 @@ export async function getFlagFromName(flagName: string) {
 	const flagData = flag[0];
 
 	// If there are related flags, fetch them as full entities
-	if (flagData.relatedFlags && flagData.relatedFlags.length > 0) {
-		// Extract IDs from relatedFlags - handle both string IDs and objects with id property
-		const relatedFlagIds = flagData.relatedFlags
-			.map((flag: string | { id: string }) =>
-				typeof flag === "string" ? flag : flag.id,
-			)
-			.filter(Boolean);
+	const relatedToThisFlag = (
+		await db
+			.select({ id: flags.id })
+			.from(flags)
+			.where(sql`related_flags @> ${JSON.stringify([flagData.id])}::jsonb`)
+	).map((flag) => flag.id);
 
-		if (relatedFlagIds.length > 0) {
-			const relatedFlags =
-				(await db
-					.select({
-						id: flags.id,
-						name: flags.name,
-						image: flags.image,
-						link: flags.link,
-						index: flags.index,
-						tags: flags.tags,
-						description: flags.description,
-						createdAt: flags.createdAt,
-						updatedAt: flags.updatedAt,
-						favorites: flags.favorites,
-						relatedFlags: flags.relatedFlags,
-						isFavorite: await isFavorite(),
-					})
-					.from(flags)
-					.where(inArray(flags.id, relatedFlagIds))) || [];
+	// Extract IDs from relatedFlags - handle both string IDs and objects with id property
+	const relatedFlagIds = Array.from(
+		new Set(flagData.relatedFlags.concat(relatedToThisFlag).filter(Boolean)),
+	);
 
-			return {
-				...flagData,
-				relatedFlags: relatedFlags,
-			};
-		}
+	if (relatedFlagIds.length > 0) {
+		const relatedFlags =
+			(await db
+				.select({
+					id: flags.id,
+					name: flags.name,
+					image: flags.image,
+					link: flags.link,
+					index: flags.index,
+					tags: flags.tags,
+					description: flags.description,
+					createdAt: flags.createdAt,
+					updatedAt: flags.updatedAt,
+					favorites: flags.favorites,
+					relatedFlags: flags.relatedFlags,
+					isFavorite: await isFavorite(),
+				})
+				.from(flags)
+				.where(inArray(flags.id, relatedFlagIds))) || [];
+
+		return {
+			...flagData,
+			relatedFlags: relatedFlags,
+		};
 	}
-
 	return flagData as unknown as FlagWithRelatedFlags;
 }
 
