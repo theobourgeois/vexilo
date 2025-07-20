@@ -139,12 +139,32 @@ export async function getTopFlagTags(limit: number) {
 	return topTags;
 }
 
-export async function getAllFlagTags(search?: string) {
-	return await db
+export async function getAllFlagTags(
+	search?: string,
+	page: number = 1,
+	limit: number = 50,
+) {
+	const offset = (page - 1) * limit;
+
+	const tags = await db
 		.select({ tag: flagTags.tag, count: flagTags.count })
 		.from(flagTags)
 		.where(search ? ilike(flagTags.tag, `%${search}%`) : sql`1=1`)
-		.orderBy(desc(flagTags.count));
+		.orderBy(desc(flagTags.count))
+		.limit(limit)
+		.offset(offset);
+
+	const totalCount = await db
+		.select({ count: count() })
+		.from(flagTags)
+		.where(search ? ilike(flagTags.tag, `%${search}%`) : sql`1=1`);
+
+	return {
+		tags,
+		totalCount: totalCount[0]?.count || 0,
+		totalPages: Math.ceil((totalCount[0]?.count || 0) / limit),
+		currentPage: page,
+	};
 }
 
 export async function getFlagFromName(flagName: string) {
