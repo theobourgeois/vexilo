@@ -16,8 +16,11 @@ import {
 	getFavouriteFlags,
 	getFlags,
 	getFlagsCount,
+	getTopFlagTags,
 } from "@/actions/flags";
 import { flags } from "@/db/schema";
+import Tag from "./Tag";
+import Link from "next/link";
 
 type OrderBy = keyof typeof flags.$inferSelect;
 
@@ -92,6 +95,14 @@ export default function FlagSearch() {
 	const orderDirection =
 		(searchParams.get("orderDirection") as "asc" | "desc") || "desc";
 
+	const { data: topFlagTags } = useQuery({
+		queryKey: ["topFlagTags"],
+		queryFn: async () => {
+			return await getTopFlagTags(20);
+		},
+	});
+	const tag = searchParams.get("tag") || "";
+
 	const { data: flags, isLoading: flagsLoading } = useQuery({
 		queryKey: [
 			"flags",
@@ -100,6 +111,7 @@ export default function FlagSearch() {
 			isFavorites,
 			orderBy,
 			orderDirection,
+			tag,
 		],
 		queryFn: async () => {
 			const fetchFn = isFavorites ? getFavouriteFlags : getFlags;
@@ -109,6 +121,7 @@ export default function FlagSearch() {
 				debouncedQuery,
 				orderBy,
 				orderDirection,
+				tag,
 			).then((flags) => {
 				return flags.map((flag) => ({
 					favorites: flag.favorites,
@@ -126,18 +139,18 @@ export default function FlagSearch() {
 	});
 
 	const { data: flagsCount } = useQuery({
-		queryKey: ["flagsCount", debouncedQuery, isFavorites],
+		queryKey: ["flagsCount", debouncedQuery, isFavorites, tag],
 		queryFn: async () => {
 			const fetchFn = isFavorites ? getFavoriteFlagsCount : getFlagsCount;
-			return await fetchFn(debouncedQuery);
+			return await fetchFn(debouncedQuery, tag);
 		},
 	});
 
 	const { data: totalFlags } = useQuery({
-		queryKey: ["totalFlags", isFavorites],
+		queryKey: ["totalFlags", isFavorites, tag],
 		queryFn: async () => {
 			const fetchFn = isFavorites ? getFavoriteFlagsCount : getFlagsCount;
-			return await fetchFn("");
+			return await fetchFn("", tag);
 		},
 	});
 
@@ -215,7 +228,7 @@ export default function FlagSearch() {
 		<div className="space-y-6">
 			{/* Search Header */}
 			<Card>
-				<CardHeader>
+				<CardHeader id="search-header">
 					<div className="space-y-4">
 						<div className="flex gap-2">
 							<Button
@@ -303,6 +316,33 @@ export default function FlagSearch() {
 								)}
 							</div>
 						</div>
+						<div>
+							{topFlagTags && (
+								<div className="flex flex-wrap gap-2 items-center">
+									<Tag
+										onClick={() => {
+											const params = new URLSearchParams(searchParams);
+											params.delete("tag");
+											router.replace(
+												`${window.location.pathname}?${params.toString()}`,
+												{ scroll: false },
+											);
+										}}
+										isActive={!tag}
+										text="All"
+									/>
+									{!topFlagTags.find((t) => t.tag === tag) && tag && (
+										<Tag key={tag} text={tag} />
+									)}
+									{topFlagTags.map((tag) => (
+										<Tag key={tag.tag} text={tag.tag} count={tag.count} />
+									))}
+									<Link className="text-main underline text-sm" href="/tags">
+										View all tags
+									</Link>
+								</div>
+							)}
+						</div>
 					</div>
 				</CardHeader>
 			</Card>
@@ -338,7 +378,10 @@ export default function FlagSearch() {
 
 			{/* Results Grid */}
 			{!flagsLoading && flags && flags.length > 0 && (
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+				<div
+					id="flags"
+					className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+				>
 					{flags.map((flag) => (
 						<FlagCard
 							id={flag.id}

@@ -9,8 +9,7 @@ import { createFlagRequest } from "@/actions/requests";
 import { Textarea } from "./ui/textarea";
 import { blobUrlToBase64 } from "@/lib/blob-to-url";
 import RelatedFlagInput from "./related-flag-input";
-import { Badge } from "./ui/badge";
-import { X } from "lucide-react";
+import TagInput from "./TagInput";
 
 type FlagFieldsFormProps = {
 	initialFlag: Omit<Flag, "index"> & { index?: number };
@@ -33,7 +32,6 @@ export default function FlagFieldsForm({
 		initialFlag.relatedFlags || [],
 	);
 	const [tags, setTags] = useState<string[]>(initialFlag.tags || []);
-	const [tagInput, setTagInput] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 
 	const handleAddRelatedFlag = (flag: RelatedFlag) => {
@@ -42,25 +40,6 @@ export default function FlagFieldsForm({
 
 	const handleRemoveRelatedFlag = (id: string) => {
 		setRelatedFlags(relatedFlags.filter((f) => f.id !== id));
-	};
-
-	const addTag = (tag: string) => {
-		const trimmedTag = tag.trim();
-		if (trimmedTag && !tags.includes(trimmedTag)) {
-			setTags([...tags, trimmedTag]);
-			setTagInput("");
-		}
-	};
-
-	const removeTag = (tagToRemove: string) => {
-		setTags(tags.filter((tag) => tag !== tagToRemove));
-	};
-
-	const handleTagKeyPress = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter") {
-			e.preventDefault();
-			addTag(tagInput);
-		}
 	};
 
 	const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,17 +118,21 @@ export default function FlagFieldsForm({
 			description !== initialFlag.description ||
 			link !== initialFlag.link ||
 			flagImage !== initialFlag.flagImage ||
-			JSON.stringify(relatedFlags) !== JSON.stringify(initialFlag.relatedFlags) ||
+			JSON.stringify(relatedFlags) !==
+				JSON.stringify(initialFlag.relatedFlags) ||
 			JSON.stringify(tags) !== JSON.stringify(initialFlag.tags)
 		);
-
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [
 		flagName,
 		description,
 		link,
 		flagImage,
+		initialFlag.flagName,
 		initialFlag.description,
+		initialFlag.link,
+		initialFlag.flagImage,
+		initialFlag.relatedFlags,
+		initialFlag.tags,
 		relatedFlags,
 		tags,
 	]);
@@ -196,46 +179,7 @@ export default function FlagFieldsForm({
 						/>
 					</div>
 				</div>
-				{/* TAGS INPUT */}
-				<div className="space-y-2">
-					<label htmlFor="tags" className="text-sm font-semibold">
-						Tags
-					</label>
-					<div className="space-y-3">
-						<div className="flex gap-2">
-							<Input
-								id="tags"
-								placeholder="Enter tags..."
-								value={tagInput}
-								onChange={(e) => setTagInput(e.target.value)}
-								onKeyPress={handleTagKeyPress}
-								className="flex-1"
-							/>
-							<Button
-								variant="neutral"
-								onClick={() => addTag(tagInput)}
-								disabled={!tagInput.trim()}
-							>
-								Add
-							</Button>
-						</div>
-						{tags.length > 0 && (
-							<div className="flex flex-wrap gap-2">
-								{tags.map((tag) => (
-									<Badge key={tag} variant="neutral" className="gap-1">
-										{tag}
-										<button
-											onClick={() => removeTag(tag)}
-											className="ml-1 hover:bg-foreground/10 rounded-full p-0.5"
-										>
-											<X className="h-3 w-3" />
-										</button>
-									</Badge>
-								))}
-							</div>
-						)}
-					</div>
-				</div>
+				<TagInput tags={tags} onTagsChange={setTags} />
 			</div>
 			<div className="space-y-2">
 				<label htmlFor="flagImage" className="text-sm font-semibold">

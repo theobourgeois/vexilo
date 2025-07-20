@@ -184,3 +184,15 @@ export const favoritesRelations = relations(favorites, ({ one }) => ({
 	user: one(users, { fields: [favorites.userId], references: [users.id] }),
 	flag: one(flags, { fields: [favorites.flagId], references: [flags.id] }),
 }));
+
+export const flagTags = createTable("flag_tag", {
+	id: uuid("id").primaryKey().defaultRandom(),
+	tag: varchar("tag", { length: 255 }).notNull(),
+	count: integer("count").notNull().default(0),
+	createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+	updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const flagTagsRelations = relations(flagTags, ({ many }) => ({
+	flags: many(flags),
+}));

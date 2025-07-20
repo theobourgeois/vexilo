@@ -1,12 +1,100 @@
 "use server";
 
 import { db } from "@/db";
-import { flagRequests, flags, leaderboard, users } from "@/db/schema";
+import { flagRequests, flags, leaderboard, users, flagTags } from "@/db/schema";
 import { getServerAuthSession } from "@/lib/auth";
 import { Flag } from "@/lib/types";
 import { and, count, eq, max, sql } from "drizzle-orm";
 import { base64ImageToS3URI, deleteFileFromUrl } from "./s3";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
+
+// Helper function to update tag counts when tags are added or removed
+async function updateTagCounts(oldTags: string[], newTags: string[]) {
+	const oldTagSet = new Set(oldTags);
+	const newTagSet = new Set(newTags);
+
+	// Find tags that were added (in newTags but not in oldTags)
+	const addedTags = newTags.filter((tag) => !oldTagSet.has(tag));
+
+	// Find tags that were removed (in oldTags but not in newTags)
+	const removedTags = oldTags.filter((tag) => !newTagSet.has(tag));
+
+	// Increment count for added tags
+	for (const tag of addedTags) {
+		if (tag.trim()) {
+			const existingTag = await db
+				.select()
+				.from(flagTags)
+				.where(eq(flagTags.tag, tag.trim()))
+				.limit(1);
+
+			if (existingTag.length > 0) {
+				// Tag exists, increment count
+				await db
+					.update(flagTags)
+					.set({ count: sql`count + 1` })
+					.where(eq(flagTags.tag, tag.trim()));
+			} else {
+				// Tag doesn't exist, create it with count 1
+				await db.insert(flagTags).values({
+					tag: tag.trim(),
+					count: 1,
+				});
+			}
+		}
+	}
+
+	// Decrement count for removed tags
+	for (const tag of removedTags) {
+		if (tag.trim()) {
+			const existingTag = await db
+				.select()
+				.from(flagTags)
+				.where(eq(flagTags.tag, tag.trim()))
+				.limit(1);
+
+			if (existingTag.length > 0) {
+				if (existingTag[0].count > 1) {
+					// Decrement count if more than 1
+					await db
+						.update(flagTags)
+						.set({ count: sql`count - 1` })
+						.where(eq(flagTags.tag, tag.trim()));
+				} else {
+					// Remove tag if count would become 0
+					await db.delete(flagTags).where(eq(flagTags.tag, tag.trim()));
+				}
+			}
+		}
+	}
+}
+
+// Helper function to add tags when a new flag is created
+async function addTagsToCount(tags: string[]) {
+	for (const tag of tags) {
+		if (tag.trim()) {
+			const existingTag = await db
+				.select()
+				.from(flagTags)
+				.where(eq(flagTags.tag, tag.trim()))
+				.limit(1);
+
+			if (existingTag.length > 0) {
+				// Tag exists, increment count
+				await db
+					.update(flagTags)
+					.set({ count: sql`count + 1` })
+					.where(eq(flagTags.tag, tag.trim()));
+			} else {
+				// Tag doesn't exist, create it with count 1
+				await db.insert(flagTags).values({
+					tag: tag.trim(),
+					count: 1,
+				});
+			}
+		}
+	}
+}
 
 export async function getPendingFlagRequests(page: number, limit: number) {
 	const session = await getServerAuthSession();
@@ -160,6 +248,9 @@ export async function approveFlagRequest(flagRequestId: string) {
 		.returning({ id: flags.id })
 		.then((res) => res[0]);
 
+	// Update tag counts for the new flag
+	await addTagsToCount(flagRequest.flag.tags);
+
 	await updateLeaderboard(flagRequest.userId);
 
 	await db
@@ -211,6 +302,13 @@ export async function approveFlagEditRequest(flagRequestId: string) {
 		await deleteFileFromUrl(flagRequest.oldFlag?.flagImage ?? "");
 	}
 
+	// Check if tags have changed
+	const tagsChanged =
+		JSON.stringify(flagRequest.flag.tags.sort()) !==
+		JSON.stringify(flag.tags.sort());
+
+	const newTags = tagsChanged ? flagRequest.flag.tags : flag.tags;
+
 	await db
 		.update(flags)
 		.set({
@@ -231,14 +329,15 @@ export async function approveFlagEditRequest(flagRequestId: string) {
 				flagRequest.flag.description === flagRequest.oldFlag?.description
 					? flag.description
 					: flagRequest.flag.description,
-			tags: flagRequest.flag.tags.every((tag) =>
-				flagRequest.oldFlag?.tags.includes(tag),
-			)
-				? flag.tags
-				: flagRequest.flag.tags,
+			tags: newTags,
 			updatedAt: new Date(),
 		})
 		.where(eq(flags.id, flagRequest.flagId ?? ""));
+
+	// Update tag counts if tags have changed
+	if (tagsChanged) {
+		await updateTagCounts(flag.tags, newTags);
+	}
 
 	await updateLeaderboard(flagRequest.userId);
 
