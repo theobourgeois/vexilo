@@ -92,7 +92,7 @@ export default function TagInput({
 	};
 
 	// Get suggestions to show (filtered tags if searching, top tags otherwise)
-	const suggestions = debouncedSearch.length > 0 ? filteredTags : topTags;
+	const suggestions = debouncedSearch.length > 0 ? filteredTags?.tags : topTags;
 
 	return (
 		<div className="space-y-2" ref={dropdownRef}>
