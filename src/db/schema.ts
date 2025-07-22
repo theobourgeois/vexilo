@@ -197,13 +197,14 @@ export const flagTagsRelations = relations(flagTags, ({ many }) => ({
 	flags: many(flags),
 }));
 
-export const reports = 
-	createTable("report", {
+export const reports = createTable("report", {
 	id: uuid("id").primaryKey().defaultRandom(),
 	userId: uuid("user_id")
 		.notNull()
 		.references(() => users.id),
-	flagId: uuid("flag_id").notNull().references(() => flags.id),
+	flagId: uuid("flag_id")
+		.notNull()
+		.references(() => flags.id, { onDelete: "cascade" }),
 	reason: varchar("reason", { length: 255 }).notNull(),
 	description: text("description").notNull().default(""),
 	createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
