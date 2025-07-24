@@ -130,12 +130,19 @@ async function removeTagsFromCount(tags: string[]) {
 }
 
 export async function getTopFlagTags(limit: number) {
+	const cachedTags = await redis.get("tags");
+	if (cachedTags) {
+		return cachedTags as typeof topTags;
+	}
+
 	const clampedLimit = Math.min(limit, 100);
 	const topTags = await db
 		.select({ tag: flagTags.tag, count: flagTags.count })
 		.from(flagTags)
 		.orderBy(desc(flagTags.count))
 		.limit(clampedLimit);
+
+	await redis.set("tags", topTags);
 
 	return topTags;
 }
@@ -302,7 +309,7 @@ async function isFavorite(userId?: string) {
 export async function getFlagOfTheDay() {
 	const cachedFotd = await redis.get("fotd");
 	if (cachedFotd) {
-		return cachedFotd as typeof flag[0];
+		return cachedFotd as (typeof flag)[0];
 	}
 
 	const fotd = await db
@@ -389,7 +396,7 @@ export async function getFlags(
 	if (isHomePage) {
 		const cachedResults = await redis.get(`flags:home`);
 		if (cachedResults) {
-			return cachedResults as typeof results
+			return cachedResults as typeof results;
 		}
 	}
 

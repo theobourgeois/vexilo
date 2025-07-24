@@ -263,6 +263,8 @@ export async function approveFlagRequest(flagRequestId: string) {
 		.where(eq(flagRequests.id, flagRequestId));
 
 	await redis.del(`flags:home`);
+	await redis.del("leaderboard");
+	await redis.del("tags");
 
 	return true;
 }
@@ -353,6 +355,8 @@ export async function approveFlagEditRequest(flagRequestId: string) {
 		.where(eq(flagRequests.id, flagRequestId));
 
 	await redis.del(`flags:home`);
+	await redis.del("leaderboard");
+	await redis.del("tags");
 
 	return true;
 }
