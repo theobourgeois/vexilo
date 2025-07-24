@@ -620,7 +620,10 @@ export async function generateFlagOfTheDay() {
 	});
 }
 
-export async function toggleFavoriteFlag(flagId: string) {
+export async function toggleFavoriteFlag(
+	flagId: string,
+	deleteCache: boolean = false,
+) {
 	const session = await getServerAuthSession();
 	if (!session?.user) {
 		return false;
@@ -657,6 +660,10 @@ export async function toggleFavoriteFlag(flagId: string) {
 			favorites: sql`favorites + 1`,
 		})
 		.where(eq(flags.id, flagId));
+
+	if (deleteCache) {
+		await redis.del("flags:home");
+	}
 
 	return true;
 }

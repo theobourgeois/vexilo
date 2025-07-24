@@ -51,7 +51,7 @@ export default function FlagCard({
 			setFavoriteCount((prev) => prev + 1);
 			setIsFavorite(true);
 		}
-		toggleFavoriteFlag(id).then((isSuccess) => {
+		toggleFavoriteFlag(id, true).then((isSuccess) => {
 			queryClient.invalidateQueries({ queryKey: ["flags"] });
 			if (!isSuccess) {
 				setFavoriteCount((prev) => prev - 1);
