@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { redis } from "@/db/redis";
 import {
 	favorites,
 	flagOfTheDay,
@@ -264,17 +265,6 @@ export async function getRelatedFlags(flagId: string) {
 	return relatedFlags;
 }
 
-export async function getRandomFlag() {
-	const flagCount = await getFlagsCount("");
-	const randomIndex = Math.floor(Math.random() * flagCount);
-	const randomFlag = await db
-		.select()
-		.from(flags)
-		.where(eq(flags.index, randomIndex))
-		.limit(1);
-	return randomFlag?.[0];
-}
-
 export async function getRandomFlagsForQuiz() {
 	// Get 4 random flags directly from the database with favorites info
 	const randomFlags = await db
@@ -310,6 +300,11 @@ async function isFavorite(userId?: string) {
 }
 
 export async function getFlagOfTheDay() {
+	const cachedFotd = await redis.get("fotd");
+	if (cachedFotd) {
+		return cachedFotd as typeof flag[0];
+	}
+
 	const fotd = await db
 		.select()
 		.from(flagOfTheDay)
@@ -344,6 +339,10 @@ export async function getFlagOfTheDay() {
 		.from(flags)
 		.where(eq(flags.id, fotdId))
 		.limit(1);
+
+	await redis.set("fotd", flag?.[0], {
+		ex: 60 * 60 * 24, // 24 hours
+	});
 
 	return flag?.[0];
 }
@@ -381,7 +380,20 @@ export async function getFlags(
 
 	const boundedLimit = Math.min(limit, 100);
 
-	return await db
+	const isHomePage =
+		page === 1 &&
+		!query &&
+		!tag &&
+		orderBy === "favorites" &&
+		orderDirection === "desc";
+	if (isHomePage) {
+		const cachedResults = await redis.get(`flags:home`);
+		if (cachedResults) {
+			return cachedResults as typeof results
+		}
+	}
+
+	const results = await db
 		.select({
 			id: flags.id,
 			favorites: flags.favorites,
@@ -404,6 +416,12 @@ export async function getFlags(
 		)
 		.limit(boundedLimit)
 		.offset((page - 1) * boundedLimit);
+
+	if (isHomePage) {
+		await redis.set(`flags:home`, results);
+	}
+
+	return results;
 }
 
 export async function getUserFavorites(

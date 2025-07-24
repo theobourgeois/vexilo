@@ -7,6 +7,7 @@ import { Flag } from "@/lib/types";
 import { and, count, eq, max, sql } from "drizzle-orm";
 import { base64ImageToS3URI, deleteFileFromUrl } from "./s3";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
+import { redis } from "@/db/redis";
 
 // Helper function to update tag counts when tags are added or removed
 async function updateTagCounts(oldTags: string[], newTags: string[]) {
@@ -261,6 +262,8 @@ export async function approveFlagRequest(flagRequestId: string) {
 		})
 		.where(eq(flagRequests.id, flagRequestId));
 
+	await redis.del(`flags:home`);
+
 	return true;
 }
 
@@ -348,6 +351,8 @@ export async function approveFlagEditRequest(flagRequestId: string) {
 			isEdit: true,
 		})
 		.where(eq(flagRequests.id, flagRequestId));
+
+	await redis.del(`flags:home`);
 
 	return true;
 }
