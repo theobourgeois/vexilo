@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { Flag } from "@/lib/types";
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { Flag } from '@/lib/types';
 
 interface FavoritesStore {
   favorites: Flag[]; // Array of flag objects
@@ -23,7 +23,9 @@ export const useFavoritesStore = create<FavoritesStore>()(
         })),
       removeFavorite: (flagName: string) =>
         set((state) => ({
-          favorites: state.favorites.filter((flag) => flag.flagName !== flagName),
+          favorites: state.favorites.filter(
+            (flag) => flag.flagName !== flagName,
+          ),
         })),
       toggleFavorite: (flag: Flag) => {
         const { isFavorite, addFavorite, removeFavorite } = get();
@@ -40,7 +42,7 @@ export const useFavoritesStore = create<FavoritesStore>()(
       clearFavorites: () => set({ favorites: [] }),
     }),
     {
-      name: "flag-favorites",
+      name: 'flag-favorites',
       onRehydrateStorage: () => (state) => {
         // Migration: Check if old string-based favorites exist and clear them
         if (typeof window !== 'undefined') {
@@ -49,10 +51,12 @@ export const useFavoritesStore = create<FavoritesStore>()(
             try {
               const parsed = JSON.parse(stored);
               // If the stored data has a state with favorites as strings, clear it
-              if (parsed.state && Array.isArray(parsed.state.favorites) &&
+              if (
+                parsed.state &&
+                Array.isArray(parsed.state.favorites) &&
                 parsed.state.favorites.length > 0 &&
-                typeof parsed.state.favorites[0] === 'string') {
-                console.log('Migrating favorites from string format to object format');
+                typeof parsed.state.favorites[0] === 'string'
+              ) {
                 localStorage.removeItem('flag-favorites');
                 if (state) {
                   state.favorites = [];
@@ -65,6 +69,6 @@ export const useFavoritesStore = create<FavoritesStore>()(
           }
         }
       },
-    }
-  )
-); 
+    },
+  ),
+);
