@@ -53,9 +53,7 @@ export default function PostFlagPage() {
 
   // Check if all required fields are filled
   const isFormValid =
-    title.trim() !== '' &&
-    sources.length > 0 &&
-    (image !== null || imageUrl.trim() !== '');
+    title.trim() !== '' && (image !== null || imageUrl.trim() !== '');
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -99,6 +97,12 @@ export default function PostFlagPage() {
 
   const handlePost = async () => {
     setIsLoading(true);
+
+    if (sources.length === 0) {
+      toast.error('Please add at least one source');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const flag = {

@@ -108,6 +108,11 @@ export default function FlagFieldsForm({
         tags: tags,
         sources: sources,
       };
+      if (sources.length === 0) {
+        alert('Please add at least one source');
+        setIsLoading(false);
+        return;
+      }
       if (flag.flagImage.startsWith('blob:')) {
         const contentType = fileType || 'image/jpeg';
         flag.flagImage = await blobUrlToBase64(flag.flagImage, contentType);

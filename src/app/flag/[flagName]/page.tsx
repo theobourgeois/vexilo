@@ -147,15 +147,15 @@ export default async function FlagPage({
           <h1 className='text-4xl md:text-5xl font-bold tracking-tight'>
             Edit Flag
           </h1>
-          <Button>
-            <Link
-              className='flex items-center gap-2'
-              href={`/flag/${encodeURIComponent(flag.name)}`}
-            >
+          <Link
+            className='flex items-center gap-2'
+            href={`/flag/${encodeURIComponent(flag.name)}`}
+          >
+            <Button>
               <ArrowLeft className='w-4 h-4 mr-2' />
               Back
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
 
         <FlagFieldsForm

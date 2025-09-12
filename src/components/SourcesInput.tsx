@@ -71,11 +71,18 @@ export default function SourcesInput({
             onClick={addSource}
             disabled={!inputValue.trim()}
             size='sm'
-            className='px-3'
+            className='px-3 min-w-[80px]'
           >
-            <Plus className='h-4 w-4' />
+            <Plus className='h-4 w-4 mr-1' />
+            Add
           </Button>
         </div>
+        {sources.length === 0 && (
+          <p className='text-sm text-muted-foreground'>
+            Enter a URL above and click &quot;Add&quot; or press Enter to add
+            your first source
+          </p>
+        )}
         {sources.length > 0 && (
           <div className='flex flex-wrap gap-2'>
             {sources.map((source) => (
