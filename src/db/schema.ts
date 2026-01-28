@@ -31,6 +31,9 @@ export const users = createTable('user', {
   image: varchar('image', { length: 255 }),
   hashedPassword: text('hashed_password'),
   isAnonymous: boolean('is_anonymous').notNull().default(false),
+  favoriteFlagId: uuid('favorite_flag_id').references(() => flags.id, {
+    onDelete: 'set null',
+  }),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({

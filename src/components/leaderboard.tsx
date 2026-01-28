@@ -9,6 +9,7 @@ import { Button } from "./ui/button";
 import { Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { getRankStyle } from "@/lib/get-rank-style";
+import Image from "next/image";
 
 export function Leaderboard() {
     const { data: leaderboard, isLoading } = useQuery({
@@ -71,25 +72,36 @@ export function Leaderboard() {
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="relative">
-                                        <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
-                                            <AvatarImage
-                                                src={user?.image || "/logo.svg"}
-                                            />
-                                            <AvatarFallback className="text-sm font-semibold">
-                                                {user?.isAnonymous
-                                                    ? "A"
-                                                    : user?.name
-                                                    ? getInitials(user.name)
-                                                    : "U"}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <Badge
-                                            className={`absolute -top-2 -right-2 h-6 w-6 p-0 flex items-center justify-center ${style.badge}`}
-                                        >
-                                            {style.icon}
-                                        </Badge>
-                                    </div>
+                                            <div className="relative">
+                                                <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+                                                    <AvatarImage
+                                                        src={user?.image || "/logo.svg"}
+                                                    />
+                                                    <AvatarFallback className="text-sm font-semibold">
+                                                        {user?.isAnonymous
+                                                            ? "A"
+                                                            : user?.name
+                                                            ? getInitials(user.name)
+                                                            : "U"}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <Badge
+                                                    className={`absolute -top-2 -right-2 h-6 w-6 p-0 flex items-center justify-center ${style.badge}`}
+                                                >
+                                                    {style.icon}
+                                                </Badge>
+                                                {/* Favorite Flag Badge */}
+                                                {user?.favoriteFlag && (
+                                                    <div className="absolute -bottom-1 -left-1 w-6 h-4 rounded border border-border shadow-sm overflow-hidden bg-background">
+                                                        <Image
+                                                            src={user.favoriteFlag.image}
+                                                            alt={user.favoriteFlag.name}
+                                                            fill
+                                                            className="object-cover"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                     <div className="flex flex-col">
                                         <Link
                                             href={`/profile/${user?.userNumber}`}

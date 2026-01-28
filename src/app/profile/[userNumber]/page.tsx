@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import FlagCard from '@/components/FlagCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import Image from 'next/image';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -226,12 +227,25 @@ export default function ProfilePage() {
         ) : user ? (
           <Card className='p-6 bg-gradient-to-r from-background to-secondary-background border-2 border-border shadow-shadow'>
             <div className='flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6'>
-              <Avatar className='h-24 w-24 border-4 border-border shadow-shadow'>
-                <AvatarImage src={user.image || ''} alt={user.name || 'User'} />
-                <AvatarFallback className='text-2xl font-bold bg-main text-main-foreground'>
-                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                </AvatarFallback>
-              </Avatar>
+              <div className='relative'>
+                <Avatar className='h-24 w-24 border-4 border-border shadow-shadow'>
+                  <AvatarImage src={user.image || ''} alt={user.name || 'User'} />
+                  <AvatarFallback className='text-2xl font-bold bg-main text-main-foreground'>
+                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Favorite Flag Badge */}
+                {user.favoriteFlag && (
+                  <div className='absolute -bottom-1 -right-1 w-9 h-7 rounded border-2 border-border shadow-shadow overflow-hidden bg-background'>
+                    <Image
+                      src={user.favoriteFlag.image}
+                      alt={user.favoriteFlag.name}
+                      fill
+                      className='object-cover'
+                    />
+                  </div>
+                )}
+              </div>
 
               <div className='flex-1 text-center sm:text-left space-y-2'>
                 <div className='flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0'>

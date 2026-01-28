@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { getRankStyle } from "@/lib/get-rank-style";
+import Image from "next/image";
 
 export default function LeaderboardPage() {
     const { data: leaderboard, isLoading } = useQuery({
@@ -112,6 +113,17 @@ export default function LeaderboardPage() {
                                                 >
                                                     {style.icon}
                                                 </Badge>
+                                                {/* Favorite Flag Badge */}
+                                                {user?.favoriteFlag && (
+                                                    <div className="absolute -bottom-1 -left-1 w-6 h-4 rounded border border-border shadow-sm overflow-hidden bg-background">
+                                                        <Image
+                                                            src={user.favoriteFlag.image}
+                                                            alt={user.favoriteFlag.name}
+                                                            fill
+                                                            className="object-cover"
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex flex-col">
                                                 <Link

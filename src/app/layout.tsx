@@ -9,7 +9,7 @@ import { PostFlagButton } from "@/components/post-flag-button";
 import { HamburgerMenu } from "@/components/hamburger-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Footer } from "@/components/footer";
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/next";
 
 
 const nunito = Nunito({

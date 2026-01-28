@@ -1,9 +1,10 @@
 'use client';
 
-import { Heart, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { Heart, Edit, Trash2, AlertTriangle, UserCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toggleFavoriteFlag, deleteFlag } from '@/actions/flags';
-import { useQueryClient } from '@tanstack/react-query';
+import { changeFavoriteFlag, getUserData } from '@/actions/users';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -32,6 +33,15 @@ export default function FlagActions({ flag }: FlagActionsProps) {
   const session = useSession();
   const router = useRouter();
   const [isFavorite, setIsFavorite] = React.useState(flag.isFavorite || false);
+  const [isSettingProfileFlag, setIsSettingProfileFlag] = React.useState(false);
+
+  const { data: userData } = useQuery({
+    queryKey: ['userData'],
+    queryFn: getUserData,
+    enabled: !!session.data?.user,
+  });
+
+  const isCurrentProfileFlag = userData?.user?.favoriteFlag?.id === flag.id;
 
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,6 +60,29 @@ export default function FlagActions({ flag }: FlagActionsProps) {
         setIsFavorite(false);
       }
     });
+  };
+
+  const handleSetProfileFlag = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!session.data?.user) {
+      toast.error('You must be logged in to set a profile flag');
+      return;
+    }
+
+    setIsSettingProfileFlag(true);
+    try {
+      const result = await changeFavoriteFlag(isCurrentProfileFlag ? null : flag.id);
+      queryClient.invalidateQueries({ queryKey: ['userData'] });
+      if (result.success) {
+        toast.success(isCurrentProfileFlag ? 'Profile flag removed' : 'Profile flag updated!');
+      } else {
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error('Failed to update profile flag');
+    } finally {
+      setIsSettingProfileFlag(false);
+    }
   };
 
   const handleEditClick = (e: React.MouseEvent) => {
@@ -82,7 +115,7 @@ export default function FlagActions({ flag }: FlagActionsProps) {
   };
 
   return (
-    <div className='flex items-center gap-2 justify-center'>
+    <div className='flex items-center gap-2 justify-center flex-wrap'>
       <Button
         variant='neutral'
         size='sm'
@@ -94,6 +127,23 @@ export default function FlagActions({ flag }: FlagActionsProps) {
         />
         {isFavorite ? 'Favorited' : 'Favorite'}
       </Button>
+
+      {session.data?.user && (
+        <Button
+          variant={isCurrentProfileFlag ? 'default' : 'neutral'}
+          size='sm'
+          onClick={handleSetProfileFlag}
+          disabled={isSettingProfileFlag}
+          className='flex items-center gap-2'
+        >
+          {isCurrentProfileFlag ? (
+            <Check className='w-4 h-4' />
+          ) : (
+            <UserCircle className='w-4 h-4' />
+          )}
+          {isCurrentProfileFlag ? 'Your Profile Flag' : 'Set as Profile Flag'}
+        </Button>
+      )}
 
       <ReportDialog flagId={flag.id} flagName={flag.name}>
         <Button variant='neutral' size='sm' className='flex items-center gap-2'>

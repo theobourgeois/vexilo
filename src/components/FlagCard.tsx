@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Heart, Edit } from 'lucide-react';
+import { Heart, Edit, UserCircle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Flag } from '@/lib/types';
@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { useSession } from 'next-auth/react';
 import React from 'react';
 import { toggleFavoriteFlag } from '@/actions/flags';
-import { useQueryClient } from '@tanstack/react-query';
+import { changeFavoriteFlag, getUserData } from '@/actions/users';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import FlagFieldsForm from '@/components/FlagFieldsForm';
@@ -36,7 +37,16 @@ export default function FlagCard({
     initialIsFavorite || false,
   );
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isSettingProfileFlag, setIsSettingProfileFlag] = React.useState(false);
   const router = useRouter();
+
+  const { data: userData } = useQuery({
+    queryKey: ['userData'],
+    queryFn: getUserData,
+    enabled: !!session?.user,
+  });
+
+  const isCurrentProfileFlag = userData?.user?.favoriteFlag?.id === id;
 
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,6 +68,29 @@ export default function FlagCard({
         setIsFavorite(false);
       }
     });
+  };
+
+  const handleSetProfileFlag = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!session?.user) {
+      toast.error('You must be logged in to set a profile flag');
+      return;
+    }
+
+    setIsSettingProfileFlag(true);
+    try {
+      const result = await changeFavoriteFlag(isCurrentProfileFlag ? null : id);
+      queryClient.invalidateQueries({ queryKey: ['userData'] });
+      if (result.success) {
+        toast.success(isCurrentProfileFlag ? 'Profile flag removed' : 'Profile flag updated!');
+      } else {
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error('Failed to update profile flag');
+    } finally {
+      setIsSettingProfileFlag(false);
+    }
   };
 
   const handleEditClick = (e: React.MouseEvent) => {
@@ -102,6 +135,28 @@ export default function FlagCard({
             onClick={handleEditClick}
           >
             <Edit className='w-4 h-4 text-gray-600' />
+          </Button>
+        )}
+
+        {/* Set as Profile Flag Button - Only visible on hover */}
+        {session?.user && (
+          <Button
+            variant='neutral'
+            size='sm'
+            className={`absolute top-2 right-26 z-10 shadow-md border border-gray-200 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
+              isCurrentProfileFlag 
+                ? 'bg-main text-main-foreground hover:bg-main/90' 
+                : 'bg-white/90 hover:bg-white'
+            }`}
+            onClick={handleSetProfileFlag}
+            disabled={isSettingProfileFlag}
+            title={isCurrentProfileFlag ? 'Your Profile Flag' : 'Set as Profile Flag'}
+          >
+            {isCurrentProfileFlag ? (
+              <Check className='w-4 h-4' />
+            ) : (
+              <UserCircle className='w-4 h-4 text-gray-600' />
+            )}
           </Button>
         )}
 

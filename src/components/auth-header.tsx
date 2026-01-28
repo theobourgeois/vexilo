@@ -15,6 +15,7 @@ import {
 } from "./ui/dropdown-menu";
 import { getUserData } from "@/actions/users";
 import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 
 export function AuthHeader() {
     const { data: session, status } = useSession();
@@ -58,15 +59,28 @@ export function AuthHeader() {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <div className="flex items-center gap-4">
-                    <Avatar className="h-10 w-10 cursor-pointer">
-                        <AvatarImage
-                            src={session.user?.image || ""}
-                            alt={session.user?.name || ""}
-                        />
-                        <AvatarFallback>
-                            {session.user?.name?.charAt(0) || "U"}
-                        </AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                        <Avatar className="h-10 w-10 cursor-pointer">
+                            <AvatarImage
+                                src={session.user?.image || ""}
+                                alt={session.user?.name || ""}
+                            />
+                            <AvatarFallback>
+                                {session.user?.name?.charAt(0) || "U"}
+                            </AvatarFallback>
+                        </Avatar>
+                        {/* Favorite Flag Badge */}
+                        {userData?.user?.favoriteFlag && (
+                            <div className="absolute -bottom-1 -right-1 w-5 h-4 rounded border border-border shadow-sm overflow-hidden bg-background">
+                                <Image
+                                    src={userData.user.favoriteFlag.image}
+                                    alt={userData.user.favoriteFlag.name}
+                                    fill
+                                    className="object-cover"
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 bg-white">
