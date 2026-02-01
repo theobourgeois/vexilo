@@ -149,7 +149,7 @@ export default function FlagQuiz() {
           {/* Flag Image Skeleton */}
           <div className='relative aspect-[3/2] w-full max-w-md mx-auto'>
             <Skeleton className='w-full h-full flex items-center justify-center'>
-              <RefreshCw className='w-8 h-8 animate-spin text-gray-400' />
+              <RefreshCw className='w-8 h-8 animate-spin text-foreground/40' />
             </Skeleton>
           </div>
 
@@ -206,7 +206,7 @@ export default function FlagQuiz() {
             src={currentQuestion.image}
             alt='Quiz flag'
             fill
-            className='object-contain border rounded-lg'
+            className='object-contain rounded-lg'
             sizes='(max-width: 768px) 100vw, 400px'
           />
           {/* Favorite Button */}
@@ -214,11 +214,11 @@ export default function FlagQuiz() {
             variant='neutral'
             size='sm'
             onClick={handleFavoriteToggle}
-            className='absolute top-0 right-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white/90 backdrop-blur-sm'
+            className='absolute top-0 right-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity bg-secondary-background/90 hover:bg-secondary-background backdrop-blur-sm'
           >
             <Heart
               className={`w-5 h-5 ${
-                isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'
+                isFavorite ? 'fill-red-500 text-red-500' : 'text-foreground/60'
               }`}
             />
           </Button>
@@ -267,8 +267,8 @@ export default function FlagQuiz() {
           <div
             className={`text-center p-4 rounded-lg ${
               isCorrect
-                ? 'bg-green-50 text-green-800 border border-green-200'
-                : 'bg-red-50 text-red-800 border border-red-200'
+                ? 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/30'
+                : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/30'
             }`}
           >
             <p className='font-medium'>

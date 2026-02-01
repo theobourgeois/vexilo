@@ -7,7 +7,7 @@ import { ProfileFlagAlert } from '@/components/alert-banner';
 
 export default function Home() {
   return (
-    <div className='min-h-screen bg-main/10 pt-0'>
+    <div className='min-h-screen bg-main/10 dark:bg-transparent pt-0'>
       <div className='pb-4'>
         <ProfileFlagAlert />
       </div>

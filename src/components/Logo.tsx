@@ -15,27 +15,27 @@ export default function Logo({ showText = false }: { showText?: boolean }) {
     return (
         <button
             onClick={handleLogoClick}
-            className="flex gap-2 cursor-pointer items-center justify-center hover:opacity-80 transition-opacity"
+            className="flex gap-3 cursor-pointer items-center justify-center group"
         >
-            <SvgLogo className="w-12 h-12" />
-            <h1
+            <div className="relative">
+                <SvgLogo className="w-11 h-11 transition-transform duration-200 group-hover:scale-105" />
+            </div>
+            <div
                 className={cn(
-                    "text-3xl font-extrabold hidden md:block",
-                    showText && "block"
+                    "hidden md:flex flex-col items-start leading-none",
+                    showText && "flex"
                 )}
-                style={{
-                    fontFamily: "Times New Roman",
-                    fontWeight: "bold",
-                    fontStyle: "italic",
-                    fontSize: "3rem",
-                    lineHeight: "1.2",
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
-                    textAlign: "center",
-                }}
             >
-                VEXILO
-            </h1>
+                <span 
+                    className="text-[1.75rem] font-bold italic tracking-wide text-foreground transition-colors"
+                    style={{ fontFamily: "Times New Roman, serif" }}
+                >
+                    VEXILO
+                </span>
+                <span className="text-[10px] font-medium tracking-[0.2em] uppercase text-muted-foreground/70">
+                    Flag Encyclopedia
+                </span>
+            </div>
         </button>
     );
 }

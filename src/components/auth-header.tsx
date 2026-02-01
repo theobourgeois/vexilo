@@ -52,9 +52,9 @@ export function AuthHeader() {
     if (!session) {
         return (
             <Button
-                className="inline-flex gap-1 bg-white"
+                className="inline-flex gap-1 bg-secondary-background"
                 onClick={handleSignIn}
-                variant="default"
+                variant="neutral"
             >
                 Sign in with Google <FcGoogle size="20" />
             </Button>
@@ -98,20 +98,20 @@ export function AuthHeader() {
                     </div>
                 </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-white">
-                <div className="px-2 py-1.5 text-sm font-medium text-gray-900 border-b border-gray-200">
+            <DropdownMenuContent align="end" className="w-48 bg-secondary-background">
+                <div className="px-2 py-1.5 text-sm font-medium text-foreground border-b border-border">
                     {userData?.user?.name || session.user?.name || "User"}
                 </div>
                 <DropdownMenuItem
                     onClick={() => router.push(`/profile/${userData?.user?.userNumber || "me"}`)}
-                    className="bg-white"
+                    className="bg-secondary-background"
                 >
                     <User className="h-4 w-4" />
                     Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={() => router.push("/settings")}
-                    className="bg-white"
+                    className="bg-secondary-background"
                 >
                     <Settings className="h-4 w-4" />
                     Settings
@@ -121,7 +121,7 @@ export function AuthHeader() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             onClick={() => router.push("/admin")}
-                            className="bg-white"
+                            className="bg-secondary-background"
                         >
                             <Shield className="h-4 w-4" />
                             Admin
@@ -131,7 +131,7 @@ export function AuthHeader() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                     onClick={handleSignOut}
-                    className="text-red-600 focus:text-red-700 focus:bg-red-50 bg-white"
+                    className="text-red-500 focus:text-red-400 focus:bg-red-500/10 bg-secondary-background"
                 >
                     <LogOut className="h-4 w-4" />
                     Logout

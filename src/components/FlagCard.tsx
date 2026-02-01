@@ -109,19 +109,19 @@ export default function FlagCard({
   return (
     <>
       <Card
-        className='cursor-pointer px-8 relative group'
+        className='cursor-pointer px-8 relative group h-full'
         onClick={handleCardClick}
       >
         {/* Favorite Button - Only visible on hover */}
         <Button
           variant='neutral'
           size='sm'
-          className='absolute top-2 right-2 z-10 bg-white/90 hover:bg-white shadow-md border border-gray-200 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200'
+          className='absolute top-2 right-2 z-10 bg-secondary-background/95 hover:bg-secondary-background shadow-md border border-border opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200'
           onClick={handleFavoriteToggle}
         >
           <Heart
             className={`w-4 h-4 ${
-              isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'
+              isFavorite ? 'fill-red-500 text-red-500' : 'text-foreground/60'
             }`}
           />
         </Button>
@@ -131,10 +131,10 @@ export default function FlagCard({
           <Button
             variant='neutral'
             size='sm'
-            className='absolute top-2 right-14 z-10 bg-white/90 hover:bg-white shadow-md border border-gray-200 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200'
+            className='absolute top-2 right-14 z-10 bg-secondary-background/95 hover:bg-secondary-background shadow-md border border-border opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200'
             onClick={handleEditClick}
           >
-            <Edit className='w-4 h-4 text-gray-600' />
+            <Edit className='w-4 h-4 text-foreground/60' />
           </Button>
         )}
 
@@ -143,10 +143,10 @@ export default function FlagCard({
           <Button
             variant='neutral'
             size='sm'
-            className={`absolute top-2 right-26 z-10 shadow-md border border-gray-200 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
+            className={`absolute top-2 right-26 z-10 shadow-md border border-border opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
               isCurrentProfileFlag 
                 ? 'bg-main text-main-foreground hover:bg-main/90' 
-                : 'bg-white/90 hover:bg-white'
+                : 'bg-secondary-background/95 hover:bg-secondary-background'
             }`}
             onClick={handleSetProfileFlag}
             disabled={isSettingProfileFlag}
@@ -155,7 +155,7 @@ export default function FlagCard({
             {isCurrentProfileFlag ? (
               <Check className='w-4 h-4' />
             ) : (
-              <UserCircle className='w-4 h-4 text-gray-600' />
+              <UserCircle className='w-4 h-4 text-foreground/60' />
             )}
           </Button>
         )}
@@ -165,7 +165,7 @@ export default function FlagCard({
           <div className='absolute top-2 left-2 z-10'>
             <Badge
               variant='neutral'
-              className='bg-white/90 text-gray-700 border border-gray-200'
+              className='bg-secondary-background/95 text-foreground/80 border border-border'
             >
               <Heart className='w-3 h-3 mr-1 fill-red-500 text-red-500' />
               {favoriteCount}

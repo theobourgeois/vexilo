@@ -4,6 +4,8 @@ import FlagCard from './FlagCard';
 import { useQuery } from '@tanstack/react-query';
 import { getFlagOfTheDay } from '@/actions/flags';
 import { Skeleton } from './ui/skeleton';
+import Link from 'next/link';
+import { History } from 'lucide-react';
 
 export function FlagOfTheDay() {
   const { data: flagOfTheDay } = useQuery({
@@ -48,10 +50,17 @@ export function FlagOfTheDay() {
           favorites={flagOfTheDay.favorites}
         />
       </CardContent>
-      <CardFooter>
-        <p className='text-center mt-4 text-sm'>
+      <CardFooter className='flex flex-col gap-3'>
+        <p className='text-center text-sm'>
           Come back tomorrow for a new flag!
         </p>
+        <Link
+          href='/flag-of-the-day'
+          className='inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors'
+        >
+          <History className='h-4 w-4' />
+          View past flags of the day
+        </Link>
       </CardFooter>
     </Card>
   );

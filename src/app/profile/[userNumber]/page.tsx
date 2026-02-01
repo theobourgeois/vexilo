@@ -4,6 +4,7 @@ import {
   getUserFlags,
   getUserContributionCounts,
   getProfileUserFavorites,
+  getUserEditedFlags,
 } from '@/actions/flags';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
@@ -32,13 +33,19 @@ import {
 import { getUserByUserNumber } from '@/actions/users';
 import { useCallback } from 'react';
 
+type ViewMode = 'contributed' | 'favorites' | 'edited';
+
 export default function ProfilePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const userNumber = params.userNumber as string;
   const page = parseInt(searchParams.get('page') || '1');
   const router = useRouter();
-  const isFavorites = searchParams.get('favorites') === 'true';
+  
+  // Support both old 'favorites' param and new 'view' param for backwards compatibility
+  const viewParam = searchParams.get('view') as ViewMode | null;
+  const isFavoritesLegacy = searchParams.get('favorites') === 'true';
+  const viewMode: ViewMode = viewParam || (isFavoritesLegacy ? 'favorites' : 'contributed');
 
   const {
     data: userData,
@@ -54,9 +61,19 @@ export default function ProfilePage() {
     isLoading: requestsLoading,
     error: requestsError,
   } = useQuery({
-    queryKey: ['flags', userNumber, page, isFavorites],
+    queryKey: ['flags', userNumber, page, viewMode],
     queryFn: async () => {
-      const fetchFn = isFavorites ? getProfileUserFavorites : getUserFlags;
+      let fetchFn;
+      switch (viewMode) {
+        case 'favorites':
+          fetchFn = getProfileUserFavorites;
+          break;
+        case 'edited':
+          fetchFn = getUserEditedFlags;
+          break;
+        default:
+          fetchFn = getUserFlags;
+      }
       const result = await fetchFn(userNumber, page);
 
       // Handle error responses
@@ -86,12 +103,14 @@ export default function ProfilePage() {
   const totalEditCount = userContributionCounts?.totalEditCount || 0;
 
   const handleViewModeChange = useCallback(
-    (newViewMode: boolean) => {
+    (newViewMode: ViewMode) => {
       const params = new URLSearchParams(searchParams);
-      if (newViewMode) {
-        params.set('favorites', 'true');
+      // Remove legacy 'favorites' param
+      params.delete('favorites');
+      if (newViewMode === 'contributed') {
+        params.delete('view');
       } else {
-        params.delete('favorites');
+        params.set('view', newViewMode);
       }
       // Reset to first page when switching modes
       params.set('page', '1');
@@ -303,28 +322,28 @@ export default function ProfilePage() {
             <h2 className='text-2xl font-bold text-foreground'>
               Flag Collection
             </h2>
-            <div className='flex items-center gap-4'>
-              <div className='flex gap-2'>
-                <Button
-                  variant={isFavorites ? 'neutral' : 'default'}
-                  onClick={() => handleViewModeChange(false)}
-                >
-                  <Flag className='w-4 h-4' />
-                  All Flags
-                </Button>
-                <Button
-                  variant={isFavorites ? 'default' : 'neutral'}
-                  onClick={() => handleViewModeChange(true)}
-                >
-                  <Heart className='w-4 h-4' />
-                  Favorites
-                </Button>
-              </div>
-              <div className='flex items-center space-x-2'>
-                <Badge variant='neutral' className='text-sm'>
-                  {totalFlagsCount} flags
-                </Badge>
-              </div>
+            <div className='flex gap-2'>
+              <Button
+                variant={viewMode === 'contributed' ? 'default' : 'neutral'}
+                onClick={() => handleViewModeChange('contributed')}
+              >
+                <Flag className='w-4 h-4' />
+                Contributed ({totalContributionsCount})
+              </Button>
+              <Button
+                variant={viewMode === 'edited' ? 'default' : 'neutral'}
+                onClick={() => handleViewModeChange('edited')}
+              >
+                <Edit className='w-4 h-4' />
+                Edited ({totalEditCount})
+              </Button>
+              <Button
+                variant={viewMode === 'favorites' ? 'default' : 'neutral'}
+                onClick={() => handleViewModeChange('favorites')}
+              >
+                <Heart className='w-4 h-4' />
+                Favorites
+              </Button>
             </div>
           </div>
 
@@ -341,7 +360,11 @@ export default function ProfilePage() {
                   No flags yet
                 </h3>
                 <p className='text-muted-foreground'>
-                  This user hasn&apos;t contributed any flags yet.
+                  {viewMode === 'favorites'
+                    ? "This user hasn't favorited any flags yet."
+                    : viewMode === 'edited'
+                      ? "This user hasn't edited any flags yet."
+                      : "This user hasn't contributed any flags yet."}
                 </p>
               </div>
             </Card>

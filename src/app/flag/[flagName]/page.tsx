@@ -1,9 +1,14 @@
-import { getFlagFromName, getRelatedFlags } from '@/actions/flags';
+import {
+  getFlagFromName,
+  getRelatedFlags,
+  getFlagEditHistory,
+} from '@/actions/flags';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ExternalLink, Flag, Star, Eye, ArrowLeft } from 'lucide-react';
+import { ExternalLink, Flag, Star, Eye, ArrowLeft, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { notFound } from 'next/navigation';
 import FlagActions from './FlagActions';
@@ -118,6 +123,94 @@ async function RelatedFlagsSection({ flagId }: { flagId: string }) {
               description={relatedFlag.description}
             />
           ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Single edit entry component
+function EditHistoryEntry({
+  edit,
+}: {
+  edit: {
+    id: string;
+    userName: string | null;
+    userImage: string | null;
+    userNumber: string;
+    createdAt: Date;
+  };
+}) {
+  return (
+    <div className='flex items-center gap-3 py-2 border-b border-border/50 last:border-0'>
+      <Link href={`/profile/${edit.userNumber}`}>
+        <Avatar className='w-6 h-6'>
+          <AvatarImage src={edit.userImage || ''} alt={edit.userName || 'User'} />
+          <AvatarFallback className='text-xs'>
+            {edit.userName?.charAt(0) || 'U'}
+          </AvatarFallback>
+        </Avatar>
+      </Link>
+      <div className='flex-1 min-w-0'>
+        <Link
+          href={`/profile/${edit.userNumber}`}
+          className='text-sm font-medium hover:underline'
+        >
+          {edit.userName || 'Unknown User'}
+        </Link>
+        <span className='text-sm text-muted-foreground ml-2'>edited this flag</span>
+      </div>
+      <time className='text-xs text-muted-foreground whitespace-nowrap'>
+        {new Date(edit.createdAt).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })}
+      </time>
+    </div>
+  );
+}
+
+// Edit history section
+async function EditHistorySection({ flagId }: { flagId: string }) {
+  const editHistory = await getFlagEditHistory(flagId);
+
+  if (!editHistory || editHistory.length === 0) {
+    return null;
+  }
+
+  const initialEdits = editHistory.slice(0, 5);
+  const remainingEdits = editHistory.slice(5);
+  const hasMore = remainingEdits.length > 0;
+
+  return (
+    <Card className='mt-8'>
+      <CardHeader className='pb-3'>
+        <CardTitle className='flex items-center gap-2 text-base font-medium text-muted-foreground'>
+          <History className='w-4 h-4' />
+          Edit History
+        </CardTitle>
+      </CardHeader>
+      <CardContent className='pt-0'>
+        <div className='space-y-2'>
+          {initialEdits.map((edit) => (
+            <EditHistoryEntry key={edit.id} edit={edit} />
+          ))}
+          {hasMore && (
+            <details className='group'>
+              <summary className='flex items-center justify-center py-2 text-sm text-muted-foreground hover:text-foreground cursor-pointer list-none'>
+                <span className='group-open:hidden'>
+                  Show {remainingEdits.length} more edit{remainingEdits.length > 1 ? 's' : ''}
+                </span>
+                <span className='hidden group-open:inline'>Show less</span>
+              </summary>
+              <div className='space-y-2'>
+                {remainingEdits.map((edit) => (
+                  <EditHistoryEntry key={edit.id} edit={edit} />
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -290,6 +383,11 @@ export default async function FlagPage({
         }
       >
         <RelatedFlagsSection flagId={flag.id} />
+      </Suspense>
+
+      {/* Edit History */}
+      <Suspense fallback={null}>
+        <EditHistorySection flagId={flag.id} />
       </Suspense>
     </div>
   );

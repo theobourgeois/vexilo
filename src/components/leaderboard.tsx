@@ -78,7 +78,7 @@ export function Leaderboard() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-4">
                                             <div className="relative">
-                                                <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+                                                <Avatar className="h-12 w-12 border-2 border-secondary-background shadow-sm">
                                                     <AvatarImage
                                                         src={user?.image || "/logo.svg"}
                                                     />
@@ -146,7 +146,7 @@ export function Leaderboard() {
                         </div>
                     );
                 })}
-                <div className="pt-4  border-gray-200 flex justify-center">
+                <div className="pt-4 border-border flex justify-center">
                     <Link href="/leaderboard">
                         <Button variant="neutral" className="w-fit">
                             View More

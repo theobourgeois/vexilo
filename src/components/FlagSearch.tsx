@@ -254,7 +254,7 @@ export default function FlagSearch() {
             </div>
             <div className='flex flex-col sm:flex-row gap-4 items-center'>
               <div className='relative flex-1 md:max-w-md w-full'>
-                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
+                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/40 w-4 h-4' />
                 <Input
                   type='text'
                   placeholder='Search flags...'
@@ -282,7 +282,7 @@ export default function FlagSearch() {
                         { scroll: false },
                       );
                     }}
-                    className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors'
+                    className='absolute right-2 top-1/2 transform -translate-y-1/2 text-foreground/40 hover:text-foreground/60 transition-colors'
                     type='button'
                     aria-label='Clear search'
                   >
@@ -315,10 +315,10 @@ export default function FlagSearch() {
                 </Button>
               </div>
 
-              <div className='text-sm text-gray-500'>
+              <div className='text-sm text-foreground/60'>
                 {flagsCount || 0} of {totalFlags || 0} flags
                 {searchQuery !== debouncedQuery && (
-                  <span className='ml-2 text-blue-500'>(searching...)</span>
+                  <span className='ml-2 text-main'>(searching...)</span>
                 )}
               </div>
             </div>
@@ -364,7 +364,7 @@ export default function FlagSearch() {
       {!flagsLoading && flags && flags.length === 0 && (
         <Card>
           <CardContent className='text-center py-12'>
-            <p className='text-gray-500 text-lg'>
+            <p className='text-foreground/60 text-lg'>
               {debouncedQuery
                 ? `No ${
                     isFavorites ? 'favorite ' : ''

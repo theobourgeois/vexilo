@@ -632,6 +632,57 @@ export async function generateFlagOfTheDay() {
   });
 }
 
+const FOTD_HISTORY_PER_PAGE = 12;
+
+export async function getPastFlagsOfTheDay(page: number = 1) {
+  const session = await getServerAuthSession();
+  const userId = session?.user?.id;
+
+  const offset = (page - 1) * FOTD_HISTORY_PER_PAGE;
+
+  // Get past flags of the day with their associated flag data
+  const pastFotd = await db
+    .select({
+      id: flagOfTheDay.id,
+      flagId: flagOfTheDay.flagId,
+      date: flagOfTheDay.createdAt,
+      flag: {
+        id: flags.id,
+        name: flags.name,
+        image: flags.image,
+        link: flags.link,
+        index: flags.index,
+        tags: flags.tags,
+        description: flags.description,
+        sources: flags.sources,
+        favorites: flags.favorites,
+      },
+      isFavorite: userId
+        ? sql<boolean>`EXISTS (
+            SELECT 1 FROM vexilo_favorite 
+            WHERE vexilo_favorite.flag_id = ${flags.id} 
+            AND vexilo_favorite.user_id = ${userId}
+          )`
+        : sql<boolean>`false`,
+    })
+    .from(flagOfTheDay)
+    .innerJoin(flags, eq(flagOfTheDay.flagId, flags.id))
+    .orderBy(desc(flagOfTheDay.createdAt))
+    .limit(FOTD_HISTORY_PER_PAGE)
+    .offset(offset);
+
+  const totalCount = await db
+    .select({ count: count() })
+    .from(flagOfTheDay);
+
+  return {
+    flags: pastFotd,
+    totalCount: totalCount[0]?.count || 0,
+    totalPages: Math.ceil((totalCount[0]?.count || 0) / FOTD_HISTORY_PER_PAGE),
+    currentPage: page,
+  };
+}
+
 export async function toggleFavoriteFlag(
   flagId: string,
   deleteCache: boolean = false,
@@ -834,6 +885,100 @@ export async function getProfileUserFavorites(
     flags: userFlags,
     count: totalFlagsCount[0].count,
   };
+}
+
+export async function getUserEditedFlags(userNumber: string, page: number) {
+  const session = await getServerAuthSession();
+
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.userNumber, userNumber))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    return {
+      success: false,
+      message: 'User not found.',
+    };
+  }
+
+  const userEditedFlags = await db
+    .select({
+      id: flags.id,
+      flagName: flags.name,
+      flagImage: flags.image,
+      link: flags.link,
+      description: flags.description,
+      sources: flags.sources,
+      tags: flags.tags,
+      index: flags.index,
+      favorites: flags.favorites,
+      isFavorite: session
+        ? sql<boolean>`EXISTS (SELECT 1 FROM vexilo_favorite WHERE vexilo_favorite.flag_id = vexilo_flag.id AND vexilo_favorite.user_id = ${session.user.id})`
+        : sql<boolean>`false`,
+    })
+    .from(flags)
+    .innerJoin(flagRequests, eq(flags.id, sql`${flagRequests.flagId}::uuid`))
+    .where(
+      and(
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, true),
+      ),
+    )
+    .orderBy(desc(flagRequests.createdAt))
+    .limit(REQUESTS_PER_PAGE)
+    .offset((page - 1) * REQUESTS_PER_PAGE);
+
+  const totalEditedFlagsCount = await db
+    .select({ count: count() })
+    .from(flagRequests)
+    .where(
+      and(
+        eq(flagRequests.userId, user.id),
+        eq(flagRequests.approved, true),
+        eq(flagRequests.isEdit, true),
+      ),
+    );
+
+  return {
+    flags: userEditedFlags,
+    count: totalEditedFlagsCount[0].count,
+  };
+}
+
+export async function getFlagEditHistory(flagId: string) {
+  const history = await db
+    .select({
+      id: flagRequests.id,
+      userId: flagRequests.userId,
+      oldFlag: flagRequests.oldFlag,
+      newFlag: flagRequests.flag,
+      createdAt: flagRequests.createdAt,
+      userName: users.name,
+      userImage: users.image,
+      userNumber: users.userNumber,
+      isAnonymous: users.isAnonymous,
+    })
+    .from(flagRequests)
+    .innerJoin(users, eq(flagRequests.userId, users.id))
+    .where(
+      and(
+        eq(flagRequests.flagId, flagId),
+        eq(flagRequests.isEdit, true),
+        eq(flagRequests.approved, true),
+      ),
+    )
+    .orderBy(desc(flagRequests.createdAt))
+    .limit(20);
+
+  return history.map((item) => ({
+    ...item,
+    userName: item.isAnonymous ? 'Anonymous User' : item.userName,
+    userImage: item.isAnonymous ? '/logo.svg' : item.userImage,
+  }));
 }
 
 export async function deleteFlag(flagId: string) {

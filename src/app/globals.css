@@ -29,19 +29,20 @@ html {
 }
 
 .dark {
-    --background: oklch(29.23% 0.0626 270.49);
-    --secondary-background: oklch(0.3451 0.0626 270.49);
-    --foreground: oklch(92.49% 0 0);
-    --main-foreground: oklch(0% 0 0);
-    --main: oklch(67.47% 0.1726 259.49);
-    --border: oklch(0% 0 0);
-    --ring: oklch(100% 0 0);
-    --shadow: 4px 4px 0px 0px var(--border);
-    --chart-1: #5294ff;
-    --chart-2: #ff6669;
-    --chart-3: #e0b700;
-    --chart-4: #04c86d;
-    --chart-5: #7a83ff;
+    --background: oklch(12% 0 0);
+    --secondary-background: oklch(18% 0 0);
+    --foreground: oklch(95% 0 0);
+    --main-foreground: oklch(100% 0 0);
+    --main: oklch(68% 0.19 259);
+    --border: oklch(30% 0 0);
+    --ring: oklch(68% 0.19 259);
+    --overlay: oklch(0% 0 0 / 0.75);
+    --shadow: 4px 4px 0px 0px oklch(5% 0 0);
+    --chart-1: #6ba3ff;
+    --chart-2: #ff7a7d;
+    --chart-3: #f0c800;
+    --chart-4: #10d87a;
+    --chart-5: #9098ff;
     --chart-active-dot: #fff;
 }
 
