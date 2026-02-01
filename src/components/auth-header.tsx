@@ -2,6 +2,7 @@
 
 import { useSession, signOut, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "./ui/button";
 import { FcGoogle } from "react-icons/fc";
 import { LogOut, Loader2, Shield, Settings, User } from "lucide-react";
@@ -16,6 +17,11 @@ import {
 import { getUserData } from "@/actions/users";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function AuthHeader() {
     const { data: session, status } = useSession();
@@ -71,14 +77,23 @@ export function AuthHeader() {
                         </Avatar>
                         {/* Favorite Flag Badge */}
                         {userData?.user?.favoriteFlag && (
-                            <div className="absolute -bottom-1 -right-1 w-5 h-4 rounded border border-border shadow-sm overflow-hidden bg-background">
-                                <Image
-                                    src={userData.user.favoriteFlag.image}
-                                    alt={userData.user.favoriteFlag.name}
-                                    fill
-                                    className="object-cover"
-                                />
-                            </div>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Link
+                                        href={`/flag/${encodeURIComponent(userData.user.favoriteFlag.name)}`}
+                                        className="absolute -bottom-1 -right-1 w-5 h-4 rounded border border-border shadow-sm overflow-hidden bg-background hover:scale-110 transition-transform"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <Image
+                                            src={userData.user.favoriteFlag.image}
+                                            alt={userData.user.favoriteFlag.name}
+                                            fill
+                                            className="object-cover"
+                                        />
+                                    </Link>
+                                </TooltipTrigger>
+                                <TooltipContent>{userData.user.favoriteFlag.name}</TooltipContent>
+                            </Tooltip>
                         )}
                     </div>
                 </div>

@@ -24,6 +24,11 @@ import {
   Heart,
 } from 'lucide-react';
 import Link from 'next/link';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { getUserByUserNumber } from '@/actions/users';
 import { useCallback } from 'react';
 
@@ -236,14 +241,22 @@ export default function ProfilePage() {
                 </Avatar>
                 {/* Favorite Flag Badge */}
                 {user.favoriteFlag && (
-                  <div className='absolute -bottom-1 -right-1 w-9 h-7 rounded border-2 border-border shadow-shadow overflow-hidden bg-background'>
-                    <Image
-                      src={user.favoriteFlag.image}
-                      alt={user.favoriteFlag.name}
-                      fill
-                      className='object-cover'
-                    />
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href={`/flag/${encodeURIComponent(user.favoriteFlag.name)}`}
+                        className='absolute -bottom-1 -right-1 w-9 h-7 rounded border-2 border-border shadow-shadow overflow-hidden bg-background hover:scale-110 transition-transform'
+                      >
+                        <Image
+                          src={user.favoriteFlag.image}
+                          alt={user.favoriteFlag.name}
+                          fill
+                          className='object-cover'
+                        />
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>{user.favoriteFlag.name}</TooltipContent>
+                  </Tooltip>
                 )}
               </div>
 

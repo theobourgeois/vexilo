@@ -10,6 +10,11 @@ import { Trophy, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { getRankStyle } from "@/lib/get-rank-style";
 import Image from "next/image";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function Leaderboard() {
     const { data: leaderboard, isLoading } = useQuery({
@@ -92,14 +97,22 @@ export function Leaderboard() {
                                                 </Badge>
                                                 {/* Favorite Flag Badge */}
                                                 {user?.favoriteFlag && (
-                                                    <div className="absolute -bottom-1 -left-1 w-6 h-4 rounded border border-border shadow-sm overflow-hidden bg-background">
-                                                        <Image
-                                                            src={user.favoriteFlag.image}
-                                                            alt={user.favoriteFlag.name}
-                                                            fill
-                                                            className="object-cover"
-                                                        />
-                                                    </div>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Link
+                                                                href={`/flag/${encodeURIComponent(user.favoriteFlag.name)}`}
+                                                                className="absolute -bottom-1 -left-1 w-6 h-4 rounded border border-border shadow-sm overflow-hidden bg-background hover:scale-110 transition-transform"
+                                                            >
+                                                                <Image
+                                                                    src={user.favoriteFlag.image}
+                                                                    alt={user.favoriteFlag.name}
+                                                                    fill
+                                                                    className="object-cover"
+                                                                />
+                                                            </Link>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>{user.favoriteFlag.name}</TooltipContent>
+                                                    </Tooltip>
                                                 )}
                                             </div>
                                     <div className="flex flex-col">
