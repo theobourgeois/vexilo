@@ -12,7 +12,6 @@ import FlagCard from '@/components/FlagCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Image from 'next/image';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -41,11 +40,12 @@ export default function ProfilePage() {
   const userNumber = params.userNumber as string;
   const page = parseInt(searchParams.get('page') || '1');
   const router = useRouter();
-  
+
   // Support both old 'favorites' param and new 'view' param for backwards compatibility
   const viewParam = searchParams.get('view') as ViewMode | null;
   const isFavoritesLegacy = searchParams.get('favorites') === 'true';
-  const viewMode: ViewMode = viewParam || (isFavoritesLegacy ? 'favorites' : 'contributed');
+  const viewMode: ViewMode =
+    viewParam || (isFavoritesLegacy ? 'favorites' : 'contributed');
 
   const {
     data: userData,
@@ -253,7 +253,10 @@ export default function ProfilePage() {
             <div className='flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6'>
               <div className='relative'>
                 <Avatar className='h-24 w-24 border-4 border-border shadow-shadow'>
-                  <AvatarImage src={user.image || ''} alt={user.name || 'User'} />
+                  <AvatarImage
+                    src={user.image || ''}
+                    alt={user.name || 'User'}
+                  />
                   <AvatarFallback className='text-2xl font-bold bg-main text-main-foreground'>
                     {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                   </AvatarFallback>
