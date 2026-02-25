@@ -4,40 +4,40 @@
 @custom-variant dark (&:is(.dark *));
 
 html {
-    font-family: "Nunito", system-ui, sans-serif;
+    font-family: "DM Sans", system-ui, sans-serif;
 }
 
 :root {
-    --background: oklch(93.46% 0.0305 255.11);
-    --secondary-background: oklch(100% 0 0);
-    --foreground: oklch(0% 0 0);
-    --main-foreground: oklch(0% 0 0);
-    --main: oklch(67.47% 0.1726 259.49);
-    --border: oklch(0% 0 0);
-    --ring: oklch(0% 0 0);
-    --overlay: oklch(0% 0 0 / 0.8);
-    --shadow: 4px 4px 0px 0px var(--border);
+    --background: oklch(95% 0.01 255);
+    --secondary-background: oklch(98% 0.005 255);
+    --foreground: oklch(25% 0.02 255);
+    --main-foreground: oklch(100% 0 0);
+    --main: oklch(65% 0.15 259);
+    --border: oklch(85% 0.02 255);
+    --ring: oklch(65% 0.15 259);
+    --overlay: oklch(0% 0 0 / 0.4);
+    --shadow: inset 0 2px 4px 0 oklch(100% 0 0 / 0.5), 0 4px 8px -2px oklch(0% 0 0 / 0.05), 0 2px 4px -2px oklch(0% 0 0 / 0.03);
     --chart-1: #5294ff;
     --chart-2: #ff4d50;
     --chart-3: #facc00;
     --chart-4: #05e17a;
     --chart-5: #7a83ff;
     --chart-active-dot: #000;
-    --font-family-base: var(--font-comic-neue), system-ui, sans-serif;
-    --font-family-heading: var(--font-comic-neue), system-ui, sans-serif;
-    --font-family-mono: var(--font-comic-neue), monospace;
+    --font-family-base: var(--font-dm-sans), system-ui, sans-serif;
+    --font-family-heading: var(--font-dm-sans), system-ui, sans-serif;
+    --font-family-mono: ui-monospace, monospace;
 }
 
 .dark {
-    --background: oklch(12% 0 0);
-    --secondary-background: oklch(18% 0 0);
-    --foreground: oklch(95% 0 0);
+    --background: oklch(22% 0.005 255);
+    --secondary-background: oklch(26% 0.005 255);
+    --foreground: oklch(95% 0.005 255);
     --main-foreground: oklch(100% 0 0);
-    --main: oklch(68% 0.19 259);
-    --border: oklch(30% 0 0);
-    --ring: oklch(68% 0.19 259);
-    --overlay: oklch(0% 0 0 / 0.75);
-    --shadow: 4px 4px 0px 0px oklch(5% 0 0);
+    --main: oklch(60% 0.15 259);
+    --border: oklch(35% 0.005 255);
+    --ring: oklch(60% 0.15 259);
+    --overlay: oklch(0% 0 0 / 0.6);
+    --shadow: inset 0 2px 4px 0 oklch(100% 0 0 / 0.05), 0 4px 8px -2px oklch(0% 0 0 / 0.2), 0 2px 4px -2px oklch(0% 0 0 / 0.1);
     --chart-1: #6ba3ff;
     --chart-2: #ff7a7d;
     --chart-3: #f0c800;
@@ -47,6 +47,13 @@ html {
 }
 
 @theme inline {
+    --background-image-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.15'/%3E%3C/svg%3E");
+    --background-image-glossy-main: linear-gradient(to bottom, oklch(75% 0.15 259) 0%, oklch(65% 0.15 259) 45%, oklch(50% 0.15 259) 50%, oklch(45% 0.15 259) 100%);
+    --background-image-glossy-neutral: linear-gradient(to bottom, oklch(100% 0 0) 0%, oklch(95% 0.01 255) 45%, oklch(90% 0.01 255) 50%, oklch(85% 0.01 255) 100%);
+    --background-image-glossy-neutral-dark: linear-gradient(to bottom, oklch(35% 0.005 255) 0%, oklch(30% 0.005 255) 45%, oklch(22% 0.005 255) 50%, oklch(18% 0.005 255) 100%);
+    --background-image-glossy-card: linear-gradient(to bottom, oklch(98% 0.005 255) 0%, oklch(95% 0.005 255) 100%);
+    --background-image-glossy-card-dark: linear-gradient(to bottom, oklch(25% 0.005 255) 0%, oklch(20% 0.005 255) 100%);
+
     --color-main: var(--main);
     --color-background: var(--background);
     --color-secondary-background: var(--secondary-background);

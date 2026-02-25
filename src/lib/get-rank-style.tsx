@@ -4,27 +4,27 @@ export const getRankStyle = (index: number ) => {
   switch (index) {
     case 0: // 1st place
       return {
-        card: "bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200 dark:from-yellow-400/25 dark:to-amber-400/20 dark:border-yellow-400/60",
-        badge: "bg-gradient-to-r from-yellow-500 to-amber-500 text-white",
-        icon: <Trophy className="h-4 w-4" />,
+        card: "bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200 dark:from-yellow-400/10 dark:to-amber-400/10 dark:border-yellow-400/30",
+        badge: "bg-gradient-to-b from-yellow-400 to-amber-500 text-white shadow-[0_2px_4px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.4)] border border-yellow-300",
+        icon: <Trophy className="h-3 w-3" />,
                     rank: "1st",
-        rankColor: "text-yellow-600 dark:text-yellow-300",
+        rankColor: "text-yellow-600 dark:text-yellow-400",
       };
     case 1: // 2nd place
       return {
-        card: "bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200 dark:from-slate-300/15 dark:to-gray-300/10 dark:border-slate-400/50",
-        badge: "bg-gradient-to-r from-gray-400 to-slate-400 text-white",
-        icon: <Medal className="h-4 w-4" />,
+        card: "bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200 dark:from-slate-300/10 dark:to-gray-300/10 dark:border-slate-400/30",
+        badge: "bg-gradient-to-b from-gray-300 to-slate-500 text-white shadow-[0_2px_4px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.4)] border border-gray-300",
+        icon: <Medal className="h-3 w-3" />,
                     rank: "2nd",
-        rankColor: "text-gray-600 dark:text-slate-300",
+        rankColor: "text-gray-600 dark:text-slate-400",
       };
     case 2: // 3rd place
       return {
-        card: "bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200 dark:from-orange-400/25 dark:to-amber-400/20 dark:border-orange-400/60",
-        badge: "bg-gradient-to-r from-orange-500 to-amber-500 text-white",
-        icon: <Award className="h-4 w-4" />,
+        card: "bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200 dark:from-orange-400/10 dark:to-amber-400/10 dark:border-orange-400/30",
+        badge: "bg-gradient-to-b from-orange-400 to-amber-600 text-white shadow-[0_2px_4px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.4)] border border-orange-300",
+        icon: <Award className="h-3 w-3" />,
                     rank: "3rd",
-        rankColor: "text-orange-600 dark:text-orange-300",
+        rankColor: "text-orange-600 dark:text-orange-400",
       };
     case 3: // 4th place
       return {

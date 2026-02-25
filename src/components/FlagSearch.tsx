@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 
 type OrderBy = keyof typeof flags.$inferSelect;
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 56;
 const DEBOUNCE_DELAY = 300; // 300ms delay
 
 // Flag Card Skeleton Component

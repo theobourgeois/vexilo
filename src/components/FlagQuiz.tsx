@@ -145,7 +145,7 @@ export default function FlagQuiz() {
           <p className=''>Who does this flag belong to?</p>
         </CardHeader>
 
-        <CardContent className='space-y-6'>
+        <CardContent className='space-y-6 px-0 pb-0'>
           {/* Flag Image Skeleton */}
           <div className='relative aspect-[3/2] w-full max-w-md mx-auto'>
             <Skeleton className='w-full h-full flex items-center justify-center'>
@@ -167,7 +167,7 @@ export default function FlagQuiz() {
   if (!currentQuestion) {
     return (
       <Card className='h-full'>
-        <CardContent className='flex items-center justify-center h-64'>
+        <CardContent className='flex items-center justify-center h-64 px-0 pb-0'>
           <div className='text-center'>
             <p>No flags available for quiz.</p>
           </div>
@@ -177,8 +177,8 @@ export default function FlagQuiz() {
   }
 
   return (
-    <Card className='h-full'>
-      <CardHeader className='text-center'>
+    <Card className='h-full p-6'>
+      <CardHeader className='text-center px-0 pt-0 pb-6 border-b-0'>
         <div className='flex flex-wrap items-center justify-between mb-4'>
           <h2 className='text-2xl font-bold '>Flag Quiz</h2>
           <div className='flex items-center gap-2 flex-wrap'>
@@ -225,7 +225,7 @@ export default function FlagQuiz() {
         </div>
 
         {/* Answer Options */}
-        <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6'>
           {options.map((option) => (
             <Button
               key={option}

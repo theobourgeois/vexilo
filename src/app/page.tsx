@@ -1,8 +1,6 @@
 import { Suspense } from 'react';
 import FlagSearch from '../components/FlagSearch';
-import FlagQuiz from '../components/FlagQuiz';
-import { FlagOfTheDay } from '@/components/flag-of-the-day';
-import { Leaderboard } from '@/components/leaderboard';
+import { HomeHighlights } from '@/components/home-highlights';
 import { ProfileFlagAlert } from '@/components/alert-banner';
 
 export default function Home() {
@@ -12,23 +10,8 @@ export default function Home() {
         <ProfileFlagAlert />
       </div>
 
-      {/* Flag Quiz and Flag of the Day Section */}
-      <div className='max-w-7xl mx-auto px-4 mb-8'>
-        <div className='flex flex-col lg:flex-row gap-8'>
-          {/* Flag Quiz Section */}
-          <div className='flex-3 lg:flex-[3]'>
-            <FlagQuiz />
-          </div>
-
-          {/* Flag of the Day Section */}
-          <div className='flex-1 lg:flex-[1]'>
-            <FlagOfTheDay />
-          </div>
-        </div>
-      </div>
-
-      <div className='max-w-7xl mx-auto px-4 mb-8'>
-        <Leaderboard />
+      <div className='max-w-7xl mx-auto px-4 mb-4'>
+        <HomeHighlights />
       </div>
 
       {/* Search and Results */}

@@ -78,7 +78,7 @@ export function Leaderboard() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-4">
                                             <div className="relative">
-                                                <Avatar className="h-12 w-12 border-2 border-secondary-background shadow-sm">
+                                                <Avatar className="h-12 w-12 border border-white/20 shadow-[inset_0_2px_4px_oklch(0%_0_0/0.2),0_2px_4px_oklch(0%_0_0/0.1)]">
                                                     <AvatarImage
                                                         src={user?.image || "/logo.svg"}
                                                     />
@@ -91,7 +91,7 @@ export function Leaderboard() {
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <Badge
-                                                    className={`absolute -top-2 -right-2 h-6 w-6 p-0 flex items-center justify-center ${style.badge}`}
+                                                    className={`absolute -top-2 -right-2 h-6 w-6 p-0 flex items-center justify-center rounded-full ${style.badge}`}
                                                 >
                                                     {style.icon}
                                                 </Badge>
@@ -101,7 +101,7 @@ export function Leaderboard() {
                                                         <TooltipTrigger asChild>
                                                             <Link
                                                                 href={`/flag/${encodeURIComponent(user.favoriteFlag.name)}`}
-                                                                className="absolute -bottom-1 -left-1 w-6 h-4 rounded border border-border shadow-sm overflow-hidden bg-background hover:scale-110 transition-transform"
+                                                                className="absolute -bottom-1 -left-1 w-6 h-4 rounded border border-white/30 shadow-[0_2px_4px_oklch(0%_0_0/0.4)] overflow-hidden bg-background hover:scale-110 transition-transform"
                                                             >
                                                                 <Image
                                                                     src={user.favoriteFlag.image}

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Nunito } from 'next/font/google';
+import { DM_Sans } from 'next/font/google';
 import './globals.css';
 import Providers from '@/components/providers';
 import Logo from '@/components/Logo';
@@ -7,12 +7,13 @@ import { AuthHeader } from '@/components/auth-header';
 import { Toaster } from '@/components/ui/sonner';
 import { PostFlagButton } from '@/components/post-flag-button';
 import { HamburgerMenu } from '@/components/hamburger-menu';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Footer } from '@/components/footer';
 import { Analytics } from '@vercel/analytics/next';
+import { Heart, Gamepad2 } from 'lucide-react';
+import Link from 'next/link';
 
-const nunito = Nunito({
-  variable: '--font-nunito',
+const dmSans = DM_Sans({
+  variable: '--font-dm-sans',
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700'],
 });
@@ -108,7 +109,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang='en'>
-      <body className={`${nunito.variable} antialiased`}>
+      <body className={`${dmSans.variable} antialiased bg-[image:var(--background-image-noise),radial-gradient(ellipse_at_top,oklch(96%_0.01_255),oklch(92%_0.02_255))] dark:bg-[image:var(--background-image-noise),radial-gradient(ellipse_at_top,oklch(22%_0.01_255),oklch(15%_0.01_255))] bg-[size:256px,auto]`}>
         <Toaster />
         <Analytics />
         <Providers>
@@ -120,7 +121,22 @@ export default function RootLayout({
               </div>
               <div className='flex items-center gap-2'>
                 <div className='hidden md:flex items-center gap-4'>
-                  <ThemeToggle />
+                  <Link
+                    href='/quiz'
+                    className='flex items-center gap-1.5 text-sm font-bold text-foreground/60 hover:text-foreground transition-colors'
+                  >
+                    <Gamepad2 className='w-4 h-4' />
+                    Quiz
+                  </Link>
+                  <a
+                    href='https://buymeacoffee.com/theobourgeois'
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='flex items-center gap-1.5 text-sm font-bold text-foreground/60 hover:text-foreground transition-colors'
+                  >
+                    <Heart className='w-4 h-4 fill-red-500 text-red-500 drop-shadow-sm' />
+                    Donate
+                  </a>
                   <PostFlagButton />
                   <AuthHeader />
                 </div>
@@ -128,7 +144,7 @@ export default function RootLayout({
               </div>
             </div>
           </header>
-          <div className='w-full bg-main/10 dark:bg-main/5 min-h-screen'>
+          <div className='w-full min-h-screen'>
             {children}
           </div>
           <Footer />

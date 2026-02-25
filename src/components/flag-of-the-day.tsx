@@ -32,11 +32,11 @@ export function FlagOfTheDay() {
   }
 
   return (
-    <Card className='h-full'>
-      <CardHeader className='text-2xl font-bold mb-4 text-center'>
+    <Card className='h-full p-6'>
+      <CardHeader className='text-2xl font-bold mb-4 text-center pb-0 px-0'>
         Flag of the Day
       </CardHeader>
-      <CardContent>
+      <CardContent className='px-0'>
         <FlagCard
           id={flagOfTheDay.id}
           sources={[]}
@@ -50,7 +50,7 @@ export function FlagOfTheDay() {
           favorites={flagOfTheDay.favorites}
         />
       </CardContent>
-      <CardFooter className='flex flex-col gap-3'>
+      <CardFooter className='flex flex-col gap-3 pt-6 px-0 border-t-0'>
         <p className='text-center text-sm'>
           Come back tomorrow for a new flag!
         </p>

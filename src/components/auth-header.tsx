@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { FcGoogle } from "react-icons/fc";
-import { LogOut, Loader2, Shield, Settings, User } from "lucide-react";
+import { LogOut, Loader2, Shield, Settings, User, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
     DropdownMenu,
@@ -30,6 +31,7 @@ export function AuthHeader() {
         queryFn: getUserData,
     });
     const router = useRouter();
+    const { theme, setTheme } = useTheme();
 
     const handleSignIn = async () => {
         void signIn("google").then(() => {
@@ -115,6 +117,13 @@ export function AuthHeader() {
                 >
                     <Settings className="h-4 w-4" />
                     Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                    onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                    className="bg-secondary-background"
+                >
+                    {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    {theme === "dark" ? "Light Mode" : "Dark Mode"}
                 </DropdownMenuItem>
                 {session.user?.isAdmin && (
                     <>

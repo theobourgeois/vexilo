@@ -249,10 +249,10 @@ export default function ProfilePage() {
         {userLoading ? (
           <UserInfoSkeleton />
         ) : user ? (
-          <Card className='p-6 bg-gradient-to-r from-background to-secondary-background border-2 border-border shadow-shadow'>
+          <Card className='p-6'>
             <div className='flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6'>
               <div className='relative'>
-                <Avatar className='h-24 w-24 border-4 border-border shadow-shadow'>
+                <Avatar className='h-24 w-24 border-2 border-white/20 shadow-[inset_0_2px_4px_oklch(0%_0_0/0.2),0_4px_8px_oklch(0%_0_0/0.3)]'>
                   <AvatarImage
                     src={user.image || ''}
                     alt={user.name || 'User'}
@@ -267,7 +267,7 @@ export default function ProfilePage() {
                     <TooltipTrigger asChild>
                       <Link
                         href={`/flag/${encodeURIComponent(user.favoriteFlag.name)}`}
-                        className='absolute -bottom-1 -right-1 w-9 h-7 rounded border-2 border-border shadow-shadow overflow-hidden bg-background hover:scale-110 transition-transform'
+                        className='absolute -bottom-1 -right-1 w-9 h-7 rounded border border-white/30 shadow-[0_2px_4px_oklch(0%_0_0/0.4)] overflow-hidden bg-background hover:scale-110 transition-transform'
                       >
                         <Image
                           src={user.favoriteFlag.image}

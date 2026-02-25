@@ -397,18 +397,18 @@ export async function getFlags(
 
   const boundedLimit = Math.min(limit, 100);
 
-  const isHomePage =
-    page === 1 &&
-    !query &&
-    !tag &&
-    orderBy === 'favorites' &&
-    orderDirection === 'desc';
-  if (isHomePage) {
-    const cachedResults = await redis.get(`flags:home`);
-    if (cachedResults) {
-      return cachedResults as typeof results;
-    }
-  }
+  // const isHomePage =
+  //   page === 1 &&
+  //   !query &&
+  //   !tag &&
+  //   orderBy === 'favorites' &&
+  //   orderDirection === 'desc';
+  // if (isHomePage) {
+  //   const cachedResults = await redis.get(`flags:home`);
+  //   if (cachedResults) {
+  //     return cachedResults as typeof results;
+  //   }
+  // }
 
   const results = await db
     .select({
@@ -435,9 +435,9 @@ export async function getFlags(
     .limit(boundedLimit)
     .offset((page - 1) * boundedLimit);
 
-  if (isHomePage) {
-    await redis.set(`flags:home`, results);
-  }
+  // if (isHomePage) {
+  //   await redis.set(`flags:home`, results);
+  // }
 
   return results;
 }
@@ -671,9 +671,7 @@ export async function getPastFlagsOfTheDay(page: number = 1) {
     .limit(FOTD_HISTORY_PER_PAGE)
     .offset(offset);
 
-  const totalCount = await db
-    .select({ count: count() })
-    .from(flagOfTheDay);
+  const totalCount = await db.select({ count: count() }).from(flagOfTheDay);
 
   return {
     flags: pastFotd,

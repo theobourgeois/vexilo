@@ -82,7 +82,11 @@ export default function FlagCard({
       const result = await changeFavoriteFlag(isCurrentProfileFlag ? null : id);
       queryClient.invalidateQueries({ queryKey: ['userData'] });
       if (result.success) {
-        toast.success(isCurrentProfileFlag ? 'Profile flag removed' : 'Profile flag updated!');
+        toast.success(
+          isCurrentProfileFlag
+            ? 'Profile flag removed'
+            : 'Profile flag updated!',
+        );
       } else {
         toast.error(result.message);
       }
@@ -109,63 +113,67 @@ export default function FlagCard({
   return (
     <>
       <Card
-        className='cursor-pointer px-8 relative group h-full'
+        className='cursor-pointer p-5 relative group h-full transition-all duration-300 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6),0_6px_12px_oklch(0%_0_0/0.15)] dark:hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_6px_12px_oklch(0%_0_0/0.5)] hover:-translate-y-1'
         onClick={handleCardClick}
       >
-        {/* Favorite Button - Only visible on hover */}
-        <Button
-          variant='neutral'
-          size='sm'
-          className='absolute top-2 right-2 z-10 bg-secondary-background/95 hover:bg-secondary-background shadow-md border border-border opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200'
-          onClick={handleFavoriteToggle}
-        >
-          <Heart
-            className={`w-4 h-4 ${
-              isFavorite ? 'fill-red-500 text-red-500' : 'text-foreground/60'
-            }`}
-          />
-        </Button>
+        {/* Top Action Buttons - Only visible on hover */}
+        <div className='absolute top-3 right-3 z-10 flex gap-1.5 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200'>
+          {session?.user && (
+            <Button
+              variant='neutral'
+              size='sm'
+              className={`bg-gradient-to-b shadow-[0_2px_4px_oklch(0%_0_0/0.2),inset_0_1px_1px_oklch(100%_0_0/0.5)] border border-white/40 backdrop-blur-md px-2.5 ${
+                isCurrentProfileFlag
+                  ? 'from-main to-[oklch(55%_0.15_259)] text-main-foreground border-[oklch(45%_0.15_259)]'
+                  : 'from-white/90 to-white/70 dark:from-white/20 dark:to-white/10'
+              }`}
+              onClick={handleSetProfileFlag}
+              disabled={isSettingProfileFlag}
+              title={
+                isCurrentProfileFlag
+                  ? 'Your Profile Flag'
+                  : 'Set as Profile Flag'
+              }
+            >
+              {isCurrentProfileFlag ? (
+                <Check className='w-4 h-4' />
+              ) : (
+                <UserCircle className='w-4 h-4 text-foreground/70' />
+              )}
+            </Button>
+          )}
 
-        {/* Edit Button - Only visible on hover */}
-        {session?.user && (
+          {session?.user && (
+            <Button
+              variant='neutral'
+              size='sm'
+              className='bg-gradient-to-b from-white/90 to-white/70 dark:from-white/20 dark:to-white/10 shadow-[0_2px_4px_oklch(0%_0_0/0.2),inset_0_1px_1px_oklch(100%_0_0/0.5)] border border-white/40 backdrop-blur-md px-2.5'
+              onClick={handleEditClick}
+            >
+              <Edit className='w-4 h-4 text-foreground/70' />
+            </Button>
+          )}
+
           <Button
             variant='neutral'
             size='sm'
-            className='absolute top-2 right-14 z-10 bg-secondary-background/95 hover:bg-secondary-background shadow-md border border-border opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200'
-            onClick={handleEditClick}
+            className='bg-gradient-to-b from-white/90 to-white/70 dark:from-white/20 dark:to-white/10 shadow-[0_2px_4px_oklch(0%_0_0/0.2),inset_0_1px_1px_oklch(100%_0_0/0.5)] border border-white/40 backdrop-blur-md px-2.5'
+            onClick={handleFavoriteToggle}
           >
-            <Edit className='w-4 h-4 text-foreground/60' />
+            <Heart
+              className={`w-4 h-4 ${
+                isFavorite ? 'fill-red-500 text-red-500' : 'text-foreground/70'
+              }`}
+            />
           </Button>
-        )}
-
-        {/* Set as Profile Flag Button - Only visible on hover */}
-        {session?.user && (
-          <Button
-            variant='neutral'
-            size='sm'
-            className={`absolute top-2 right-26 z-10 shadow-md border border-border opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${
-              isCurrentProfileFlag 
-                ? 'bg-main text-main-foreground hover:bg-main/90' 
-                : 'bg-secondary-background/95 hover:bg-secondary-background'
-            }`}
-            onClick={handleSetProfileFlag}
-            disabled={isSettingProfileFlag}
-            title={isCurrentProfileFlag ? 'Your Profile Flag' : 'Set as Profile Flag'}
-          >
-            {isCurrentProfileFlag ? (
-              <Check className='w-4 h-4' />
-            ) : (
-              <UserCircle className='w-4 h-4 text-foreground/60' />
-            )}
-          </Button>
-        )}
+        </div>
 
         {/* Favorites Count Badge */}
         {Boolean(favoriteCount) && (
-          <div className='absolute top-2 left-2 z-10'>
+          <div className='absolute top-3.5 left-3.5 z-10'>
             <Badge
               variant='neutral'
-              className='bg-secondary-background/95 text-foreground/80 border border-border'
+              className='text-foreground/80 shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.5)] border-white/40 backdrop-blur-md px-2'
             >
               <Heart className='w-3 h-3 mr-1 fill-red-500 text-red-500' />
               {favoriteCount}
@@ -173,23 +181,23 @@ export default function FlagCard({
           </div>
         )}
 
-        <div className='relative overflow-hidden'>
-          <div className='aspect-[3/2] relative shadow-shadow'>
+        {/* Flag Image Recessed Container */}
+        <div className='relative w-full mt-2'>
+          <div className='aspect-[3/2] relative rounded-md overflow-hidden bg-black/5 dark:bg-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.15)] dark:shadow-[inset_0_1px_6px_rgba(0,0,0,0.5)] border border-black/5 dark:border-white/5'>
             <Image
-              style={{
-                boxShadow: '8px upx 0px 0px var(--border)',
-              }}
               src={flagImage}
               alt={flagName}
               fill
-              className='drop-shadow-shadow object-contain text-main-foreground bg-main/70 border-4 border-border shadow-shadow hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none p-2 rounded-base'
+              className='object-contain p-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)] transition-transform duration-300 group-hover:scale-105'
               sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
             />
           </div>
         </div>
 
-        <CardContent className='pb-2'>
-          <h3 className='font-semibold text-center'>{flagName}</h3>
+        <CardContent className='p-0 mt-0 flex-grow flex items-center justify-center px-1'>
+          <h3 className='text-[15px] font-medium text-center text-foreground/80 leading-snug line-clamp-2 [text-shadow:0_1px_0_rgba(255,255,255,0.5)] dark:[text-shadow:0_1px_0_rgba(0,0,0,0.5)]'>
+            {flagName}
+          </h3>
         </CardContent>
       </Card>
 
