@@ -18,6 +18,7 @@ import {
 import { getUserData } from "@/actions/users";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
+import { ThemeToggle } from "./theme-toggle";
 import {
     Tooltip,
     TooltipContent,
@@ -53,13 +54,16 @@ export function AuthHeader() {
 
     if (!session) {
         return (
-            <Button
-                className="inline-flex gap-1 bg-secondary-background"
-                onClick={handleSignIn}
-                variant="neutral"
-            >
-                Sign in with Google <FcGoogle size="20" />
-            </Button>
+            <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <Button
+                    className="inline-flex gap-1 bg-secondary-background"
+                    onClick={handleSignIn}
+                    variant="neutral"
+                >
+                    Sign in with Google <FcGoogle size="20" />
+                </Button>
+            </div>
         );
     }
 
