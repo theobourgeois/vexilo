@@ -14,6 +14,7 @@ import TagInput from './TagInput';
 import SourcesInput from './SourcesInput';
 import { getRelatedFlags } from '@/actions/flags';
 import { useQuery } from '@tanstack/react-query';
+import { toastErrorWithLogin } from '@/lib/toast-auth';
 
 type FlagFieldsFormProps = {
   initialFlag: Omit<Flag, 'index'> & { index?: number };
@@ -122,7 +123,7 @@ export default function FlagFieldsForm({
       if (result.success) {
         toast.success('Flag update request sent! Please wait for approval.');
       } else {
-        toast.error(result.message);
+        toastErrorWithLogin(result.message);
       }
       if (onCancel) {
         onCancel();

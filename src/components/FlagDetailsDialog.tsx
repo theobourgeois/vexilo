@@ -18,6 +18,7 @@ import FlagFieldsForm from './FlagFieldsForm';
 import { toggleFavoriteFlag, deleteFlag } from '@/actions/flags';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { toastErrorWithLogin } from '@/lib/toast-auth';
 
 type FlagDetailsDialogProps = {
   open: boolean;
@@ -51,7 +52,7 @@ export default function FlagDetailsDialog({
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session?.user) {
-      toast.error('You must be logged in to favorite a flag');
+      toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
     if (isFavorite) {

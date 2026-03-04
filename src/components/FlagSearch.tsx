@@ -22,11 +22,13 @@ import { flags } from '@/db/schema';
 import Tag from './Tag';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 type OrderBy = keyof typeof flags.$inferSelect;
 
 const ITEMS_PER_PAGE = 56;
 const DEBOUNCE_DELAY = 300; // 300ms delay
+const MOBILE_TAGS_TO_SHOW = 7;
 
 // Flag Card Skeleton Component
 function FlagCardSkeleton() {
@@ -80,6 +82,7 @@ function SimplePagination({
 export default function FlagSearch() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
 
   // Local state for search query with debouncing
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
@@ -105,6 +108,10 @@ export default function FlagSearch() {
   });
 
   const tag = searchParams.get('tag') || '';
+  const visibleTopTags = (topFlagTags || []).slice(
+    0,
+    isMobile ? MOBILE_TAGS_TO_SHOW : topFlagTags?.length,
+  );
 
   const { data: flags, isLoading: flagsLoading } = useQuery({
     queryKey: [
@@ -340,7 +347,7 @@ export default function FlagSearch() {
                   {!topFlagTags.find((t) => t.tag === tag) && tag && (
                     <Tag key={tag} text={tag} />
                   )}
-                  {topFlagTags.map((tag) => (
+                  {visibleTopTags.map((tag) => (
                     <Tag key={tag.tag} text={tag.tag} count={tag.count} />
                   ))}
                   <Link className='text-main underline text-sm' href='/tags'>

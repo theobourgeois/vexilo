@@ -26,6 +26,7 @@ import RelatedFlagInput from '@/components/related-flag-input';
 import { RelatedFlag } from '@/lib/types';
 import TagInput from '@/components/TagInput';
 import SourcesInput from '@/components/SourcesInput';
+import { toastErrorWithLogin } from '@/lib/toast-auth';
 
 export default function PostFlagPage() {
   const { data: session, status } = useSession();
@@ -126,7 +127,7 @@ export default function PostFlagPage() {
           description: 'Your flag has been submitted for review.',
         });
       } else {
-        toast.error(result.message);
+        toastErrorWithLogin(result.message);
       }
     } catch (error) {
       console.error(error);
@@ -255,12 +256,11 @@ export default function PostFlagPage() {
               <label htmlFor='description' className='text-sm font-semibold'>
                 Description
               </label>
-              <textarea
+              <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 id='description'
                 placeholder='Describe the flag, its history, or any interesting facts...'
-                className='flex w-full min-h-[100px] rounded-base border-2 border-border bg-secondary-background selection:bg-main selection:text-main-foreground px-3 py-2 text-sm font-base text-foreground placeholder:text-foreground/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
               />
             </div>
 

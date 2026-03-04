@@ -11,6 +11,7 @@ import React from 'react';
 import { useSession } from 'next-auth/react';
 import { ReportDialog } from '@/components/ReportDialog';
 import { RelatedFlag } from '@/lib/types';
+import { toastErrorWithLogin } from '@/lib/toast-auth';
 
 type FlagActionsProps = {
   flag: {
@@ -46,7 +47,7 @@ export default function FlagActions({ flag }: FlagActionsProps) {
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session.data?.user) {
-      toast.error('You must be logged in to favorite a flag');
+      toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
     if (isFavorite) {
@@ -65,7 +66,7 @@ export default function FlagActions({ flag }: FlagActionsProps) {
   const handleSetProfileFlag = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session.data?.user) {
-      toast.error('You must be logged in to set a profile flag');
+      toastErrorWithLogin('You must be logged in to set a profile flag');
       return;
     }
 
@@ -76,7 +77,7 @@ export default function FlagActions({ flag }: FlagActionsProps) {
       if (result.success) {
         toast.success(isCurrentProfileFlag ? 'Profile flag removed' : 'Profile flag updated!');
       } else {
-        toast.error(result.message);
+        toastErrorWithLogin(result.message);
       }
     } catch {
       toast.error('Failed to update profile flag');
@@ -87,7 +88,7 @@ export default function FlagActions({ flag }: FlagActionsProps) {
 
   const handleEditClick = (e: React.MouseEvent) => {
     if (!session.data?.user) {
-      toast.error('You must be logged in to edit a flag');
+      toastErrorWithLogin('You must be logged in to edit a flag');
       return;
     }
     // add mode to the url

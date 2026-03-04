@@ -11,9 +11,9 @@ import { useSession } from 'next-auth/react';
 import { getRandomFlag } from '@/lib/get-random-flag';
 import { toggleFavoriteFlag } from '@/actions/flags';
 import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import FlagDetailsDialog from './FlagDetailsDialog';
 import { useRouter } from 'next/navigation';
+import { toastErrorWithLogin } from '@/lib/toast-auth';
 
 type Flag = {
   name: string;
@@ -44,7 +44,7 @@ export default function FlagQuiz() {
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session?.user) {
-      toast.error('You must be logged in to favorite a flag');
+      toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
     if (!currentQuestion) return;

@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import FlagFieldsForm from '@/components/FlagFieldsForm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { toastErrorWithLogin } from '@/lib/toast-auth';
 
 type FlagCardProps = Flag;
 
@@ -51,7 +52,7 @@ export default function FlagCard({
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session?.user) {
-      toast.error('You must be logged in to favorite a flag');
+      toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
     if (isFavorite) {
@@ -73,7 +74,7 @@ export default function FlagCard({
   const handleSetProfileFlag = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session?.user) {
-      toast.error('You must be logged in to set a profile flag');
+      toastErrorWithLogin('You must be logged in to set a profile flag');
       return;
     }
 
@@ -88,7 +89,7 @@ export default function FlagCard({
             : 'Profile flag updated!',
         );
       } else {
-        toast.error(result.message);
+        toastErrorWithLogin(result.message);
       }
     } catch {
       toast.error('Failed to update profile flag');
@@ -99,7 +100,7 @@ export default function FlagCard({
 
   const handleEditClick = (e: React.MouseEvent) => {
     if (!session?.user) {
-      toast.error('You must be logged in to edit a flag');
+      toastErrorWithLogin('You must be logged in to edit a flag');
       return;
     }
     e.stopPropagation();

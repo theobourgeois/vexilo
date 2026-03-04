@@ -21,6 +21,7 @@ import {
 import { createReport } from "@/actions/reports";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
+import { toastErrorWithLogin } from "@/lib/toast-auth";
 
 interface ReportDialogProps {
 	flagId: string;
@@ -71,7 +72,7 @@ export function ReportDialog({
 				setReason("");
 				setDescription("");
 			} else {
-				toast.error(result.message || "Failed to submit report");
+				toastErrorWithLogin(result.message || "Failed to submit report");
 			}
 		} catch (error) {
 			console.error("Error submitting report:", error);

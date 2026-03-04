@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { notFound } from 'next/navigation';
 import FlagActions from './FlagActions';
+import ExpandableDescription from './ExpandableDescription';
 import FlagCard from '@/components/FlagCard';
 import { Metadata } from 'next';
 import Tag from '@/components/Tag';
@@ -272,13 +273,13 @@ export default async function FlagPage({
     <div className='container mx-auto px-4 py-8 max-w-6xl'>
       {/* Header */}
       <div className='text-center space-y-4 mb-8'>
-        <Badge variant='neutral' className='mb-2'>
-          <Flag className='w-4 h-4 mr-1' />
+        <Badge variant='neutral' className='mb-2 gap-2 pl-1.5 pr-3'>
+          <span className='relative inline-block w-5 h-3.5 rounded-[2px] overflow-hidden border border-border/60'>
+            <Image src={flag.image} alt={`${flag.name} flag`} fill className='object-cover' sizes='20px' />
+          </span>
           Flag #{flag.index}
         </Badge>
-        <h1 className='text-4xl md:text-5xl font-bold tracking-tight'>
-          {flag.name}
-        </h1>
+        <h1 className='text-4xl md:text-5xl font-bold tracking-tight'>{flag.name}</h1>
         {/* Tags before description */}
         {flag.tags && flag.tags.length > 0 && (
           <div className='flex flex-wrap gap-2 justify-center mb-2'>
@@ -288,9 +289,7 @@ export default async function FlagPage({
           </div>
         )}
         {flag.description && (
-          <p className='text-lg text-muted-foreground max-w-3xl mx-auto'>
-            {flag.description}
-          </p>
+          <ExpandableDescription description={flag.description} />
         )}
         {/* Sources */}
         {flag.sources && flag.sources.length > 0 && (

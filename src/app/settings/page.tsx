@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
 import Image from 'next/image';
+import { toastErrorWithLogin } from '@/lib/toast-auth';
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -104,7 +105,7 @@ export default function SettingsPage() {
       if (result.success) {
         toast.success(result.message);
       } else {
-        toast.error(result.message);
+        toastErrorWithLogin(result.message);
       }
     } catch {
       toast.error('Failed to update name. Please try again.');
@@ -122,7 +123,7 @@ export default function SettingsPage() {
         setIsAnonymous(checked);
         toast.success(result.message);
       } else {
-        toast.error(result.message);
+        toastErrorWithLogin(result.message);
       }
     } catch {
       toast.error('Failed to update anonymization setting. Please try again.');
@@ -141,7 +142,7 @@ export default function SettingsPage() {
         setFlagSearch('');
         setIsFlagDropdownOpen(false);
       } else {
-        toast.error(result.message);
+        toastErrorWithLogin(result.message);
       }
     } catch {
       toast.error('Failed to update favorite flag. Please try again.');

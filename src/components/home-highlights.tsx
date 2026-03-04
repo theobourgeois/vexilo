@@ -1,16 +1,20 @@
 'use client';
 
 import { getLeaderboard } from '@/actions/leaderboard';
-import { getFlagOfTheDay } from '@/actions/flags';
+import { getFlagOfTheDay, toggleFavoriteFlag } from '@/actions/flags';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Badge } from './ui/badge';
-import { Trophy, ArrowRight, History } from 'lucide-react';
+import { Trophy, ArrowRight, History, Heart } from 'lucide-react';
 import Link from 'next/link';
 import { getRankStyle } from '@/lib/get-rank-style';
 import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { useSession } from 'next-auth/react';
+import React from 'react';
+import { toastErrorWithLogin } from '@/lib/toast-auth';
 import {
   Tooltip,
   TooltipContent,
@@ -18,6 +22,8 @@ import {
 } from '@/components/ui/tooltip';
 
 export function HomeHighlights() {
+  const { data: session } = useSession();
+  const queryClient = useQueryClient();
   const { data: leaderboard, isLoading: leaderboardLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: () => getLeaderboard(),
@@ -32,9 +38,38 @@ export function HomeHighlights() {
         link: flag.link,
         index: flag.index,
         id: flag.id,
+        isFavorite: flag.isFavorite,
+        favorites: flag.favorites,
       }));
     },
   });
+  const [isFotdFavorite, setIsFotdFavorite] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsFotdFavorite(Boolean(flagOfTheDay?.isFavorite));
+  }, [flagOfTheDay?.isFavorite, flagOfTheDay?.id]);
+
+  const handleFotdFavoriteToggle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!session?.user || !flagOfTheDay?.id) {
+      toastErrorWithLogin('You must be logged in to favorite a flag');
+      return;
+    }
+
+    const previousValue = isFotdFavorite;
+    setIsFotdFavorite(!previousValue);
+
+    const isSuccess = await toggleFavoriteFlag(flagOfTheDay.id, true);
+    if (!isSuccess) {
+      setIsFotdFavorite(previousValue);
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['flagOfTheDay'] });
+    queryClient.invalidateQueries({ queryKey: ['flags'] });
+  };
 
   const getInitials = (name: string) => {
     return name
@@ -155,17 +190,30 @@ export function HomeHighlights() {
             <Skeleton className='aspect-[3/2] w-full rounded-md' />
           ) : (
             <div className='flex flex-col items-center gap-2'>
-              <Link
-                href={`/flag/${encodeURIComponent(flagOfTheDay.flagName)}`}
-                className='relative aspect-[3/2] w-full rounded-md overflow-hidden border border-border hover:shadow-md transition-shadow group'
-              >
-                <Image
-                  src={flagOfTheDay.flagImage}
-                  alt={flagOfTheDay.flagName}
-                  fill
-                  className='object-cover group-hover:scale-105 transition-transform duration-200'
-                />
-              </Link>
+              <div className='relative w-full group'>
+                <Link
+                  href={`/flag/${encodeURIComponent(flagOfTheDay.flagName)}`}
+                  className='relative aspect-[3/2] w-full rounded-md overflow-hidden border border-border hover:shadow-md transition-shadow block'
+                >
+                  <Image
+                    src={flagOfTheDay.flagImage}
+                    alt={flagOfTheDay.flagName}
+                    fill
+                    className='object-cover group-hover:scale-105 transition-transform duration-200'
+                  />
+                </Link>
+                <Button
+                  variant='neutral'
+                  size='sm'
+                  className='absolute top-2 right-2 z-10 bg-white/85 dark:bg-black/50 border border-white/40 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity'
+                  onClick={handleFotdFavoriteToggle}
+                  aria-label='Like flag of the day'
+                >
+                  <Heart
+                    className={`w-4 h-4 ${isFotdFavorite ? 'fill-red-500 text-red-500' : 'text-foreground/70'}`}
+                  />
+                </Button>
+              </div>
               <Link
                 href={`/flag/${encodeURIComponent(flagOfTheDay.flagName)}`}
                 className='text-sm font-semibold hover:underline text-center'

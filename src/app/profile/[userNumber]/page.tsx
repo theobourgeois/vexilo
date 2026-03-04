@@ -23,6 +23,13 @@ import {
   Loader2,
   Heart,
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import Link from 'next/link';
 import {
   Tooltip,
@@ -321,11 +328,37 @@ export default function ProfilePage() {
 
         {/* Flags Section */}
         <div className='space-y-6'>
-          <div className='flex items-center justify-between'>
+          <div className='flex flex-wrap items-center justify-center gap-2 [@media(min-width:340px)]:justify-between'>
             <h2 className='text-2xl font-bold text-foreground'>
               Flag Collection
             </h2>
-            <div className='flex gap-2'>
+            {/* Mobile: Select dropdown */}
+            <div className='sm:hidden'>
+              <Select
+                value={viewMode}
+                onValueChange={(v) => handleViewModeChange(v as ViewMode)}
+              >
+                <SelectTrigger className='bg-[image:var(--background-image-noise),var(--background-image-glossy-neutral)] bg-[size:256px,auto] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-neutral-dark)] text-foreground font-bold rounded-xl border border-[oklch(72%_0.01_255)] dark:border-black shadow-[inset_0_1px_1px_rgba(255,255,255,1),inset_0_4px_8px_rgba(255,255,255,0.9),inset_0_-4px_8px_rgba(0,0,0,0.12),0_4px_0_oklch(60%_0.01_260),0_12px_20px_oklch(0%_0_0/0.15),0_2px_0_1px_oklch(100%_0_0/0.7)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.1),inset_0_-4px_8px_rgba(0,0,0,0.4),0_4px_0_oklch(15%_0.004_255),0_12px_20px_oklch(0%_0_0/0.4),0_2px_0_1px_rgba(255,255,255,0.15)] h-10 px-4'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className='bg-[image:var(--background-image-noise),var(--background-image-glossy-neutral)] bg-[size:256px,auto] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-neutral-dark)] border-[oklch(72%_0.01_255)] dark:border-black rounded-xl shadow-[0_12px_20px_oklch(0%_0_0/0.15)] dark:shadow-[0_12px_20px_oklch(0%_0_0/0.4)]'>
+                  <SelectItem value='contributed'>
+                    <Flag className='w-4 h-4' />
+                    Contributed ({totalContributionsCount})
+                  </SelectItem>
+                  <SelectItem value='edited'>
+                    <Edit className='w-4 h-4' />
+                    Edited ({totalEditCount})
+                  </SelectItem>
+                  <SelectItem value='favorites'>
+                    <Heart className='w-4 h-4' />
+                    Favorites
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Desktop: Buttons */}
+            <div className='hidden sm:flex gap-2'>
               <Button
                 variant={viewMode === 'contributed' ? 'default' : 'neutral'}
                 onClick={() => handleViewModeChange('contributed')}
