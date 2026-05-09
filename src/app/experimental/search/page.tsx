@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import ExperimentalFlagSearch from '@/components/ExperimentalFlagSearch';
@@ -9,5 +10,9 @@ export const metadata: Metadata = {
 };
 
 export default function ExperimentalSearchPage() {
-  return <ExperimentalFlagSearch />;
+  return (
+    <Suspense fallback={null}>
+      <ExperimentalFlagSearch />
+    </Suspense>
+  );
 }
