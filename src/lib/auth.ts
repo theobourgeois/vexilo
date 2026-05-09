@@ -29,9 +29,8 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
-    jwt({ token, account, user }) {
-      if (account) {
-        token.accessToken = account.access_token;
+    jwt({ token, user }) {
+      if (user) {
         token.id = user.id;
         token.name = user.name;
         // @ts-expect-error - this is a custom field

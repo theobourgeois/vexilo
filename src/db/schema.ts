@@ -17,6 +17,117 @@ import { type AdapterAccount } from 'next-auth/adapters';
 
 export const createTable = pgTableCreator((name) => `vexilo_${name}`);
 
+export type FlagAiResearchSource = {
+  type: 'llm' | 'web' | 'image' | 'manual';
+  title?: string;
+  url?: string;
+  provider?: string;
+  model?: string;
+  notes?: string;
+};
+
+export type FlagAiColor =
+  | 'red'
+  | 'blue'
+  | 'green'
+  | 'yellow'
+  | 'white'
+  | 'black'
+  | 'orange'
+  | 'purple'
+  | 'brown'
+  | 'gold'
+  | 'silver'
+  | 'maroon'
+  | 'light_blue';
+
+export type FlagAiLayoutType =
+  | 'solid'
+  | 'horizontal_stripes'
+  | 'vertical_stripes'
+  | 'cross'
+  | 'nordic_cross'
+  | 'saltire'
+  | 'centered_emblem'
+  | 'canton'
+  | 'diagonal'
+  | 'triangle'
+  | 'quartered'
+  | 'complex';
+
+export type FlagAiPatternType =
+  | 'solid'
+  | 'bicolor'
+  | 'tricolor'
+  | 'multistripe'
+  | 'solid_with_center_symbol'
+  | 'solid_with_canton'
+  | 'cross_pattern'
+  | 'diagonal_pattern'
+  | 'quartered'
+  | 'complex';
+
+export type FlagAiSymbolType =
+  | 'star'
+  | 'cross'
+  | 'circle'
+  | 'sun'
+  | 'moon'
+  | 'triangle'
+  | 'diamond'
+  | 'animal'
+  | 'plant'
+  | 'weapon'
+  | 'coat_of_arms'
+  | 'seal'
+  | 'text'
+  | 'map'
+  | 'building'
+  | 'human'
+  | 'crown'
+  | 'ship'
+  | 'tool'
+  | 'constellation'
+  | 'other';
+
+export type FlagAiSymbolCount = 'none' | 'one' | 'few' | 'many';
+
+export type FlagAiTextType =
+  | 'none'
+  | 'motto'
+  | 'name'
+  | 'initials'
+  | 'scripture'
+  | 'date'
+  | 'other';
+
+export type FlagAiEmblemPlacement =
+  | 'none'
+  | 'center'
+  | 'canton'
+  | 'hoist'
+  | 'fly'
+  | 'top'
+  | 'bottom'
+  | 'full_field';
+
+export type FlagAiStructuredData = {
+  dominantColors?: FlagAiColor[];
+  secondaryColors?: FlagAiColor[];
+  layoutType?: FlagAiLayoutType | null;
+  patternType?: FlagAiPatternType | null;
+  primarySymbols?: FlagAiSymbolType[];
+  secondarySymbols?: FlagAiSymbolType[];
+  symbolCount?: FlagAiSymbolCount | null;
+  hasText?: boolean;
+  textType?: FlagAiTextType | null;
+  emblemPlacement?: FlagAiEmblemPlacement | null;
+  regionTags?: string[];
+  periodTags?: string[];
+  styleTags?: string[];
+  notes?: string[];
+};
+
 export const users = createTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
   isAdmin: boolean('is_admin').notNull().default(false),
@@ -129,6 +240,48 @@ export const flags = createTable(
     indexUnique: uniqueIndex('index_unique').on(table.index),
   }),
 );
+
+export const flagAiMetadata = createTable(
+  'flag_ai_metadata',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    flagId: uuid('flag_id')
+      .notNull()
+      .references(() => flags.id, { onDelete: 'cascade' }),
+    generationStatus: varchar('generation_status', { length: 50 })
+      .notNull()
+      .default('pending'),
+    pipelineVersion: varchar('pipeline_version', { length: 100 })
+      .notNull()
+      .default('v1'),
+    descriptionDraft: text('description_draft').notNull().default(''),
+    tagsDraft: text('tags_draft').array().notNull().default([]),
+    metaTags: text('meta_tags').array().notNull().default([]),
+    detailedDescription: text('detailed_description').notNull().default(''),
+    visualDescription: text('visual_description').notNull().default(''),
+    historicalContext: text('historical_context').notNull().default(''),
+    searchTokens: text('search_tokens').array().notNull().default([]),
+    embeddingText: text('embedding_text').notNull().default(''),
+    researchSources: jsonb('research_sources')
+      .$type<FlagAiResearchSource[]>()
+      .notNull()
+      .default([]),
+    structuredData: jsonb('structured_data').$type<FlagAiStructuredData | null>(),
+    generatedAt: timestamp('generated_at', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => ({
+    flagIdUnique: uniqueIndex('flag_ai_metadata_flag_id_unique').on(table.flagId),
+    generationStatusIdx: index('flag_ai_metadata_generation_status_idx').on(
+      table.generationStatus,
+    ),
+  }),
+);
+
+export const flagAiMetadataRelations = relations(flagAiMetadata, ({ one }) => ({
+  flag: one(flags, { fields: [flagAiMetadata.flagId], references: [flags.id] }),
+}));
 
 export const flagRequests = createTable('flag_request', {
   id: uuid('id').primaryKey().defaultRandom(),

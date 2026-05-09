@@ -1,11 +1,23 @@
 import {
-  getFlagFromName,
+  getFlagDetailFromName,
   getRelatedFlags,
   getFlagEditHistory,
 } from '@/actions/flags';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ExternalLink, Flag, Star, Eye, ArrowLeft, History } from 'lucide-react';
+import {
+  ExternalLink,
+  Flag,
+  Star,
+  Eye,
+  ArrowLeft,
+  History,
+  BookOpen,
+  Palette,
+  Globe,
+  Sparkles,
+} from 'lucide-react';
+import { after } from 'next/server';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -19,6 +31,8 @@ import Tag from '@/components/Tag';
 import { Suspense } from 'react';
 import FlagFieldsForm from '@/components/FlagFieldsForm';
 import SourceBadge from '@/components/SourceBadge';
+import { ensureFlagImageSelfHosted } from '@/lib/storage/flag-image-mirror';
+import type { FlagAiResearchSource, FlagAiStructuredData } from '@/db/schema';
 
 export type RelatedFlag = {
   name: string;
@@ -30,17 +44,236 @@ type Props = {
   params: Promise<{ flagName: string }>;
 };
 
+const COLOR_SWATCHES: Record<string, string> = {
+  red: '#dc2626',
+  blue: '#2563eb',
+  green: '#16a34a',
+  yellow: '#facc15',
+  white: '#ffffff',
+  black: '#0a0a0a',
+  orange: '#f97316',
+  purple: '#9333ea',
+  brown: '#92400e',
+  gold: '#d4a017',
+  silver: '#c0c0c0',
+  maroon: '#7f1d1d',
+  light_blue: '#7dd3fc',
+};
+
+function humanize(value: string) {
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/(^|\s)\S/g, (match) => match.toUpperCase());
+}
+
+function MetadataProfileCard({
+  structured,
+}: {
+  structured: FlagAiStructuredData | null | undefined;
+}) {
+  if (!structured) {
+    return null;
+  }
+
+  const hasContextBadges =
+    (structured.regionTags?.length ?? 0) > 0 ||
+    (structured.periodTags?.length ?? 0) > 0 ||
+    (structured.styleTags?.length ?? 0) > 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className='flex items-center gap-2'>
+          <Sparkles className='w-5 h-5' />
+          Flag Metadata Profile
+        </CardTitle>
+      </CardHeader>
+      <CardContent className='space-y-6'>
+        {structured.dominantColors && structured.dominantColors.length > 0 && (
+          <div>
+            <h3 className='mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground'>
+              Palette
+            </h3>
+            <div className='flex flex-wrap gap-2.5'>
+              {structured.dominantColors.map((color) => {
+                const isWhite = color === 'white';
+                return (
+                  <div
+                    key={color}
+                    className='flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 py-1.5 pl-1.5 pr-3.5'
+                  >
+                    <span
+                      className={`h-4 w-4 rounded-full shadow-sm ${
+                        isWhite ? 'border border-border/80' : ''
+                      }`}
+                      style={{ backgroundColor: COLOR_SWATCHES[color] || '#ccc' }}
+                      aria-hidden
+                    />
+                    <span className='text-sm font-medium capitalize leading-none'>
+                      {humanize(color)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <h3 className='mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground'>
+            Structure
+          </h3>
+          <ul className='space-y-2.5 text-sm'>
+            {structured.layoutType && (
+              <li className='flex items-center justify-between gap-4'>
+                <span className='text-muted-foreground'>Layout</span>
+                <span className='font-medium'>{humanize(structured.layoutType)}</span>
+              </li>
+            )}
+            {structured.patternType && (
+              <li className='flex items-center justify-between gap-4'>
+                <span className='text-muted-foreground'>Pattern</span>
+                <span className='font-medium'>{humanize(structured.patternType)}</span>
+              </li>
+            )}
+            {typeof structured.hasText === 'boolean' && structured.hasText && (
+              <li className='flex items-center justify-between gap-4'>
+                <span className='text-muted-foreground'>Text</span>
+                <span className='font-medium'>
+                  {structured.textType ? humanize(structured.textType) : 'Yes'}
+                </span>
+              </li>
+            )}
+            {structured.emblemPlacement &&
+              structured.emblemPlacement !== 'none' && (
+                <li className='flex items-center justify-between gap-4'>
+                  <span className='text-muted-foreground'>Emblem</span>
+                  <span className='font-medium'>
+                    {humanize(structured.emblemPlacement)}
+                  </span>
+                </li>
+              )}
+          </ul>
+        </div>
+
+        {structured.primarySymbols && structured.primarySymbols.length > 0 && (
+          <div>
+            <h3 className='mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground'>
+              Symbols
+            </h3>
+            <div className='flex flex-wrap gap-2'>
+              {structured.primarySymbols.map((symbol) => (
+                <Badge key={symbol} variant='neutral' className='bg-muted/50 font-medium'>
+                  {humanize(symbol)}
+                </Badge>
+              ))}
+              {structured.secondarySymbols?.map((symbol) => (
+                <Badge
+                  key={symbol}
+                  variant='neutral'
+                  className='bg-transparent font-normal opacity-70'
+                >
+                  {humanize(symbol)}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {hasContextBadges && (
+          <div>
+            <h3 className='mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground'>
+              Context
+            </h3>
+            <div className='flex flex-wrap gap-2'>
+              {structured.regionTags?.map((tag) => (
+                <Badge key={tag} variant='neutral' className='font-medium'>
+                  {humanize(tag)}
+                </Badge>
+              ))}
+              {structured.periodTags?.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant='neutral'
+                  className='bg-transparent font-normal text-muted-foreground'
+                >
+                  {humanize(tag)}
+                </Badge>
+              ))}
+              {structured.styleTags?.map((tag) => (
+                <Badge key={tag} variant='neutral' className='bg-muted/50'>
+                  {humanize(tag)}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MetadataResearchCard({
+  sources,
+}: {
+  sources: FlagAiResearchSource[] | null | undefined;
+}) {
+  const validSources = sources?.filter((source) => source.url) ?? [];
+
+  if (validSources.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className='flex items-center gap-2'>
+          <Globe className='w-5 h-5' />
+          Metadata Research
+        </CardTitle>
+      </CardHeader>
+      <CardContent className='space-y-3'>
+        {validSources.map((source, index) => (
+          <div key={`${source.url}-${index}`} className='rounded-lg border border-border/50 p-4'>
+            <div className='flex flex-wrap items-center gap-2 mb-2'>
+              <Badge variant='neutral' className='uppercase tracking-wide text-[10px]'>
+                {source.type}
+              </Badge>
+              {source.provider && (
+                <span className='text-xs text-muted-foreground'>{source.provider}</span>
+              )}
+            </div>
+            <Link
+              href={source.url!}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='font-medium hover:underline break-all'
+            >
+              {source.title || source.url}
+            </Link>
+            {source.notes && (
+              <p className='mt-2 text-sm text-muted-foreground'>{source.notes}</p>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const flagName = decodeURIComponent((await params).flagName);
-  const flag = await getFlagFromName(flagName);
+  const flag = await getFlagDetailFromName(flagName);
   if (flag) {
     const pageUrl = `https://vexilo.org/flag/${encodeURIComponent(flag.name)}`;
     return {
       title: `${flag.name} - Vexilo`,
-      description: flag.description,
+      description: flag.displayDescription,
       keywords: [
         flag.name,
-        ...flag.tags,
+        ...flag.displayTags,
         'Vexilo',
         'Flags',
         'World Flags',
@@ -50,7 +283,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ],
       openGraph: {
         title: `${flag.name} - Vexilo`,
-        description: flag.description,
+        description: flag.displayDescription,
         url: pageUrl,
         siteName: 'Vexilo',
         images: [
@@ -63,7 +296,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       twitter: {
         card: 'summary_large_image',
         title: `${flag.name} - Vexilo`,
-        description: flag.description,
+        description: flag.displayDescription,
         images: [
           {
             url: flag.image,
@@ -227,12 +460,23 @@ export default async function FlagPage({
 }) {
   const { flagName: flagNameRaw } = await params;
   const flagName = decodeURIComponent(flagNameRaw);
-  const flag = await getFlagFromName(flagName);
+  const flag = await getFlagDetailFromName(flagName);
   const mode = (await searchParams).mode;
 
   if (!flag) {
     notFound();
   }
+
+  after(async () => {
+    try {
+      await ensureFlagImageSelfHosted(flag);
+    } catch (error) {
+      console.error(
+        `[flag-image-mirror] Failed to mirror "${flag.name}" (${flag.id}):`,
+        error,
+      );
+    }
+  });
 
   if (mode === 'edit') {
     return (
@@ -281,15 +525,15 @@ export default async function FlagPage({
         </Badge>
         <h1 className='text-4xl md:text-5xl font-bold tracking-tight'>{flag.name}</h1>
         {/* Tags before description */}
-        {flag.tags && flag.tags.length > 0 && (
+        {flag.displayTags.length > 0 && (
           <div className='flex flex-wrap gap-2 justify-center mb-2'>
-            {flag.tags.map((tag: string) => (
+            {flag.displayTags.map((tag: string) => (
               <Tag key={tag} text={tag} />
             ))}
           </div>
         )}
-        {flag.description && (
-          <ExpandableDescription description={flag.description} />
+        {flag.displayDescription && (
+          <ExpandableDescription description={flag.displayDescription} />
         )}
         {/* Sources */}
         {flag.sources && flag.sources.length > 0 && (
@@ -357,6 +601,142 @@ export default async function FlagPage({
           </div>
         </CardContent>
       </Card>
+
+      {(flag.metadata?.historicalContext ||
+        flag.metadata?.visualDescription ||
+        flag.metadata?.detailedDescription ||
+        (flag.metadata?.metaTags?.length ?? 0) > 0 ||
+        flag.metadata?.structuredData ||
+        (flag.metadata?.researchSources?.length ?? 0) > 0) && (
+        <div className='grid gap-8 lg:grid-cols-3 mb-8'>
+          <div className='space-y-8 lg:col-span-2'>
+            {flag.metadata?.historicalContext && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center gap-2'>
+                    <BookOpen className='w-5 h-5' />
+                    Historical Context
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className='leading-7 text-muted-foreground'>
+                    {flag.metadata.historicalContext}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {(flag.metadata?.visualDescription ||
+              flag.metadata?.detailedDescription) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center gap-2'>
+                    <Palette className='w-5 h-5' />
+                    Design & Symbolism
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className='space-y-4'>
+                  {flag.metadata?.visualDescription && (
+                    <p className='leading-7 text-muted-foreground'>
+                      {flag.metadata.visualDescription}
+                    </p>
+                  )}
+                  {flag.metadata?.detailedDescription && (
+                    <p className='leading-7 text-muted-foreground'>
+                      {flag.metadata.detailedDescription}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <MetadataResearchCard sources={flag.metadata?.researchSources} />
+          </div>
+
+          <div className='space-y-8'>
+            {flag.metadata?.metaTags && flag.metadata.metaTags.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Metadata Tags</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className='flex flex-wrap gap-2'>
+                    {flag.metadata.metaTags.map((tag) => (
+                      <Badge key={tag} variant='neutral'>
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <MetadataProfileCard structured={flag.metadata?.structuredData} />
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Flag Properties</CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-5'>
+                <div>
+                  <h3 className='mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground'>
+                    Record Description
+                  </h3>
+                  <p className='text-sm leading-6 text-muted-foreground'>
+                    {flag.description || 'No description saved on the flag record yet.'}
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className='mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground'>
+                    Record Tags
+                  </h3>
+                  <div className='flex flex-wrap gap-2'>
+                    {flag.tags.length > 0 ? (
+                      flag.tags.map((tag) => <Tag key={tag} text={tag} />)
+                    ) : (
+                      <p className='text-sm text-muted-foreground'>
+                        No tags saved on the flag record yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className='mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground'>
+                    Sources
+                  </h3>
+                  <div className='flex flex-wrap gap-2'>
+                    {flag.sources.length > 0 ? (
+                      flag.sources.map((source, index) => (
+                        <SourceBadge key={`property-source-${index}`} source={source} />
+                      ))
+                    ) : (
+                      <p className='text-sm text-muted-foreground'>
+                        No sources saved on the flag record yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className='mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground'>
+                    External Link
+                  </h3>
+                  <Link
+                    href={flag.link}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='text-sm hover:underline break-all'
+                  >
+                    {flag.link}
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Related Flags - Loaded separately for better performance */}
       <Suspense

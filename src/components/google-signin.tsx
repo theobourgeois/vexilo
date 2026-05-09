@@ -1,17 +1,12 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { FcGoogle } from "react-icons/fc";
 
 export function GoogleSignin() {
-    const router = useRouter();
-
     const handleSignIn = async () => {
-        void signIn("google").then(() => {
-            router.push("/");
-        });
+        await signIn("google", { callbackUrl: "/" });
     };
 
     return (

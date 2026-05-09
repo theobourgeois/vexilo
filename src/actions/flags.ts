@@ -4,15 +4,374 @@ import { db } from '@/db';
 import { redis } from '@/db/redis';
 import {
   favorites,
+  flagAiMetadata,
   flagOfTheDay,
   flagRequests,
   flags,
   flagTags,
+  type FlagAiStructuredData,
   users,
 } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { Flag } from '@/lib/types';
-import { and, asc, count, desc, eq, ilike, sql, inArray } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  ne,
+  sql,
+} from 'drizzle-orm';
+
+const EXPERIMENTAL_RECOMMENDATION_LIMIT = 8;
+const EXPERIMENTAL_RECOMMENDATION_CACHE_TTL_SECONDS = 60 * 60 * 24;
+const EXPERIMENTAL_RECOMMENDATION_CACHE_VERSION = 'v1';
+const RECOMMENDATION_STOP_WORDS = new Set([
+  'and',
+  'are',
+  'flag',
+  'flags',
+  'for',
+  'from',
+  'has',
+  'have',
+  'into',
+  'its',
+  'often',
+  'that',
+  'the',
+  'their',
+  'this',
+  'was',
+  'were',
+  'with',
+]);
+
+type RecommendationMetadataRow = {
+  flagId: string;
+  descriptionDraft: string;
+  tagsDraft: string[];
+  metaTags: string[];
+  detailedDescription: string;
+  visualDescription: string;
+  historicalContext: string;
+  searchTokens: string[];
+  structuredData: FlagAiStructuredData | null;
+};
+
+type RecommendationCandidateRow = RecommendationMetadataRow & {
+  id: string;
+  name: string;
+  image: string;
+  link: string;
+  sources: string[];
+  index: number;
+  tags: string[];
+  description: string;
+  favorites: number;
+};
+
+function normalizeRecommendationToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildTokenSet(values: Array<string | null | undefined>): Set<string> {
+  const tokens = new Set<string>();
+
+  for (const value of values) {
+    const normalized = normalizeRecommendationToken(value || '');
+    if (!normalized) {
+      continue;
+    }
+
+    for (const token of normalized.split(' ')) {
+      if (token.length < 3 || RECOMMENDATION_STOP_WORDS.has(token)) {
+        continue;
+      }
+
+      tokens.add(token);
+    }
+  }
+
+  return tokens;
+}
+
+function uniqueValues(values: Array<string | null | undefined>): string[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => normalizeRecommendationToken(value || ''))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function getOverlapCount(left: string[] | undefined, right: string[] | undefined) {
+  if (!left?.length || !right?.length) {
+    return 0;
+  }
+
+  const rightSet = new Set(right);
+  let matches = 0;
+
+  for (const value of new Set(left)) {
+    if (rightSet.has(value)) {
+      matches += 1;
+    }
+  }
+
+  return matches;
+}
+
+function getMetadataKeywordTokens(metadata: RecommendationMetadataRow): string[] {
+  return Array.from(
+    buildTokenSet([
+      metadata.descriptionDraft,
+      metadata.detailedDescription,
+      metadata.visualDescription,
+      metadata.historicalContext,
+      ...metadata.tagsDraft,
+      ...metadata.metaTags,
+    ]),
+  );
+}
+
+function hasRecommendationMetadata(metadata: RecommendationMetadataRow | null) {
+  if (!metadata) {
+    return false;
+  }
+
+  return !!(
+    metadata.structuredData ||
+    metadata.searchTokens.length > 0 ||
+    metadata.tagsDraft.length > 0 ||
+    metadata.metaTags.length > 0 ||
+    metadata.descriptionDraft ||
+    metadata.detailedDescription ||
+    metadata.visualDescription ||
+    metadata.historicalContext
+  );
+}
+
+function scoreMetadataRecommendation(
+  source: RecommendationMetadataRow,
+  candidate: RecommendationCandidateRow,
+) {
+  let score = 0;
+  let matchedSignals = 0;
+  const sourceStructured = source.structuredData;
+  const candidateStructured = candidate.structuredData;
+
+  const sourceDominantColors = uniqueValues(sourceStructured?.dominantColors || []);
+  const candidateDominantColors = uniqueValues(
+    candidateStructured?.dominantColors || [],
+  );
+  const dominantColorMatches = getOverlapCount(
+    sourceDominantColors,
+    candidateDominantColors,
+  );
+  if (dominantColorMatches > 0) {
+    score += dominantColorMatches * 22;
+    matchedSignals += 1;
+  }
+
+  const sourceSecondaryColors = uniqueValues(
+    sourceStructured?.secondaryColors || [],
+  );
+  const candidateSecondaryColors = uniqueValues(
+    candidateStructured?.secondaryColors || [],
+  );
+  const secondaryColorMatches = getOverlapCount(
+    sourceSecondaryColors,
+    candidateSecondaryColors,
+  );
+  if (secondaryColorMatches > 0) {
+    score += secondaryColorMatches * 10;
+    matchedSignals += 1;
+  }
+
+  if (
+    sourceStructured?.layoutType &&
+    candidateStructured?.layoutType &&
+    sourceStructured.layoutType === candidateStructured.layoutType
+  ) {
+    score += 28;
+    matchedSignals += 1;
+  }
+
+  if (
+    sourceStructured?.patternType &&
+    candidateStructured?.patternType &&
+    sourceStructured.patternType === candidateStructured.patternType
+  ) {
+    score += 22;
+    matchedSignals += 1;
+  }
+
+  const primarySymbolMatches = getOverlapCount(
+    uniqueValues(sourceStructured?.primarySymbols || []),
+    uniqueValues(candidateStructured?.primarySymbols || []),
+  );
+  if (primarySymbolMatches > 0) {
+    score += primarySymbolMatches * 18;
+    matchedSignals += 1;
+  }
+
+  const secondarySymbolMatches = getOverlapCount(
+    uniqueValues(sourceStructured?.secondarySymbols || []),
+    uniqueValues(candidateStructured?.secondarySymbols || []),
+  );
+  if (secondarySymbolMatches > 0) {
+    score += secondarySymbolMatches * 8;
+    matchedSignals += 1;
+  }
+
+  if (
+    sourceStructured?.symbolCount &&
+    candidateStructured?.symbolCount &&
+    sourceStructured.symbolCount !== 'none' &&
+    sourceStructured.symbolCount === candidateStructured.symbolCount
+  ) {
+    score += 8;
+    matchedSignals += 1;
+  }
+
+  if (
+    typeof sourceStructured?.hasText === 'boolean' &&
+    typeof candidateStructured?.hasText === 'boolean' &&
+    sourceStructured.hasText === candidateStructured.hasText
+  ) {
+    score += 6;
+    matchedSignals += 1;
+  }
+
+  if (
+    sourceStructured?.textType &&
+    candidateStructured?.textType &&
+    sourceStructured.textType !== 'none' &&
+    sourceStructured.textType === candidateStructured.textType
+  ) {
+    score += 10;
+    matchedSignals += 1;
+  }
+
+  if (
+    sourceStructured?.emblemPlacement &&
+    candidateStructured?.emblemPlacement &&
+    sourceStructured.emblemPlacement !== 'none' &&
+    sourceStructured.emblemPlacement === candidateStructured.emblemPlacement
+  ) {
+    score += 12;
+    matchedSignals += 1;
+  }
+
+  const regionMatches = getOverlapCount(
+    uniqueValues(sourceStructured?.regionTags || []),
+    uniqueValues(candidateStructured?.regionTags || []),
+  );
+  if (regionMatches > 0) {
+    score += regionMatches * 14;
+    matchedSignals += 1;
+  }
+
+  const periodMatches = getOverlapCount(
+    uniqueValues(sourceStructured?.periodTags || []),
+    uniqueValues(candidateStructured?.periodTags || []),
+  );
+  if (periodMatches > 0) {
+    score += periodMatches * 10;
+    matchedSignals += 1;
+  }
+
+  const styleMatches = getOverlapCount(
+    uniqueValues(sourceStructured?.styleTags || []),
+    uniqueValues(candidateStructured?.styleTags || []),
+  );
+  if (styleMatches > 0) {
+    score += styleMatches * 12;
+    matchedSignals += 1;
+  }
+
+  const searchTokenMatches = getOverlapCount(
+    uniqueValues(source.searchTokens),
+    uniqueValues(candidate.searchTokens),
+  );
+  if (searchTokenMatches > 0) {
+    score += Math.min(searchTokenMatches * 3, 24);
+    matchedSignals += 1;
+  }
+
+  const keywordMatches = getOverlapCount(
+    getMetadataKeywordTokens(source),
+    getMetadataKeywordTokens(candidate),
+  );
+  if (keywordMatches > 0) {
+    score += Math.min(keywordMatches * 2, 18);
+    matchedSignals += 1;
+  }
+
+  const tagMatches = getOverlapCount(
+    uniqueValues([...source.tagsDraft, ...source.metaTags]),
+    uniqueValues([...candidate.tagsDraft, ...candidate.metaTags]),
+  );
+  if (tagMatches > 0) {
+    score += Math.min(tagMatches * 4, 20);
+    matchedSignals += 1;
+  }
+
+  if (matchedSignals >= 5) {
+    score += 20;
+  } else if (matchedSignals >= 3) {
+    score += 10;
+  }
+
+  score += Math.min(candidate.favorites / 20, 8);
+
+  return score;
+}
+
+async function getFlagsByIds(flagIds: string[], userId?: string) {
+  if (flagIds.length === 0) {
+    return [];
+  }
+
+  const rows = await db
+    .select({
+      id: flags.id,
+      name: flags.name,
+      image: flags.image,
+      link: flags.link,
+      sources: flags.sources,
+      index: flags.index,
+      tags: flags.tags,
+      description: flags.description,
+      favorites: flags.favorites,
+      relatedFlags: flags.relatedFlags,
+      isFavorite: userId
+        ? sql<boolean>`EXISTS (
+				SELECT 1 FROM vexilo_favorite 
+				WHERE vexilo_favorite.flag_id = vexilo_flag.id 
+				AND vexilo_favorite.user_id = ${userId}
+			)`
+        : sql<boolean>`false`,
+    })
+    .from(flags)
+    .where(inArray(flags.id, flagIds));
+
+  const order = new Map(flagIds.map((id, index) => [id, index]));
+
+  return rows.sort((left, right) => {
+    return (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0);
+  });
+}
 
 // Helper function to update tag counts when tags are added or removed
 async function updateTagCounts(oldTags: string[], newTags: string[]) {
@@ -209,6 +568,122 @@ export async function getFlagFromName(flagName: string) {
   return flag[0];
 }
 
+function cleanTextValue(value: string | null | undefined) {
+  return value?.trim() ?? '';
+}
+
+function cleanStringArray(values: string[] | null | undefined) {
+  return Array.from(
+    new Set(values?.map((value) => value.trim()).filter(Boolean) ?? []),
+  );
+}
+
+function buildResolvedFlagMetadata(
+  row: Awaited<ReturnType<typeof getFlagDetailFromNameQuery>>[number],
+) {
+  if (!row?.metadataId) {
+    return null;
+  }
+
+  return {
+    id: row.metadataId,
+    flagId: row.metadataFlagId,
+    generationStatus: row.metadataGenerationStatus,
+    pipelineVersion: row.metadataPipelineVersion,
+    descriptionDraft: row.metadataDescriptionDraft,
+    tagsDraft: row.metadataTagsDraft,
+    metaTags: row.metadataMetaTags,
+    detailedDescription: row.metadataDetailedDescription,
+    visualDescription: row.metadataVisualDescription,
+    historicalContext: row.metadataHistoricalContext,
+    searchTokens: row.metadataSearchTokens,
+    embeddingText: row.metadataEmbeddingText,
+    researchSources: row.metadataResearchSources,
+    structuredData: row.metadataStructuredData,
+    generatedAt: row.metadataGeneratedAt,
+    updatedAt: row.metadataUpdatedAt,
+  };
+}
+
+async function getFlagDetailFromNameQuery(flagName: string, userId?: string) {
+  return db
+    .select({
+      id: flags.id,
+      name: flags.name,
+      image: flags.image,
+      link: flags.link,
+      index: flags.index,
+      sources: flags.sources,
+      tags: flags.tags,
+      description: flags.description,
+      favorites: flags.favorites,
+      relatedFlags: flags.relatedFlags,
+      isFavorite: userId
+        ? sql<boolean>`EXISTS (
+				SELECT 1 FROM vexilo_favorite
+				WHERE vexilo_favorite.flag_id = vexilo_flag.id
+				AND vexilo_favorite.user_id = ${userId}
+			)`
+        : sql<boolean>`false`,
+      metadataId: flagAiMetadata.id,
+      metadataFlagId: flagAiMetadata.flagId,
+      metadataGenerationStatus: flagAiMetadata.generationStatus,
+      metadataPipelineVersion: flagAiMetadata.pipelineVersion,
+      metadataDescriptionDraft: flagAiMetadata.descriptionDraft,
+      metadataTagsDraft: flagAiMetadata.tagsDraft,
+      metadataMetaTags: flagAiMetadata.metaTags,
+      metadataDetailedDescription: flagAiMetadata.detailedDescription,
+      metadataVisualDescription: flagAiMetadata.visualDescription,
+      metadataHistoricalContext: flagAiMetadata.historicalContext,
+      metadataSearchTokens: flagAiMetadata.searchTokens,
+      metadataEmbeddingText: flagAiMetadata.embeddingText,
+      metadataResearchSources: flagAiMetadata.researchSources,
+      metadataStructuredData: flagAiMetadata.structuredData,
+      metadataGeneratedAt: flagAiMetadata.generatedAt,
+      metadataUpdatedAt: flagAiMetadata.updatedAt,
+    })
+    .from(flags)
+    .leftJoin(flagAiMetadata, eq(flagAiMetadata.flagId, flags.id))
+    .where(eq(flags.name, flagName))
+    .limit(1);
+}
+
+export async function getFlagDetailFromName(flagName: string) {
+  const session = await getServerAuthSession();
+  const userId = session?.user?.id;
+  const rows = await getFlagDetailFromNameQuery(flagName, userId);
+  const row = rows[0];
+
+  if (!row) {
+    return null;
+  }
+
+  const metadata = buildResolvedFlagMetadata(row);
+  const displayDescription =
+    cleanTextValue(metadata?.descriptionDraft) || row.description;
+  const displayTags = (() => {
+    const metadataTags = cleanStringArray(metadata?.tagsDraft);
+    return metadataTags.length > 0 ? metadataTags : row.tags;
+  })();
+
+  return {
+    id: row.id,
+    name: row.name,
+    image: row.image,
+    link: row.link,
+    index: row.index,
+    sources: row.sources,
+    tags: row.tags,
+    description: row.description,
+    favorites: row.favorites,
+    relatedFlags: row.relatedFlags,
+    isFavorite: row.isFavorite,
+    metadata,
+    displayDescription,
+    displayTags,
+  };
+}
+
 export async function getRelatedFlags(flagId: string) {
   const cachedRelatedFlags = await redis.get(`recommendations-${flagId}`);
   if (cachedRelatedFlags) {
@@ -278,6 +753,94 @@ export async function getRelatedFlags(flagId: string) {
   await redis.set(`recommendations-${flagId}`, relatedFlags);
 
   return relatedFlags;
+}
+
+export async function getExperimentalRecommendedFlags(flagId: string) {
+  const metadata = await db
+    .select({
+      flagId: flagAiMetadata.flagId,
+      descriptionDraft: flagAiMetadata.descriptionDraft,
+      tagsDraft: flagAiMetadata.tagsDraft,
+      metaTags: flagAiMetadata.metaTags,
+      detailedDescription: flagAiMetadata.detailedDescription,
+      visualDescription: flagAiMetadata.visualDescription,
+      historicalContext: flagAiMetadata.historicalContext,
+      searchTokens: flagAiMetadata.searchTokens,
+      structuredData: flagAiMetadata.structuredData,
+    })
+    .from(flagAiMetadata)
+    .where(eq(flagAiMetadata.flagId, flagId))
+    .limit(1);
+
+  const sourceMetadata = metadata[0] ?? null;
+  if (!hasRecommendationMetadata(sourceMetadata)) {
+    return getRelatedFlags(flagId);
+  }
+
+  const session = await getServerAuthSession();
+  const userId = session?.user?.id;
+  const cacheKey = `experimental-recommendations-${EXPERIMENTAL_RECOMMENDATION_CACHE_VERSION}-${flagId}`;
+  const cachedRecommendationIds = await redis.get<string[]>(cacheKey);
+
+  if (Array.isArray(cachedRecommendationIds) && cachedRecommendationIds.length > 0) {
+    return getFlagsByIds(cachedRecommendationIds, userId);
+  }
+
+  const candidates = await db
+    .select({
+      id: flags.id,
+      name: flags.name,
+      image: flags.image,
+      link: flags.link,
+      sources: flags.sources,
+      index: flags.index,
+      tags: flags.tags,
+      description: flags.description,
+      favorites: flags.favorites,
+      flagId: flagAiMetadata.flagId,
+      descriptionDraft: flagAiMetadata.descriptionDraft,
+      tagsDraft: flagAiMetadata.tagsDraft,
+      metaTags: flagAiMetadata.metaTags,
+      detailedDescription: flagAiMetadata.detailedDescription,
+      visualDescription: flagAiMetadata.visualDescription,
+      historicalContext: flagAiMetadata.historicalContext,
+      searchTokens: flagAiMetadata.searchTokens,
+      structuredData: flagAiMetadata.structuredData,
+    })
+    .from(flagAiMetadata)
+    .innerJoin(flags, eq(flags.id, flagAiMetadata.flagId))
+    .where(ne(flagAiMetadata.flagId, flagId));
+
+  const rankedIds = candidates
+    .map((candidate) => ({
+      id: candidate.id,
+      score: scoreMetadataRecommendation(sourceMetadata, candidate),
+      favorites: candidate.favorites,
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      if (right.favorites !== left.favorites) {
+        return right.favorites - left.favorites;
+      }
+
+      return left.id.localeCompare(right.id);
+    })
+    .slice(0, EXPERIMENTAL_RECOMMENDATION_LIMIT)
+    .map((candidate) => candidate.id);
+
+  if (rankedIds.length === 0) {
+    return getRelatedFlags(flagId);
+  }
+
+  await redis.set(cacheKey, rankedIds, {
+    ex: EXPERIMENTAL_RECOMMENDATION_CACHE_TTL_SECONDS,
+  });
+
+  return getFlagsByIds(rankedIds, userId);
 }
 
 export async function getRandomFlagsForQuiz() {

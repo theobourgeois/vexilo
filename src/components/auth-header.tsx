@@ -35,9 +35,7 @@ export function AuthHeader() {
     const { theme, setTheme } = useTheme();
 
     const handleSignIn = async () => {
-        void signIn("google").then(() => {
-            router.push("/");
-        });
+        await signIn("google", { callbackUrl: "/" });
     };
 
     const handleSignOut = async () => {

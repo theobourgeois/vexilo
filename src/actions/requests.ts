@@ -8,6 +8,7 @@ import { and, count, eq, max, sql } from 'drizzle-orm';
 import { base64ImageToS3URI, deleteFileFromUrl } from './s3';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { redis } from '@/db/redis';
+import { upsertFlagMetadataMirror } from './flag-ai-metadata';
 
 // Helper function to update tag counts when tags are added or removed
 async function updateTagCounts(oldTags: string[], newTags: string[]) {
@@ -250,6 +251,15 @@ export async function approveFlagRequest(flagRequestId: string) {
     .returning({ id: flags.id })
     .then((res) => res[0]);
 
+  await upsertFlagMetadataMirror({
+    flagId: flag.id,
+    name: flagRequest.flag.flagName,
+    link: flagRequest.flag.link,
+    sources: flagRequest.flag.sources,
+    tags: flagRequest.flag.tags,
+    description: flagRequest.flag.description,
+  });
+
   // Update tag counts for the new flag
   await addTagsToCount(flagRequest.flag.tags);
 
@@ -312,36 +322,50 @@ export async function approveFlagEditRequest(flagRequestId: string) {
     JSON.stringify(flagRequest.flag.tags.sort()) !==
     JSON.stringify(flag.tags.sort());
 
+  const nextName =
+    flagRequest.flag.flagName === flagRequest.oldFlag?.flagName
+      ? flag.name
+      : flagRequest.flag.flagName;
+  const nextImage =
+    flagRequest.flag.flagImage === flagRequest.oldFlag?.flagImage
+      ? flag.image
+      : flagRequest.flag.flagImage;
+  const nextLink =
+    flagRequest.flag.link === flagRequest.oldFlag?.link
+      ? flag.link
+      : flagRequest.flag.link;
+  const nextSources =
+    flagRequest.flag.sources === flagRequest.oldFlag?.sources
+      ? flag.sources
+      : flagRequest.flag.sources;
+  const nextDescription =
+    flagRequest.flag.description === flagRequest.oldFlag?.description
+      ? flag.description
+      : flagRequest.flag.description;
   const newTags = tagsChanged ? flagRequest.flag.tags : flag.tags;
 
   await db
     .update(flags)
     .set({
       relatedFlags: flagRequest.flag.relatedFlags?.map((flag) => flag.id),
-      name:
-        flagRequest.flag.flagName === flagRequest.oldFlag?.flagName
-          ? flag.name
-          : flagRequest.flag.flagName,
-      image:
-        flagRequest.flag.flagImage === flagRequest.oldFlag?.flagImage
-          ? flag.image
-          : flagRequest.flag.flagImage,
-      link:
-        flagRequest.flag.link === flagRequest.oldFlag?.link
-          ? flag.link
-          : flagRequest.flag.link,
-      sources:
-        flagRequest.flag.sources === flagRequest.oldFlag?.sources
-          ? flag.sources
-          : flagRequest.flag.sources,
-      description:
-        flagRequest.flag.description === flagRequest.oldFlag?.description
-          ? flag.description
-          : flagRequest.flag.description,
+      name: nextName,
+      image: nextImage,
+      link: nextLink,
+      sources: nextSources,
+      description: nextDescription,
       tags: newTags,
       updatedAt: new Date(),
     })
     .where(eq(flags.id, flagRequest.flagId ?? ''));
+
+  await upsertFlagMetadataMirror({
+    flagId: flag.id,
+    name: nextName,
+    link: nextLink,
+    sources: nextSources,
+    tags: newTags,
+    description: nextDescription,
+  });
 
   // Update tag counts if tags have changed
   if (tagsChanged) {
