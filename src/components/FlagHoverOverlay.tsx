@@ -2,13 +2,44 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { cn } from '@/lib/utils';
 
 type FlagHoverOverlayProps = {
   open: boolean;
   triggerRef: React.RefObject<HTMLElement | null>;
   children: React.ReactNode;
 };
+
+type Coords = {
+  left: number;
+  top: number;
+};
+
+function getPreviewCoords(
+  trigger: HTMLElement,
+  preview: HTMLElement,
+): Coords {
+  const anchor = trigger.getBoundingClientRect();
+  const width = preview.offsetWidth;
+  const height = preview.offsetHeight;
+  const gap = 12;
+  const padding = 16;
+
+  const canPlaceRight =
+    anchor.right + gap + width <= window.innerWidth - padding;
+  let left = canPlaceRight ? anchor.right + gap : anchor.left - gap - width;
+  left = Math.min(
+    Math.max(padding, left),
+    Math.max(padding, window.innerWidth - width - padding),
+  );
+
+  let top = anchor.top + (anchor.height - height) / 2;
+  top = Math.min(
+    Math.max(padding, top),
+    Math.max(padding, window.innerHeight - height - padding),
+  );
+
+  return { left: Math.round(left), top: Math.round(top) };
+}
 
 export default function FlagHoverOverlay({
   open,
@@ -17,6 +48,7 @@ export default function FlagHoverOverlay({
 }: FlagHoverOverlayProps) {
   const previewRef = React.useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = React.useState(false);
+  const [coords, setCoords] = React.useState<Coords | null>(null);
 
   React.useEffect(() => {
     setMounted(true);
@@ -29,31 +61,18 @@ export default function FlagHoverOverlay({
       return;
     }
 
-    const anchor = trigger.getBoundingClientRect();
-    const width = preview.offsetWidth;
-    const height = preview.offsetHeight;
-    const gap = 12;
-    const padding = 16;
-
-    const canPlaceRight =
-      anchor.right + gap + width <= window.innerWidth - padding;
-    let left = canPlaceRight ? anchor.right + gap : anchor.left - gap - width;
-    left = Math.min(
-      Math.max(padding, left),
-      Math.max(padding, window.innerWidth - width - padding),
-    );
-
-    let top = anchor.top + (anchor.height - height) / 2;
-    top = Math.min(
-      Math.max(padding, top),
-      Math.max(padding, window.innerHeight - height - padding),
-    );
-
-    preview.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+    const next = getPreviewCoords(trigger, preview);
+    setCoords((current) => {
+      if (current && current.left === next.left && current.top === next.top) {
+        return current;
+      }
+      return next;
+    });
   }, [triggerRef]);
 
   React.useLayoutEffect(() => {
     if (!open) {
+      setCoords(null);
       return;
     }
 
@@ -83,10 +102,12 @@ export default function FlagHoverOverlay({
     <div
       ref={previewRef}
       data-flag-hover-preview=''
-      className={cn(
-        'pointer-events-none fixed top-0 left-0 z-50 w-[340px] rounded-2xl border border-white/90 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] bg-[size:256px,auto] p-3 text-foreground shadow-[0_24px_64px_-12px_rgba(0,0,0,0.25)] backdrop-blur-xl dark:border-white/15 dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.55)]',
-        'animate-in fade-in-0 zoom-in-95',
-      )}
+      style={{
+        left: coords?.left ?? 0,
+        top: coords?.top ?? 0,
+        visibility: coords ? 'visible' : 'hidden',
+      }}
+      className='pointer-events-none fixed z-50 w-[340px] rounded-2xl border border-white/90 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] bg-[size:256px,auto] p-3 text-foreground shadow-[0_24px_64px_-12px_rgba(0,0,0,0.25)] backdrop-blur-xl dark:border-white/15 dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.55)]'
     >
       {children}
     </div>,
