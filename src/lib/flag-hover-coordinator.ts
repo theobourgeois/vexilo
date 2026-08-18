@@ -1,7 +1,4 @@
-const TRIGGER_SELECTOR = '[data-flag-hover-trigger]';
-const PREVIEW_SELECTOR = '[data-flag-hover-preview]';
 const OPEN_DELAY_MS = 350;
-const HANDOFF_DELAY_MS = 0;
 const HANDOFF_WINDOW_MS = 500;
 
 type Notify = (open: boolean) => void;
@@ -12,7 +9,6 @@ let activeId: string | null = null;
 let pendingId: string | null = null;
 let openTimer: number | null = null;
 let lastCloseAt = 0;
-let listenerCount = 0;
 
 function clearOpenTimer() {
   if (openTimer === null) {
@@ -43,106 +39,48 @@ function openCard(id: string) {
   cards.get(id)?.(true);
 }
 
-function targetIdAtPoint(clientX: number, clientY: number): string | null {
-  const elements = document.elementsFromPoint(clientX, clientY);
-  for (const element of elements) {
-    if (!(element instanceof Element)) {
-      continue;
-    }
-    if (element.closest(PREVIEW_SELECTOR)) {
-      continue;
-    }
-    const trigger = element.closest(TRIGGER_SELECTOR);
-    if (trigger instanceof HTMLElement) {
-      return trigger.getAttribute('data-flag-hover-trigger');
-    }
-  }
-  return null;
-}
-
-function setPendingTarget(nextId: string | null) {
-  if (nextId === activeId) {
-    if (pendingId !== null) {
-      clearOpenTimer();
-      pendingId = null;
-    }
+export function enterFlagHover(id: string) {
+  if (activeId === id) {
+    clearOpenTimer();
+    pendingId = null;
     return;
   }
 
-  if (nextId === pendingId) {
+  if (pendingId === id) {
     return;
   }
 
   clearOpenTimer();
-  pendingId = nextId;
-
-  if (activeId) {
-    closeActive();
-  }
-
-  if (!nextId) {
-    return;
-  }
+  pendingId = id;
 
   const delay =
-    Date.now() - lastCloseAt < HANDOFF_WINDOW_MS
-      ? HANDOFF_DELAY_MS
-      : OPEN_DELAY_MS;
+    Date.now() - lastCloseAt < HANDOFF_WINDOW_MS ? 0 : OPEN_DELAY_MS;
 
   if (delay === 0) {
     pendingId = null;
-    openCard(nextId);
+    openCard(id);
     return;
   }
 
   openTimer = window.setTimeout(() => {
     openTimer = null;
     pendingId = null;
-    openCard(nextId);
+    openCard(id);
   }, delay);
 }
 
-function handlePointerMove(event: PointerEvent) {
-  if (event.pointerType !== 'mouse') {
-    return;
+export function leaveFlagHover(id: string) {
+  if (pendingId === id) {
+    clearOpenTimer();
+    pendingId = null;
   }
-  setPendingTarget(targetIdAtPoint(event.clientX, event.clientY));
-}
-
-function handlePointerLeaveDocument(event: PointerEvent) {
-  if (event.relatedTarget !== null) {
-    return;
+  if (activeId === id) {
+    closeActive();
   }
-  clearOpenTimer();
-  pendingId = null;
-  closeActive();
-}
-
-function attachListeners() {
-  if (listenerCount === 0) {
-    document.addEventListener('pointermove', handlePointerMove, {
-      passive: true,
-    });
-    document.addEventListener('pointerleave', handlePointerLeaveDocument);
-  }
-  listenerCount += 1;
-}
-
-function detachListeners() {
-  listenerCount = Math.max(0, listenerCount - 1);
-  if (listenerCount > 0) {
-    return;
-  }
-  document.removeEventListener('pointermove', handlePointerMove);
-  document.removeEventListener('pointerleave', handlePointerLeaveDocument);
-  clearOpenTimer();
-  pendingId = null;
-  closeActive();
 }
 
 export function registerFlagHoverCard(id: string, notify: Notify) {
   cards.set(id, notify);
-  attachListeners();
 
   return () => {
     cards.delete(id);
@@ -153,6 +91,5 @@ export function registerFlagHoverCard(id: string, notify: Notify) {
     if (activeId === id) {
       closeActive();
     }
-    detachListeners();
   };
 }

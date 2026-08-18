@@ -19,7 +19,7 @@ import { toastErrorWithLogin } from '@/lib/toast-auth';
 import FlagHoverPreview from '@/components/FlagHoverPreview';
 import FlagHoverOverlay from '@/components/FlagHoverOverlay';
 import { usePrefersFineHover } from '@/hooks/useIsMobile';
-import { registerFlagHoverCard } from '@/lib/flag-hover-coordinator';
+import { registerFlagHoverCard, enterFlagHover, leaveFlagHover } from '@/lib/flag-hover-coordinator';
 
 type FlagCardProps = Flag;
 
@@ -226,6 +226,18 @@ export default function FlagCard({
           ref={triggerRef}
           data-flag-hover-trigger={id}
           className='h-full'
+          onPointerEnter={(event) => {
+            if (event.pointerType !== 'mouse' || !hoverEnabled) {
+              return;
+            }
+            enterFlagHover(id);
+          }}
+          onPointerLeave={(event) => {
+            if (event.pointerType !== 'mouse') {
+              return;
+            }
+            leaveFlagHover(id);
+          }}
         >
           {card}
         </div>

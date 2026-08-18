@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { cn } from '@/lib/utils';
+
+const FADE_MS = 200;
 
 type FlagHoverOverlayProps = {
   open: boolean;
@@ -49,12 +50,35 @@ export default function FlagHoverOverlay({
 }: FlagHoverOverlayProps) {
   const previewRef = React.useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = React.useState(false);
+  const [rendered, setRendered] = React.useState(false);
   const [coords, setCoords] = React.useState<Coords | null>(null);
-  const [visible, setVisible] = React.useState(false);
+  const [revealed, setRevealed] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  React.useLayoutEffect(() => {
+    if (open) {
+      setRendered(true);
+      return;
+    }
+    setRevealed(false);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (open) {
+      return;
+    }
+    if (!rendered) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setRendered(false);
+      setCoords(null);
+    }, FADE_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [open, rendered]);
 
   const updatePosition = React.useCallback(() => {
     const trigger = triggerRef.current;
@@ -73,9 +97,7 @@ export default function FlagHoverOverlay({
   }, [triggerRef]);
 
   React.useLayoutEffect(() => {
-    if (!open) {
-      setCoords(null);
-      setVisible(false);
+    if (!rendered || !open) {
       return;
     }
 
@@ -95,24 +117,27 @@ export default function FlagHoverOverlay({
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
     };
-  }, [open, updatePosition, children]);
+  }, [open, rendered, updatePosition, children]);
 
   React.useEffect(() => {
-    if (!coords) {
-      setVisible(false);
-      return;
-    }
-    if (visible) {
+    if (!open || !coords) {
       return;
     }
 
-    const frame = window.requestAnimationFrame(() => {
-      setVisible(true);
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        setRevealed(true);
+      });
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [coords, visible]);
 
-  if (!mounted || !open) {
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [open, coords]);
+
+  if (!mounted || !rendered) {
     return null;
   }
 
@@ -128,12 +153,12 @@ export default function FlagHoverOverlay({
       className='pointer-events-none fixed z-50 w-[340px]'
     >
       <div
-        className={cn(
-          'rounded-2xl border border-white/90 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] bg-[size:256px,auto] p-3 text-foreground shadow-[0_24px_64px_-12px_rgba(0,0,0,0.25)] backdrop-blur-xl dark:border-white/15 dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.55)]',
-          coords && visible
-            ? 'origin-center animate-in fade-in-0 zoom-in-95 duration-300 fill-mode-both'
-            : 'opacity-0',
-        )}
+        style={{
+          opacity: revealed ? 1 : 0,
+          transform: revealed ? 'scale(1)' : 'scale(0.97)',
+          transition: `opacity ${FADE_MS}ms ease-out, transform ${FADE_MS}ms ease-out`,
+        }}
+        className='origin-center rounded-2xl border border-white/90 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] bg-[size:256px,auto] p-3 text-foreground shadow-[0_24px_64px_-12px_rgba(0,0,0,0.25)] backdrop-blur-xl dark:border-white/15 dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.55)]'
       >
         {children}
       </div>
