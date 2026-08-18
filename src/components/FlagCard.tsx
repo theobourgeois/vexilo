@@ -47,6 +47,7 @@ export default function FlagCard({
   );
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isHoverOpen, setIsHoverOpen] = React.useState(false);
+  const ignoreHoverOpenRef = React.useRef(false);
   const [isSettingProfileFlag, setIsSettingProfileFlag] = React.useState(false);
   const router = useRouter();
   const canHover = usePrefersFineHover();
@@ -119,6 +120,22 @@ export default function FlagCard({
 
   const handleCardClick = () => {
     router.push(`/flag/${encodeURIComponent(flagName)}`);
+  };
+
+  const handleHoverOpenChange = (open: boolean) => {
+    if (open && ignoreHoverOpenRef.current) {
+      setIsHoverOpen(false);
+      return;
+    }
+    setIsHoverOpen(open);
+  };
+
+  const handlePreviewPointerEnter = () => {
+    ignoreHoverOpenRef.current = true;
+    setIsHoverOpen(false);
+    window.setTimeout(() => {
+      ignoreHoverOpenRef.current = false;
+    }, 50);
   };
 
   const card = (
@@ -217,19 +234,20 @@ export default function FlagCard({
       {canHover ? (
         <HoverCard
           open={!isDialogOpen && isHoverOpen}
-          onOpenChange={setIsHoverOpen}
+          onOpenChange={handleHoverOpenChange}
           openDelay={350}
-          closeDelay={120}
+          closeDelay={0}
         >
           <HoverCardTrigger asChild>
             <div className='h-full'>{card}</div>
           </HoverCardTrigger>
           <HoverCardContent
-            side='top'
+            side='right'
             align='center'
             sideOffset={12}
             collisionPadding={16}
-            className='w-[340px] rounded-2xl border border-white/15 bg-zinc-950/90 p-3 text-white shadow-[0_24px_64px_-12px_rgba(0,0,0,0.55)] backdrop-blur-xl dark:bg-black/85'
+            onPointerEnter={handlePreviewPointerEnter}
+            className='w-[340px] rounded-2xl border border-white/90 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] bg-[size:256px,auto] p-3 text-foreground shadow-[0_24px_64px_-12px_rgba(0,0,0,0.25)] backdrop-blur-xl dark:border-white/15 dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.55)]'
           >
             <FlagHoverPreview
               flagName={flagName}
@@ -240,11 +258,6 @@ export default function FlagCard({
               favorites={favoriteCount}
               sources={sources}
               relatedFlags={relatedFlags}
-              onNavigate={() => {
-                setIsHoverOpen(false);
-                handleCardClick();
-              }}
-              onClose={() => setIsHoverOpen(false)}
             />
           </HoverCardContent>
         </HoverCard>
