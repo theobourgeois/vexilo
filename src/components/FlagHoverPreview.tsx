@@ -84,8 +84,9 @@ export default function FlagHoverPreview({
   onNavigate,
   onClose,
 }: FlagHoverPreviewProps) {
-  const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS);
-  const extraTagCount = Math.max(tags.length - MAX_VISIBLE_TAGS, 0);
+  const tagList = tags ?? [];
+  const visibleTags = tagList.slice(0, MAX_VISIBLE_TAGS);
+  const extraTagCount = Math.max(tagList.length - MAX_VISIBLE_TAGS, 0);
   const sourceCount = sources?.length ?? 0;
   const relatedCount = relatedFlags?.length ?? 0;
   const favoriteCount = favorites ?? 0;
@@ -178,10 +179,10 @@ export default function FlagHoverPreview({
             <>
               <p className='inline-flex items-center justify-end gap-1.5 text-base font-bold text-white'>
                 <Hash className='h-3.5 w-3.5 text-white/50' />
-                {tags.length}
+                {tagList.length}
               </p>
               <p className='text-xs text-white/50'>
-                {tags.length === 1 ? 'Tag' : 'Tags'}
+                {tagList.length === 1 ? 'Tag' : 'Tags'}
               </p>
             </>
           )}
