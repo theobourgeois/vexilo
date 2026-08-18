@@ -22,6 +22,7 @@ export function FlagOfTheDay() {
           id: flag.id,
           isFavorite: flag.isFavorite,
           favorites: flag.favorites,
+          sources: flag.sources,
         };
       });
     },
@@ -39,7 +40,7 @@ export function FlagOfTheDay() {
       <CardContent className='px-0'>
         <FlagCard
           id={flagOfTheDay.id}
-          sources={[]}
+          sources={flagOfTheDay.sources ?? []}
           tags={flagOfTheDay.tags}
           description={flagOfTheDay.description}
           flagName={flagOfTheDay.flagName}

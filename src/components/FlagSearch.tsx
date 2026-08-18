@@ -143,6 +143,7 @@ export default function FlagSearch() {
           description: flag.description,
           id: flag.id,
           isFavorite: flag.isFavorite,
+          sources: flag.sources,
         }));
       });
     },
@@ -406,7 +407,7 @@ export default function FlagSearch() {
               link={flag.link}
               index={flag.index}
               tags={flag.tags}
-              sources={[]}
+              sources={flag.sources ?? []}
               description={flag.description}
               favorites={flag.favorites}
               isFavorite={flag.isFavorite}
