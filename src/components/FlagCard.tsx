@@ -16,13 +16,10 @@ import { useRouter } from 'next/navigation';
 import FlagFieldsForm from '@/components/FlagFieldsForm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from '@/components/ui/hover-card';
 import FlagHoverPreview from '@/components/FlagHoverPreview';
+import FlagHoverOverlay from '@/components/FlagHoverOverlay';
 import { usePrefersFineHover } from '@/hooks/useIsMobile';
+import { registerFlagHoverCard } from '@/lib/flag-hover-coordinator';
 
 type FlagCardProps = Flag;
 
@@ -48,8 +45,18 @@ export default function FlagCard({
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isHoverOpen, setIsHoverOpen] = React.useState(false);
   const [isSettingProfileFlag, setIsSettingProfileFlag] = React.useState(false);
+  const triggerRef = React.useRef<HTMLDivElement>(null);
   const router = useRouter();
   const canHover = usePrefersFineHover();
+  const hoverEnabled = canHover && !isDialogOpen;
+
+  React.useEffect(() => {
+    if (!hoverEnabled) {
+      setIsHoverOpen(false);
+      return;
+    }
+    return registerFlagHoverCard(id, setIsHoverOpen);
+  }, [hoverEnabled, id]);
 
   const { data: userData } = useQuery({
     queryKey: ['userData'],
@@ -215,36 +222,30 @@ export default function FlagCard({
   return (
     <>
       {canHover ? (
-        <HoverCard
-          open={!isDialogOpen && isHoverOpen}
-          onOpenChange={setIsHoverOpen}
-          openDelay={350}
-          closeDelay={0}
+        <div
+          ref={triggerRef}
+          data-flag-hover-trigger={id}
+          className='h-full'
         >
-          <HoverCardTrigger asChild>
-            <div className='h-full'>{card}</div>
-          </HoverCardTrigger>
-          <HoverCardContent
-            side='right'
-            align='center'
-            sideOffset={12}
-            collisionPadding={16}
-            className='pointer-events-none w-[340px] rounded-2xl border border-white/90 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] bg-[size:256px,auto] p-3 text-foreground shadow-[0_24px_64px_-12px_rgba(0,0,0,0.25)] backdrop-blur-xl dark:border-white/15 dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] dark:shadow-[0_24px_64px_-12px_rgba(0,0,0,0.55)]'
-          >
-            <FlagHoverPreview
-              flagName={flagName}
-              flagImage={flagImage}
-              index={index}
-              tags={tags}
-              description={description}
-              favorites={favoriteCount}
-              sources={sources}
-              relatedFlags={relatedFlags}
-            />
-          </HoverCardContent>
-        </HoverCard>
+          {card}
+        </div>
       ) : (
         card
+      )}
+
+      {canHover && (
+        <FlagHoverOverlay open={isHoverOpen && !isDialogOpen} triggerRef={triggerRef}>
+          <FlagHoverPreview
+            flagName={flagName}
+            flagImage={flagImage}
+            index={index}
+            tags={tags}
+            description={description}
+            favorites={favoriteCount}
+            sources={sources}
+            relatedFlags={relatedFlags}
+          />
+        </FlagHoverOverlay>
       )}
 
       {/* Edit Dialog */}
