@@ -131,6 +131,8 @@ export type FlagAiStructuredData = {
 export const users = createTable('user', {
   id: uuid('id').primaryKey().defaultRandom(),
   isAdmin: boolean('is_admin').notNull().default(false),
+  // Trusted creators' flag requests and edits are approved automatically.
+  isTrusted: boolean('is_trusted').notNull().default(false),
   name: varchar('name', { length: 255 }),
   userNumber: uuid('user_number').defaultRandom().notNull().unique(),
   email: varchar('email', { length: 255 }).notNull(),

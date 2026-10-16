@@ -118,6 +118,7 @@ export async function getPendingFlagRequests(page: number, limit: number) {
       deleted: flagRequests.deleted,
       userMessage: flagRequests.userMessage,
       userName: users.name,
+      userIsTrusted: users.isTrusted,
     })
     .from(flagRequests)
     .leftJoin(users, eq(flagRequests.userId, users.id))
@@ -214,23 +215,19 @@ async function updateLeaderboard(userId: string) {
   }
 }
 
-export async function approveFlagRequest(flagRequestId: string) {
-  const session = await getServerAuthSession();
-  if (!session?.user?.isAdmin) {
-    return null;
-  }
+type FlagRequestRow = typeof flagRequests.$inferSelect;
 
-  const flagRequest = await db
+async function getFlagRequest(flagRequestId: string) {
+  return db
     .select()
     .from(flagRequests)
     .where(eq(flagRequests.id, flagRequestId))
     .limit(1)
     .then((res) => res[0]);
+}
 
-  if (!flagRequest) {
-    return false;
-  }
-
+/** Creates the flag for a new-flag request and marks the request approved. */
+async function publishNewFlagRequest(flagRequest: FlagRequestRow) {
   const index = await db
     .select({ maxIndex: max(flags.index) })
     .from(flags)
@@ -271,31 +268,16 @@ export async function approveFlagRequest(flagRequestId: string) {
       approved: true,
       flagId: flag.id,
     })
-    .where(eq(flagRequests.id, flagRequestId));
+    .where(eq(flagRequests.id, flagRequest.id));
 
   await redis.del('leaderboard');
   await redis.del('tags');
 
-  return true;
+  return flag.id;
 }
 
-export async function approveFlagEditRequest(flagRequestId: string) {
-  const session = await getServerAuthSession();
-  if (!session?.user?.isAdmin) {
-    return null;
-  }
-
-  const flagRequest = await db
-    .select()
-    .from(flagRequests)
-    .where(eq(flagRequests.id, flagRequestId))
-    .limit(1)
-    .then((res) => res[0]);
-
-  if (!flagRequest) {
-    return false;
-  }
-
+/** Applies an edit request to its flag and marks the request approved. */
+async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
   const flag = await db
     .select()
     .from(flags)
@@ -380,7 +362,7 @@ export async function approveFlagEditRequest(flagRequestId: string) {
       approved: true,
       isEdit: true,
     })
-    .where(eq(flagRequests.id, flagRequestId));
+    .where(eq(flagRequests.id, flagRequest.id));
 
   await redis.del('leaderboard');
   await redis.del('tags');
@@ -388,6 +370,82 @@ export async function approveFlagEditRequest(flagRequestId: string) {
   await redis.del(`recommendations-${flagRequest.flagId}`);
 
   return true;
+}
+
+export async function approveFlagRequest(flagRequestId: string) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const flagRequest = await getFlagRequest(flagRequestId);
+  if (!flagRequest) {
+    return false;
+  }
+
+  await publishNewFlagRequest(flagRequest);
+  return true;
+}
+
+export async function approveFlagEditRequest(flagRequestId: string) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const flagRequest = await getFlagRequest(flagRequestId);
+  if (!flagRequest) {
+    return false;
+  }
+
+  return publishFlagEditRequest(flagRequest);
+}
+
+/**
+ * Publishes a request immediately for trusted creators. Failures leave the
+ * request pending for a moderator instead of failing the submission.
+ */
+async function autoApproveFlagRequest(flagRequest: FlagRequestRow) {
+  try {
+    if (flagRequest.flagId) {
+      return await publishFlagEditRequest(flagRequest);
+    }
+    await publishNewFlagRequest(flagRequest);
+    return true;
+  } catch (error) {
+    console.error(`Auto-approving flag request ${flagRequest.id} failed`, error);
+    return false;
+  }
+}
+
+/** Approves every pending request from a user (e.g. right after trusting them). */
+export async function approvePendingFlagRequestsForUser(userId: string) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const pending = await db
+    .select()
+    .from(flagRequests)
+    .where(
+      and(
+        eq(flagRequests.userId, userId),
+        eq(flagRequests.approved, false),
+        eq(flagRequests.deleted, false),
+      ),
+    )
+    .orderBy(flagRequests.createdAt);
+
+  let approved = 0;
+  // Sequential on purpose: new flags take the next free index one at a time.
+  for (const flagRequest of pending) {
+    if (await autoApproveFlagRequest(flagRequest)) {
+      approved += 1;
+    }
+  }
+
+  return { approved, total: pending.length };
 }
 
 const MAX_FLAG_REQUESTS = 100;
@@ -429,7 +487,7 @@ export async function createFlagRequest(
       ),
     );
 
-  if (numFlagRequests[0].count >= MAX_FLAG_REQUESTS) {
+  if (!user.isTrusted && numFlagRequests[0].count >= MAX_FLAG_REQUESTS) {
     return {
       success: false,
       message: `You have reached the maximum number of flag requests. Please wait for your request to be approved or contact an admin.`,
@@ -467,21 +525,31 @@ export async function createFlagRequest(
       : null;
   }
 
-  await db.insert(flagRequests).values({
-    userId: session.user.id,
-    flagId: flagId ?? null,
-    oldFlag: oldFlag ?? null,
-    userMessage: userMessage ?? '',
-    flag: {
-      ...flag,
-      index: -1,
-      flagImage: imageUrl,
-    },
-  });
+  const [flagRequest] = await db
+    .insert(flagRequests)
+    .values({
+      userId: session.user.id,
+      flagId: flagId ?? null,
+      oldFlag: oldFlag ?? null,
+      userMessage: userMessage ?? '',
+      flag: {
+        ...flag,
+        index: -1,
+        flagImage: imageUrl,
+      },
+    })
+    .returning();
+
+  const autoApproved = user.isTrusted
+    ? await autoApproveFlagRequest(flagRequest)
+    : false;
 
   return {
     success: true,
-    message: 'Flag request created successfully.',
+    autoApproved,
+    message: autoApproved
+      ? 'Flag published.'
+      : 'Flag request created successfully.',
   };
 }
 
@@ -498,13 +566,25 @@ async function countPendingFlagRequests(userId: string) {
 export async function getRemainingFlagRequestSlots() {
   const session = await getServerAuthSession();
   if (!session?.user) {
-    return { remaining: 0, max: MAX_FLAG_REQUESTS };
+    return { remaining: 0, max: MAX_FLAG_REQUESTS, isTrusted: false };
   }
 
-  const pending = await countPendingFlagRequests(session.user.id);
+  const [user, pending] = await Promise.all([
+    db
+      .select({ isTrusted: users.isTrusted })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1)
+      .then((res) => res[0]),
+    countPendingFlagRequests(session.user.id),
+  ]);
+  const isTrusted = user?.isTrusted ?? false;
+
   return {
+    // Trusted creators aren't limited; their requests never stay pending.
     remaining: Math.max(MAX_FLAG_REQUESTS - pending, 0),
     max: MAX_FLAG_REQUESTS,
+    isTrusted,
   };
 }
 
@@ -528,7 +608,11 @@ export async function createFlagRequests(batch: BatchFlagRequestInput[]) {
   }
 
   const user = await db
-    .select({ id: users.id, userNumber: users.userNumber })
+    .select({
+      id: users.id,
+      userNumber: users.userNumber,
+      isTrusted: users.isTrusted,
+    })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1)
@@ -560,7 +644,7 @@ export async function createFlagRequests(batch: BatchFlagRequestInput[]) {
 
   const pending = await countPendingFlagRequests(session.user.id);
   const remaining = MAX_FLAG_REQUESTS - pending;
-  if (batch.length > remaining) {
+  if (!user.isTrusted && batch.length > remaining) {
     return {
       success: false as const,
       message:
@@ -570,7 +654,7 @@ export async function createFlagRequests(batch: BatchFlagRequestInput[]) {
     };
   }
 
-  await db.insert(flagRequests).values(
+  const inserted = await db.insert(flagRequests).values(
     batch.map((flag) => ({
       userId: session.user.id,
       flagId: null,
@@ -587,11 +671,25 @@ export async function createFlagRequests(batch: BatchFlagRequestInput[]) {
         index: -1,
       },
     })),
-  );
+  ).returning();
+
+  // Sequential on purpose: new flags take the next free index one at a time.
+  const autoApprovedIds: string[] = [];
+  if (user.isTrusted) {
+    for (const flagRequest of inserted) {
+      if (await autoApproveFlagRequest(flagRequest)) {
+        autoApprovedIds.push(flagRequest.id);
+      }
+    }
+  }
 
   return {
     success: true as const,
     created: batch.length,
+    // Index-aligned with the submitted batch.
+    published: inserted.map((flagRequest) =>
+      autoApprovedIds.includes(flagRequest.id),
+    ),
     userNumber: user.userNumber,
   };
 }

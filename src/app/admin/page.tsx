@@ -22,7 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Search, Save, X, Trash2 } from 'lucide-react';
+import { Search, Save, X, Trash2, ShieldCheck } from 'lucide-react';
+import { CreatorsAdmin, useTrustCreator } from '@/components/admin/CreatorsAdmin';
 import Image from 'next/image';
 
 function Requests({ page }: { page: number }) {
@@ -35,6 +36,7 @@ function Requests({ page }: { page: number }) {
 
   const flagRequests = flagRequestsData?.flagRequests;
   const total = flagRequestsData?.total;
+  const { setTrusted } = useTrustCreator();
 
   return (
     <div className='flex flex-col gap-2'>
@@ -46,6 +48,37 @@ function Requests({ page }: { page: number }) {
       </div>
       {flagRequests?.map((flagRequest) => (
         <div key={flagRequest.id} className='space-y-4'>
+          <div className='flex items-center gap-2 text-sm'>
+            <span className='text-foreground/60'>From</span>
+            <span className='font-semibold'>
+              {flagRequest.userName || 'Anonymous'}
+            </span>
+            {flagRequest.userIsTrusted ? (
+              <Badge className='gap-1'>
+                <ShieldCheck className='size-3' />
+                Trusted
+              </Badge>
+            ) : (
+              <Button
+                size='sm'
+                variant='neutral'
+                className='h-7 px-2.5 text-xs'
+                onClick={() =>
+                  setTrusted(
+                    {
+                      id: flagRequest.userId,
+                      name: flagRequest.userName,
+                      pending: null,
+                    },
+                    true,
+                  )
+                }
+              >
+                <ShieldCheck />
+                Trust creator
+              </Button>
+            )}
+          </div>
           {flagRequest.userMessage && (
             <div className='bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg'>
               <div className='flex items-start gap-2'>
@@ -470,6 +503,7 @@ function AdminContent() {
           <Tabs defaultValue='requests' className='w-full'>
             <TabsList>
               <TabsTrigger value='requests'>Flag Requests</TabsTrigger>
+              <TabsTrigger value='creators'>Creators</TabsTrigger>
               <TabsTrigger value='reports'>Reports</TabsTrigger>
               <TabsTrigger value='edit'>Edit Flags</TabsTrigger>
               <TabsTrigger value='misc'>Misc</TabsTrigger>
@@ -478,6 +512,10 @@ function AdminContent() {
             <TabsContent value='requests' className='space-y-4'>
               <Requests page={page} />
               <Pagination page={page} />
+            </TabsContent>
+
+            <TabsContent value='creators' className='space-y-4'>
+              <CreatorsAdmin />
             </TabsContent>
 
             <TabsContent value='reports' className='space-y-4'>
