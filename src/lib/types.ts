@@ -31,4 +31,5 @@ export type FlagRequestWithUser = {
   deleted: boolean;
   userMessage: string;
   userName: string | null;
+  userIsTrusted?: boolean | null;
 };

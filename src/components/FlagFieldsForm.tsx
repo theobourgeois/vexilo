@@ -121,7 +121,11 @@ export default function FlagFieldsForm({
 
       const result = await createFlagRequest(flag, initialFlag.id, userMessage);
       if (result.success) {
-        toast.success('Flag update request sent! Please wait for approval.');
+        toast.success(
+          result.autoApproved
+            ? 'Flag updated!'
+            : 'Flag update request sent! Please wait for approval.',
+        );
       } else {
         toastErrorWithLogin(result.message);
       }
