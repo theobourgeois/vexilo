@@ -9,6 +9,7 @@ import {
   flagRequests,
   flags,
   flagTags,
+  reports,
   type FlagAiStructuredData,
   users,
 } from '@/db/schema';
@@ -1603,6 +1604,233 @@ export async function updateFlag(
     .where(eq(flags.id, flagId));
 
   await updateTagCounts(oldTags, newTags);
+
+  return true;
+}
+
+const ADMIN_FLAGS_PAGE_SIZE = 50;
+
+export type AdminFlagsSort = 'recent' | 'oldest' | 'name';
+
+export async function getAdminFlags(params: {
+  query?: string;
+  tag?: string;
+  missingDescription?: boolean;
+  sort?: AdminFlagsSort;
+  page?: number;
+}) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const query = params.query?.trim();
+  const tag = params.tag?.trim().toLowerCase();
+  const where = and(
+    query ? ilike(flags.name, `%${query}%`) : undefined,
+    tag ? sql`${tag} = any(${flags.tags})` : undefined,
+    params.missingDescription ? eq(flags.description, '') : undefined,
+  );
+  const orderBy =
+    params.sort === 'oldest'
+      ? asc(flags.createdAt)
+      : params.sort === 'name'
+        ? asc(flags.name)
+        : desc(flags.createdAt);
+  const page = Math.max(params.page ?? 1, 1);
+
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({
+        id: flags.id,
+        name: flags.name,
+        image: flags.image,
+        link: flags.link,
+        tags: flags.tags,
+        sources: flags.sources,
+        description: flags.description,
+        favorites: flags.favorites,
+        createdAt: flags.createdAt,
+      })
+      .from(flags)
+      .where(where)
+      .orderBy(orderBy, asc(flags.id))
+      .limit(ADMIN_FLAGS_PAGE_SIZE)
+      .offset((page - 1) * ADMIN_FLAGS_PAGE_SIZE),
+    db.select({ total: count() }).from(flags).where(where),
+  ]);
+
+  return { flags: rows, total, pageSize: ADMIN_FLAGS_PAGE_SIZE };
+}
+
+export async function bulkEditFlagTags(
+  flagIds: string[],
+  changes: { add?: string[]; remove?: string[] },
+) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const add = (changes.add ?? []).map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  const remove = new Set((changes.remove ?? []).map((tag) => tag.trim().toLowerCase()));
+  if (flagIds.length === 0 || (add.length === 0 && remove.size === 0)) {
+    return 0;
+  }
+
+  const rows = await db
+    .select({ id: flags.id, tags: flags.tags })
+    .from(flags)
+    .where(inArray(flags.id, flagIds));
+
+  let updated = 0;
+  for (const row of rows) {
+    const nextTags = Array.from(
+      new Set([...row.tags.filter((tag) => !remove.has(tag)), ...add]),
+    );
+    if (
+      nextTags.length === row.tags.length &&
+      nextTags.every((tag) => row.tags.includes(tag))
+    ) {
+      continue;
+    }
+    await db
+      .update(flags)
+      .set({ tags: nextTags, updatedAt: new Date() })
+      .where(eq(flags.id, row.id));
+    await updateTagCounts(row.tags, nextTags);
+    updated += 1;
+  }
+
+  await redis.del('tags');
+  return updated;
+}
+
+/** Marks every selected flag as related to all the others. */
+export async function relateFlags(flagIds: string[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const ids = Array.from(new Set(flagIds));
+  if (ids.length < 2) {
+    return 0;
+  }
+
+  const rows = await db
+    .select({ id: flags.id, relatedFlags: flags.relatedFlags })
+    .from(flags)
+    .where(inArray(flags.id, ids));
+
+  for (const row of rows) {
+    const nextRelated = Array.from(
+      new Set([...row.relatedFlags, ...ids.filter((id) => id !== row.id)]),
+    );
+    await db
+      .update(flags)
+      .set({ relatedFlags: nextRelated, updatedAt: new Date() })
+      .where(eq(flags.id, row.id));
+    await redis.del(`recommendations-${row.id}`);
+  }
+
+  return rows.length;
+}
+
+export async function deleteFlags(flagIds: string[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const rows = await db
+    .select({ id: flags.id, name: flags.name, tags: flags.tags })
+    .from(flags)
+    .where(inArray(flags.id, flagIds));
+
+  const deleted: string[] = [];
+  const failed: Array<{ id: string; name: string; message: string }> = [];
+  for (const row of rows) {
+    try {
+      await db.delete(flags).where(eq(flags.id, row.id));
+      await removeTagsFromCount(row.tags);
+      deleted.push(row.id);
+    } catch (error) {
+      console.error(`Deleting flag ${row.id} failed`, error);
+      failed.push({
+        id: row.id,
+        name: row.name,
+        message: 'Still referenced elsewhere (e.g. a past flag of the day).',
+      });
+    }
+  }
+
+  await redis.del('tags');
+  return { deleted, failed };
+}
+
+export async function getAdminCounts() {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const [[pending], [openReports], [allFlags]] = await Promise.all([
+    db
+      .select({ count: count() })
+      .from(flagRequests)
+      .where(and(eq(flagRequests.approved, false), eq(flagRequests.deleted, false))),
+    db.select({ count: count() }).from(reports).where(eq(reports.resolved, false)),
+    db.select({ count: count() }).from(flags),
+  ]);
+
+  return {
+    pending: pending.count,
+    reports: openReports.count,
+    flags: allFlags.count,
+  };
+}
+
+export async function updateAdminFlag(
+  flagId: string,
+  data: {
+    name: string;
+    image: string;
+    description: string;
+    tags: string[];
+    sources: string[];
+  },
+) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const [existing] = await db
+    .select({ tags: flags.tags })
+    .from(flags)
+    .where(eq(flags.id, flagId))
+    .limit(1);
+  if (!existing) {
+    return false;
+  }
+
+  const tags = Array.from(
+    new Set(data.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean)),
+  );
+  await db
+    .update(flags)
+    .set({
+      name: data.name.trim(),
+      image: data.image.trim(),
+      description: data.description.trim(),
+      sources: data.sources,
+      tags,
+      updatedAt: new Date(),
+    })
+    .where(eq(flags.id, flagId));
+  await updateTagCounts(existing.tags, tags);
+  await redis.del('tags');
 
   return true;
 }

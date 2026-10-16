@@ -4,11 +4,12 @@ import { db } from '@/db';
 import { flagRequests, flags, leaderboard, users, flagTags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { Flag, RelatedFlag } from '@/lib/types';
-import { and, count, eq, max, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, max, ne, sql } from 'drizzle-orm';
 import { base64ImageToS3URI, deleteFileFromUrl } from './s3';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { redis } from '@/db/redis';
 import { upsertFlagMetadataMirror } from './flag-ai-metadata';
+import { findExistingFlags } from './batch-flags';
 
 // Helper function to update tag counts when tags are added or removed
 async function updateTagCounts(oldTags: string[], newTags: string[]) {
@@ -141,6 +142,46 @@ export async function getPendingFlagRequests(page: number, limit: number) {
   };
 }
 
+/**
+ * Deletes a stored image unless a flag still uses it. Requests can point at any
+ * CloudFront URL (including another flag's image), so never delete blindly.
+ */
+async function deleteImageIfUnused(
+  imageUrl: string,
+  options: { uploadsOnly?: boolean; ignoreFlagId?: string } = {},
+) {
+  if (!imageUrl.startsWith(`${CLOUD_FRONT_URL}/`)) return;
+  if (options.uploadsOnly && !imageUrl.startsWith(`${CLOUD_FRONT_URL}/images/`)) return;
+
+  const [inUse] = await db
+    .select({ id: flags.id })
+    .from(flags)
+    .where(
+      and(
+        eq(flags.image, imageUrl),
+        options.ignoreFlagId ? ne(flags.id, options.ignoreFlagId) : undefined,
+      ),
+    )
+    .limit(1);
+  if (inUse) return;
+
+  await deleteFileFromUrl(imageUrl);
+}
+
+async function declineRequest(flagRequest: typeof flagRequests.$inferSelect) {
+  // Only new flags own their image; only clean up images uploaded for the request.
+  if (!flagRequest.flagId) {
+    await deleteImageIfUnused(flagRequest.flag.flagImage, { uploadsOnly: true });
+  }
+
+  await db
+    .update(flagRequests)
+    .set({
+      deleted: true,
+    })
+    .where(eq(flagRequests.id, flagRequest.id));
+}
+
 export async function declineFlagRequest(flagRequestId: string) {
   const session = await getServerAuthSession();
   if (!session?.user?.isAdmin) {
@@ -158,21 +199,7 @@ export async function declineFlagRequest(flagRequestId: string) {
     return false;
   }
 
-  // only delete the flag image if it's a new flag
-  if (!flagRequest.flagId) {
-    const flagImage = flagRequest.flag.flagImage;
-    if (flagImage.includes(CLOUD_FRONT_URL)) {
-      await deleteFileFromUrl(flagImage);
-    }
-  }
-
-  await db
-    .update(flagRequests)
-    .set({
-      deleted: true,
-    })
-    .where(eq(flagRequests.id, flagRequestId));
-
+  await declineRequest(flagRequest);
   return true;
 }
 
@@ -292,11 +319,10 @@ async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
   const isImageChanged =
     flagRequest.flag.flagImage !== flagRequest.oldFlag?.flagImage;
 
-  if (
-    isImageChanged &&
-    flagRequest.oldFlag?.flagImage?.includes(CLOUD_FRONT_URL)
-  ) {
-    await deleteFileFromUrl(flagRequest.oldFlag?.flagImage ?? '');
+  if (isImageChanged && flagRequest.oldFlag?.flagImage) {
+    await deleteImageIfUnused(flagRequest.oldFlag.flagImage, {
+      ignoreFlagId: flag.id,
+    });
   }
 
   // Check if tags have changed
@@ -692,4 +718,234 @@ export async function createFlagRequests(batch: BatchFlagRequestInput[]) {
     ),
     userNumber: user.userNumber,
   };
+}
+
+export type ReviewQueueItem = {
+  id: string;
+  flagId: string | null;
+  isEdit: boolean;
+  flag: Omit<Flag, 'id'>;
+  oldFlag: Omit<Flag, 'id'> | null;
+  userMessage: string;
+  createdAt: Date;
+  duplicateOf: string | null;
+  user: {
+    id: string;
+    name: string | null;
+    image: string | null;
+    userNumber: string | null;
+    isTrusted: boolean;
+    approvedCount: number;
+    declinedCount: number;
+  };
+};
+
+const REVIEW_QUEUE_LIMIT = 500;
+
+export async function getReviewQueue(): Promise<{
+  items: ReviewQueueItem[];
+  total: number;
+} | null> {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const pendingWhere = and(
+    eq(flagRequests.approved, false),
+    eq(flagRequests.deleted, false),
+  );
+
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({
+        id: flagRequests.id,
+        flagId: flagRequests.flagId,
+        flag: flagRequests.flag,
+        oldFlag: flagRequests.oldFlag,
+        userMessage: flagRequests.userMessage,
+        createdAt: flagRequests.createdAt,
+        userId: flagRequests.userId,
+        userName: users.name,
+        userImage: users.image,
+        userNumber: users.userNumber,
+        userIsTrusted: users.isTrusted,
+      })
+      .from(flagRequests)
+      .leftJoin(users, eq(flagRequests.userId, users.id))
+      .where(pendingWhere)
+      .orderBy(flagRequests.createdAt)
+      .limit(REVIEW_QUEUE_LIMIT),
+    db.select({ total: count() }).from(flagRequests).where(pendingWhere),
+  ]);
+
+  const userIds = Array.from(new Set(rows.map((row) => row.userId)));
+  const history =
+    userIds.length > 0
+      ? await db
+          .select({
+            userId: flagRequests.userId,
+            approved: sql<number>`count(*) filter (where ${flagRequests.approved})`,
+            declined: sql<number>`count(*) filter (where ${flagRequests.deleted})`,
+          })
+          .from(flagRequests)
+          .where(inArray(flagRequests.userId, userIds))
+          .groupBy(flagRequests.userId)
+      : [];
+  const historyByUser = new Map(history.map((entry) => [entry.userId, entry]));
+
+  const duplicates = await findExistingFlags(
+    rows
+      .filter((row) => !row.flagId)
+      .map((row) => ({
+        key: row.id,
+        name: row.flag.flagName,
+        sources: row.flag.sources ?? [],
+      })),
+  );
+  const duplicateById = new Map(
+    duplicates
+      .filter((match) => match.status === 'live')
+      .map((match) => [match.key, match.name]),
+  );
+
+  return {
+    total,
+    items: rows.map((row) => {
+      const userHistory = historyByUser.get(row.userId);
+      return {
+        id: row.id,
+        flagId: row.flagId,
+        isEdit: row.flagId !== null,
+        flag: row.flag,
+        oldFlag: row.oldFlag,
+        userMessage: row.userMessage,
+        createdAt: row.createdAt,
+        duplicateOf: duplicateById.get(row.id) ?? null,
+        user: {
+          id: row.userId,
+          name: row.userName,
+          image: row.userImage,
+          userNumber: row.userNumber,
+          isTrusted: row.userIsTrusted ?? false,
+          approvedCount: Number(userHistory?.approved ?? 0),
+          declinedCount: Number(userHistory?.declined ?? 0),
+        },
+      };
+    }),
+  };
+}
+
+async function getPendingRequestsByIds(ids: string[]) {
+  if (ids.length === 0) {
+    return [];
+  }
+  return db
+    .select()
+    .from(flagRequests)
+    .where(
+      and(
+        inArray(flagRequests.id, ids),
+        eq(flagRequests.approved, false),
+        eq(flagRequests.deleted, false),
+      ),
+    )
+    .orderBy(flagRequests.createdAt);
+}
+
+export async function approveFlagRequests(ids: string[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const approved: string[] = [];
+  const failed: Array<{ id: string; message: string }> = [];
+  // Sequential on purpose: new flags take the next free index one at a time.
+  for (const flagRequest of await getPendingRequestsByIds(ids)) {
+    try {
+      if (flagRequest.flagId) {
+        if (!(await publishFlagEditRequest(flagRequest))) {
+          throw new Error('The flag being edited no longer exists.');
+        }
+      } else {
+        await publishNewFlagRequest(flagRequest);
+      }
+      approved.push(flagRequest.id);
+    } catch (error) {
+      console.error(`Approving flag request ${flagRequest.id} failed`, error);
+      failed.push({
+        id: flagRequest.id,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  return { approved, failed };
+}
+
+export async function declineFlagRequests(ids: string[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const declined: string[] = [];
+  for (const flagRequest of await getPendingRequestsByIds(ids)) {
+    await declineRequest(flagRequest);
+    declined.push(flagRequest.id);
+  }
+
+  return { declined };
+}
+
+/** Lets an admin tweak a pending request (typo, tags...) before approving it. */
+export async function updatePendingFlagRequest(
+  id: string,
+  patch: Partial<
+    Pick<Flag, 'flagName' | 'description' | 'tags' | 'sources'>
+  >,
+) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const [flagRequest] = await getPendingRequestsByIds([id]);
+  if (!flagRequest) {
+    return false;
+  }
+
+  await db
+    .update(flagRequests)
+    .set({
+      flag: { ...flagRequest.flag, ...patch },
+      updatedAt: new Date(),
+    })
+    .where(eq(flagRequests.id, id));
+
+  return true;
+}
+
+export async function addTagsToFlagRequests(ids: string[], tags: string[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const cleanTags = tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  for (const flagRequest of await getPendingRequestsByIds(ids)) {
+    await db
+      .update(flagRequests)
+      .set({
+        flag: {
+          ...flagRequest.flag,
+          tags: Array.from(new Set([...flagRequest.flag.tags, ...cleanTags])),
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(flagRequests.id, flagRequest.id));
+  }
+
+  return true;
 }
