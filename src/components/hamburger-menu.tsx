@@ -55,7 +55,7 @@ export function HamburgerMenu() {
             <Link href='/post-flag' onClick={() => setOpen(false)} className='block'>
               <Button size='lg' className='w-full justify-center'>
                 <Plus className='h-4 w-4' />
-                Post Flag
+                Add Flags
               </Button>
             </Link>
           </div>

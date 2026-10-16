@@ -7,7 +7,7 @@ export function PostFlagButton() {
         <Link href="/post-flag" className="">
             <Button className="">
                 <Plus className="w-4 h-4" />
-                Post Flag
+                Add Flags
             </Button>
         </Link>
     );

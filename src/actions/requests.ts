@@ -3,7 +3,7 @@
 import { db } from '@/db';
 import { flagRequests, flags, leaderboard, users, flagTags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
-import { Flag } from '@/lib/types';
+import { Flag, RelatedFlag } from '@/lib/types';
 import { and, count, eq, max, sql } from 'drizzle-orm';
 import { base64ImageToS3URI, deleteFileFromUrl } from './s3';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
@@ -482,5 +482,116 @@ export async function createFlagRequest(
   return {
     success: true,
     message: 'Flag request created successfully.',
+  };
+}
+
+async function countPendingFlagRequests(userId: string) {
+  const [result] = await db
+    .select({ count: count() })
+    .from(flagRequests)
+    .where(
+      and(eq(flagRequests.userId, userId), eq(flagRequests.approved, false)),
+    );
+  return result.count;
+}
+
+export async function getRemainingFlagRequestSlots() {
+  const session = await getServerAuthSession();
+  if (!session?.user) {
+    return { remaining: 0, max: MAX_FLAG_REQUESTS };
+  }
+
+  const pending = await countPendingFlagRequests(session.user.id);
+  return {
+    remaining: Math.max(MAX_FLAG_REQUESTS - pending, 0),
+    max: MAX_FLAG_REQUESTS,
+  };
+}
+
+export type BatchFlagRequestInput = {
+  flagName: string;
+  flagImage: string;
+  sources: string[];
+  tags: string[];
+  description: string;
+  relatedFlags: RelatedFlag[];
+  userMessage: string;
+};
+
+export async function createFlagRequests(batch: BatchFlagRequestInput[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user) {
+    return {
+      success: false as const,
+      message: 'You must be logged in to create a flag request.',
+    };
+  }
+
+  const user = await db
+    .select({ id: users.id, userNumber: users.userNumber })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    return {
+      success: false as const,
+      message: 'User not found in database. Please try logging in again.',
+    };
+  }
+
+  if (batch.length === 0) {
+    return { success: false as const, message: 'Add at least one flag.' };
+  }
+
+  const invalid = batch.find(
+    (flag) =>
+      !flag.flagName.trim() ||
+      !/^https?:\/\//.test(flag.flagImage) ||
+      flag.sources.length === 0,
+  );
+  if (invalid) {
+    return {
+      success: false as const,
+      message: `"${invalid.flagName || 'Untitled flag'}" needs a name, an uploaded image and a source.`,
+    };
+  }
+
+  const pending = await countPendingFlagRequests(session.user.id);
+  const remaining = MAX_FLAG_REQUESTS - pending;
+  if (batch.length > remaining) {
+    return {
+      success: false as const,
+      message:
+        remaining > 0
+          ? `You can only have ${MAX_FLAG_REQUESTS} flags waiting for review. You can submit ${remaining} more right now.`
+          : `You have reached the maximum number of flag requests. Please wait for your requests to be approved or contact an admin.`,
+    };
+  }
+
+  await db.insert(flagRequests).values(
+    batch.map((flag) => ({
+      userId: session.user.id,
+      flagId: null,
+      oldFlag: null,
+      userMessage: flag.userMessage.trim(),
+      flag: {
+        flagName: flag.flagName.trim(),
+        flagImage: flag.flagImage,
+        link: '',
+        sources: flag.sources,
+        tags: flag.tags,
+        description: flag.description.trim(),
+        relatedFlags: flag.relatedFlags,
+        index: -1,
+      },
+    })),
+  );
+
+  return {
+    success: true as const,
+    created: batch.length,
+    userNumber: user.userNumber,
   };
 }
