@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:local": "docker compose up -d --wait && DATABASE_URL=postgres://postgres:postgres@localhost:5433/postgres npx drizzle-kit push && DATABASE_URL=postgres://postgres:postgres@localhost:5433/postgres next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
