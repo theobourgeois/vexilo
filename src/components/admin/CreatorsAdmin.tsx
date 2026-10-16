@@ -119,7 +119,7 @@ export function CreatorsAdmin() {
               <li key={user.id} className='flex items-center gap-3 px-3 py-3'>
                 {user.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.image} alt='' className='size-9 rounded-full shrink-0' />
+                  <img src={user.image} alt='' referrerPolicy='no-referrer' className='size-9 rounded-full shrink-0' />
                 ) : (
                   <div className='size-9 rounded-full bg-foreground/10 shrink-0' />
                 )}
