@@ -38,7 +38,7 @@ import {
 
 const ACCEPTED_FILE_TYPES = 'image/svg+xml,image/png,image/jpeg,image/gif,image/webp,image/avif,.svg';
 
-type SubmittedFlag = { id: string; name: string; previewUrl: string };
+type SubmittedFlag = { id: string; name: string; previewUrl: string; published: boolean };
 
 function isTypingTarget(target: EventTarget | null): boolean {
   return (
@@ -188,7 +188,8 @@ export default function BatchCreateFlags() {
   const missingSourceCount = items.filter((item) =>
     (issuesById[item.id] ?? []).some((issue) => issue.kind === 'missing-source'),
   ).length;
-  const overLimit = slots !== undefined && items.length > slots.remaining;
+  const overLimit =
+    slots !== undefined && !slots.isTrusted && items.length > slots.remaining;
 
   const focusItem = useCallback((id: string) => {
     const element = document.querySelector<HTMLElement>(`[data-batch-flag-id="${id}"]`);
@@ -239,10 +240,11 @@ export default function BatchCreateFlags() {
       }
 
       setSubmitted({
-        flags: items.map((item) => ({
+        flags: items.map((item, index) => ({
           id: item.id,
           name: item.name.trim(),
           previewUrl: item.imageUrl ?? item.previewUrl,
+          published: result.published[index] ?? false,
         })),
         userNumber: result.userNumber,
       });
@@ -317,16 +319,22 @@ export default function BatchCreateFlags() {
 
   if (submitted) {
     const count = submitted.flags.length;
+    const publishedCount = submitted.flags.filter((flag) => flag.published).length;
+    const allPublished = publishedCount === count;
     return (
       <div className='max-w-4xl mx-auto px-4 py-12 sm:py-16 text-center'>
         <div className='mx-auto size-16 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center mb-5'>
           <Check className='size-8 text-green-600' />
         </div>
         <h1 className='text-3xl sm:text-4xl font-bold tracking-tight'>
-          {count} flag{count === 1 ? '' : 's'} submitted
+          {count} flag{count === 1 ? '' : 's'} {allPublished ? 'published' : 'submitted'}
         </h1>
         <p className='text-foreground/60 mt-2 text-lg'>
-          They&apos;re with the moderators and will show up once approved.
+          {allPublished
+            ? 'You’re a trusted creator, so they’re live on Vexilo already.'
+            : publishedCount > 0
+              ? `${publishedCount} went live right away. The rest are with the moderators.`
+              : 'They’re with the moderators and will show up once approved.'}
         </p>
         <Card className='mt-10 p-6 gap-0'>
           <div className='grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4'>
@@ -341,11 +349,28 @@ export default function BatchCreateFlags() {
                     className='max-h-12 w-auto max-w-[80%] object-contain'
                   />
                 </div>
-                <p className='text-xs font-semibold mt-1.5 truncate'>{flag.name}</p>
-                <p className='text-[11px] font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1'>
-                  <Clock className='size-3' />
-                  In review
-                </p>
+                {flag.published ? (
+                  <>
+                    <Link
+                      href={`/flag/${encodeURIComponent(flag.name)}`}
+                      className='block text-xs font-semibold mt-1.5 truncate hover:underline'
+                    >
+                      {flag.name}
+                    </Link>
+                    <p className='text-[11px] font-semibold text-green-700 dark:text-green-400 flex items-center gap-1'>
+                      <Check className='size-3' />
+                      Live
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className='text-xs font-semibold mt-1.5 truncate'>{flag.name}</p>
+                    <p className='text-[11px] font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1'>
+                      <Clock className='size-3' />
+                      In review
+                    </p>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -549,13 +574,15 @@ export default function BatchCreateFlags() {
             <div className='text-foreground/60 text-xs truncate'>
               {overLimit && slots
                 ? `You can submit ${slots.remaining} more right now (${slots.max} waiting for review max)`
-                : 'They’ll go to the moderators for review'}
+                : slots?.isTrusted
+                  ? 'You’re trusted, so they’ll go live right away'
+                  : 'They’ll go to the moderators for review'}
             </div>
           </div>
           <span className='hidden md:inline text-xs text-foreground/50 font-semibold'>⌘↵</span>
           <Button onClick={handleSubmit} disabled={isSubmitting} size='lg' className='px-4 sm:px-6'>
             {isSubmitting ? <Loader2 className='animate-spin' /> : <Send />}
-            Submit {items.length} flag{items.length === 1 ? '' : 's'}
+            {slots?.isTrusted ? 'Publish' : 'Submit'} {items.length} flag{items.length === 1 ? '' : 's'}
           </Button>
         </Card>
       </div>
