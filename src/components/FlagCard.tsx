@@ -55,19 +55,19 @@ export default function FlagCard({
       toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
-    if (isFavorite) {
-      setFavoriteCount((prev) => prev - 1);
-      setIsFavorite(false);
-    } else {
-      setFavoriteCount((prev) => prev + 1);
-      setIsFavorite(true);
-    }
+    const wasFavorite = isFavorite;
+    const delta = wasFavorite ? -1 : 1;
+    setFavoriteCount((prev) => prev + delta);
+    setIsFavorite(!wasFavorite);
     toggleFavoriteFlag(id, true).then((isSuccess) => {
-      queryClient.invalidateQueries({ queryKey: ['flags'] });
       if (!isSuccess) {
-        setFavoriteCount((prev) => prev - 1);
-        setIsFavorite(false);
+        setFavoriteCount((prev) => prev - delta);
+        setIsFavorite(wasFavorite);
+        return;
       }
+      // Mark lists stale without refetching the one on screen, so the grid doesn't
+      // reorder under the cursor. The new order shows on the next visit or refresh.
+      queryClient.invalidateQueries({ queryKey: ['flags'], refetchType: 'none' });
     });
   };
 

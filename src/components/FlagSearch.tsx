@@ -20,12 +20,13 @@ import {
 import { flags } from '@/db/schema';
 
 type OrderBy = keyof typeof flags.$inferSelect;
-type Sort = 'popular' | 'latest' | 'az';
+type Sort = 'popular' | 'views' | 'latest' | 'az';
 
 const ITEMS_PER_PAGE = 56;
 
 const SORTS: Record<Sort, { orderBy: OrderBy; direction: 'asc' | 'desc' }> = {
   popular: { orderBy: 'favorites', direction: 'desc' },
+  views: { orderBy: 'views', direction: 'desc' },
   latest: { orderBy: 'updatedAt', direction: 'desc' },
   az: { orderBy: 'name', direction: 'asc' },
 };
@@ -97,7 +98,7 @@ export default function FlagSearch() {
   const orderDirection =
     (searchParams.get('orderDirection') as 'asc' | 'desc') || 'desc';
   const sort: Sort =
-    orderBy === 'name' ? 'az' : orderBy === 'updatedAt' ? 'latest' : 'popular';
+    orderBy === 'name' ? 'az' : orderBy === 'updatedAt' ? 'latest' : orderBy === 'views' ? 'views' : 'popular';
 
   const { data: topFlagTags } = useQuery({
     queryKey: ['topFlagTags'],
@@ -191,6 +192,7 @@ export default function FlagSearch() {
             }
             options={[
               { value: 'popular', label: 'Popular' },
+              { value: 'views', label: 'Most viewed' },
               { value: 'latest', label: 'Latest' },
               { value: 'az', label: 'A–Z' },
             ]}

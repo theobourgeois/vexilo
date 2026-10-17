@@ -38,7 +38,7 @@ export function FlagOfTheDayTile({ className }: { className?: string }) {
       return;
     }
     queryClient.invalidateQueries({ queryKey: ['flagOfTheDay'] });
-    queryClient.invalidateQueries({ queryKey: ['flags'] });
+    queryClient.invalidateQueries({ queryKey: ['flags'], refetchType: 'none' });
   };
 
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' });

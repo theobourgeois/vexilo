@@ -13,7 +13,8 @@
     "ai:generate-flag": "tsx scripts/ai/generate-flag-metadata.ts",
     "ai:generate-missing-flags": "tsx scripts/ai/generate-missing-flag-metadata.ts",
     "ai:backfill-flag-metadata": "tsx scripts/ai/backfill-flag-metadata.ts",
-    "images:self-host-flags": "tsx scripts/storage/self-host-flag-images.ts"
+    "images:self-host-flags": "tsx scripts/storage/self-host-flag-images.ts",
+    "views:backfill": "tsx scripts/views/backfill-flag-views.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.58",

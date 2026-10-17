@@ -50,16 +50,14 @@ export default function FlagActions({ flag }: FlagActionsProps) {
       toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
-    if (isFavorite) {
-      setIsFavorite(false);
-    } else {
-      setIsFavorite(true);
-    }
+    const wasFavorite = isFavorite;
+    setIsFavorite(!wasFavorite);
     toggleFavoriteFlag(flag.id).then((isSuccess) => {
-      queryClient.invalidateQueries({ queryKey: ['flags'] });
       if (!isSuccess) {
-        setIsFavorite(false);
+        setIsFavorite(wasFavorite);
+        return;
       }
+      queryClient.invalidateQueries({ queryKey: ['flags'], refetchType: 'none' });
     });
   };
 

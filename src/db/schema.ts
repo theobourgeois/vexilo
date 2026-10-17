@@ -1,6 +1,7 @@
 import { Flag } from '@/lib/types';
 import { relations, sql } from 'drizzle-orm';
 import {
+  date,
   index,
   integer,
   pgTableCreator,
@@ -233,6 +234,8 @@ export const flags = createTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
     favorites: integer('favorites').notNull().default(0),
+    // Lifetime page views, kept in step with flag_view_daily so lists can sort by it.
+    views: integer('views').notNull().default(0),
     relatedFlags: jsonb('related_flags')
       .$type<string[]>()
       .notNull()
@@ -240,6 +243,27 @@ export const flags = createTable(
   },
   (table) => ({
     indexUnique: uniqueIndex('index_unique').on(table.index),
+  }),
+);
+
+/**
+ * Page views per flag per UTC day. `views` counts every flag page view; `visitors`
+ * counts distinct visitors that day. Rows from before tracking started were backfilled
+ * from Vercel Web Analytics.
+ */
+export const flagViewDaily = createTable(
+  'flag_view_daily',
+  {
+    flagId: uuid('flag_id')
+      .notNull()
+      .references(() => flags.id, { onDelete: 'cascade' }),
+    day: date('day', { mode: 'string' }).notNull(),
+    views: integer('views').notNull().default(0),
+    visitors: integer('visitors').notNull().default(0),
+  },
+  (table) => ({
+    compoundKey: primaryKey({ columns: [table.flagId, table.day] }),
+    dayIdx: index('flag_view_daily_day_idx').on(table.day),
   }),
 );
 

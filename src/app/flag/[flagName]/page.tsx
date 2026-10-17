@@ -12,6 +12,7 @@ import { notFound } from 'next/navigation';
 import FlagActions from './FlagActions';
 import ExpandableDescription from './ExpandableDescription';
 import FlagViewer from './FlagViewer';
+import FlagViewTracker from './FlagViewTracker';
 import type { FlagAiStructuredData } from '@/db/schema';
 import FlagCard from '@/components/FlagCard';
 import { Metadata } from 'next';
@@ -341,6 +342,7 @@ export default async function FlagPage({
   const firstTag = flag.displayTags.find((t) => t.toLowerCase() !== flag.name.toLowerCase());
   const details: [string, React.ReactNode][] = [
     ['Catalogue', <span key='i' className='tabular-nums'>#{String(flag.index).padStart(4, '0')}</span>],
+    ['Views', <span key='v' className='tabular-nums'>{flag.views.toLocaleString()}</span>],
     ['Favorites', <span key='f' className='tabular-nums'>{flag.favorites}</span>],
   ];
   if (flag.link) {
@@ -360,6 +362,7 @@ export default async function FlagPage({
 
   return (
     <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
+      <FlagViewTracker flagId={flag.id} />
       <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
         <Link href='/' className='hover:text-foreground'>
           Browse
