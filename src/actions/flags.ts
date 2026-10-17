@@ -5,6 +5,7 @@ import { redis } from '@/db/redis';
 import {
   favorites,
   flagAiMetadata,
+  flagColors,
   flagOfTheDay,
   flagRequests,
   flags,
@@ -14,6 +15,9 @@ import {
   users,
 } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
+import { relatedFlagsCacheKey } from '@/lib/cache-keys';
+import { saveFlagColorsLater } from '@/lib/flag-palette';
+import { getTrait, isColorFamily, parseFlagQuery } from '@/lib/flag-search-terms';
 import { Flag } from '@/lib/types';
 import {
   and,
@@ -24,6 +28,7 @@ import {
   ilike,
   inArray,
   ne,
+  type SQL,
   sql,
 } from 'drizzle-orm';
 
@@ -689,48 +694,86 @@ export async function getFlagDetailFromName(flagName: string) {
   };
 }
 
-export async function getRelatedFlags(flagId: string) {
-  const cachedRelatedFlags = await redis.get(`recommendations-${flagId}`);
-  if (cachedRelatedFlags) {
-    return cachedRelatedFlags as typeof relatedFlags;
-  }
+const RELATED_LIMIT = 8;
+const RELATED_CACHE_SECONDS = 60 * 60 * 24;
 
+/** Flags people linked to this one, in either direction. */
+async function getLinkedFlagIds(flagId: string, ownRelated: string[]) {
+  const linkingHere = await db
+    .select({ id: flags.id })
+    .from(flags)
+    .where(sql`related_flags @> ${JSON.stringify([flagId])}::jsonb`);
+  return Array.from(new Set([...ownRelated, ...linkingHere.map((flag) => flag.id)].filter(Boolean)));
+}
+
+/** Flags that share the most tags, for flags without generated traits to compare. */
+async function getFlagIdsBySharedTags(flagId: string, tags: string[], limit: number) {
+  if (tags.length === 0) return [];
+  const tagArray = sql`ARRAY[${sql.join(tags.map((tag) => sql`${tag}`), sql`, `)}]::text[]`;
+  const rows = await db
+    .select({ id: flags.id })
+    .from(flags)
+    .where(and(ne(flags.id, flagId), sql`${flags.tags} && ${tagArray}`))
+    .orderBy(
+      sql`cardinality(ARRAY(SELECT unnest(${flags.tags}) INTERSECT SELECT unnest(${tagArray}))) DESC`,
+      desc(flags.favorites),
+    )
+    .limit(limit);
+  return rows.map((row) => row.id);
+}
+
+/**
+ * Related flags: the ones people linked first, then the most similar flags (by generated traits
+ * when the flag has them, otherwise by shared tags). Only IDs are cached, so favorites stay per user.
+ */
+export async function getRelatedFlags(flagId: string) {
   const session = await getServerAuthSession();
   const userId = session?.user?.id;
 
-  // Get the flag data to extract related flags
-  const flagData = await db
-    .select({
-      id: flags.id,
-      relatedFlags: flags.relatedFlags,
-    })
+  const cached = await redis.get<string[]>(relatedFlagsCacheKey(flagId)).catch(() => null);
+  if (Array.isArray(cached)) return getFlagsByIds(cached, userId);
+
+  const [flag] = await db
+    .select({ relatedFlags: flags.relatedFlags, tags: flags.tags })
     .from(flags)
     .where(eq(flags.id, flagId))
     .limit(1);
+  if (!flag) return [];
 
-  if (!flagData?.[0]) {
-    return [];
+  const linked = await getLinkedFlagIds(flagId, flag.relatedFlags);
+  const room = Math.max(RELATED_LIMIT - linked.length, 0);
+  let similar: string[] = [];
+  if (room > 0) {
+    const [metadata] = await db
+      .select(recommendationMetadataColumns)
+      .from(flagAiMetadata)
+      .where(eq(flagAiMetadata.flagId, flagId))
+      .limit(1);
+    similar = hasRecommendationMetadata(metadata ?? null)
+      ? await rankSimilarByMetadata(flagId, metadata, RELATED_LIMIT * 2)
+      : await getFlagIdsBySharedTags(flagId, flag.tags, RELATED_LIMIT * 2);
   }
+  const ids = Array.from(new Set([...linked, ...similar])).slice(0, Math.max(RELATED_LIMIT, linked.length));
 
-  // Find flags that have this flag in their related flags
-  const relatedToThisFlag = (
-    await db
-      .select({ id: flags.id })
-      .from(flags)
-      .where(sql`related_flags @> ${JSON.stringify([flagId])}::jsonb`)
-  ).map((flag) => flag.id);
+  await redis.set(relatedFlagsCacheKey(flagId), ids, { ex: RELATED_CACHE_SECONDS }).catch(() => null);
+  return getFlagsByIds(ids, userId);
+}
 
-  // Extract IDs from relatedFlags - handle both string IDs and objects with id property
-  const relatedFlagIds = Array.from(
-    new Set(flagData[0].relatedFlags.concat(relatedToThisFlag).filter(Boolean)),
-  );
+const recommendationMetadataColumns = {
+  flagId: flagAiMetadata.flagId,
+  descriptionDraft: flagAiMetadata.descriptionDraft,
+  tagsDraft: flagAiMetadata.tagsDraft,
+  metaTags: flagAiMetadata.metaTags,
+  detailedDescription: flagAiMetadata.detailedDescription,
+  visualDescription: flagAiMetadata.visualDescription,
+  historicalContext: flagAiMetadata.historicalContext,
+  searchTokens: flagAiMetadata.searchTokens,
+  structuredData: flagAiMetadata.structuredData,
+};
 
-  if (relatedFlagIds.length === 0) {
-    return [];
-  }
-
-  // Fetch the full related flag data
-  const relatedFlags = await db
+/** Other flags with generated traits, ranked by how many traits they share with this one. */
+async function rankSimilarByMetadata(flagId: string, source: RecommendationMetadataRow, limit: number) {
+  const candidates = await db
     .select({
       id: flags.id,
       name: flags.name,
@@ -740,45 +783,33 @@ export async function getRelatedFlags(flagId: string) {
       index: flags.index,
       tags: flags.tags,
       description: flags.description,
-      createdAt: flags.createdAt,
-      updatedAt: flags.updatedAt,
       favorites: flags.favorites,
-      relatedFlags: flags.relatedFlags,
-      isFavorite: userId
-        ? sql<boolean>`EXISTS (
-				SELECT 1 FROM vexilo_favorite 
-				WHERE vexilo_favorite.flag_id = vexilo_flag.id 
-				AND vexilo_favorite.user_id = ${userId}
-			)`
-        : sql<boolean>`false`,
+      ...recommendationMetadataColumns,
     })
-    .from(flags)
-    .where(inArray(flags.id, relatedFlagIds));
+    .from(flagAiMetadata)
+    .innerJoin(flags, eq(flags.id, flagAiMetadata.flagId))
+    .where(ne(flagAiMetadata.flagId, flagId));
 
-  await redis.set(`recommendations-${flagId}`, relatedFlags);
-
-  return relatedFlags;
+  return candidates
+    .map((candidate) => ({
+      id: candidate.id,
+      score: scoreMetadataRecommendation(source, candidate),
+      favorites: candidate.favorites,
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => right.score - left.score || right.favorites - left.favorites || left.id.localeCompare(right.id))
+    .slice(0, limit)
+    .map((candidate) => candidate.id);
 }
 
 export async function getExperimentalRecommendedFlags(flagId: string) {
-  const metadata = await db
-    .select({
-      flagId: flagAiMetadata.flagId,
-      descriptionDraft: flagAiMetadata.descriptionDraft,
-      tagsDraft: flagAiMetadata.tagsDraft,
-      metaTags: flagAiMetadata.metaTags,
-      detailedDescription: flagAiMetadata.detailedDescription,
-      visualDescription: flagAiMetadata.visualDescription,
-      historicalContext: flagAiMetadata.historicalContext,
-      searchTokens: flagAiMetadata.searchTokens,
-      structuredData: flagAiMetadata.structuredData,
-    })
+  const [sourceMetadata] = await db
+    .select(recommendationMetadataColumns)
     .from(flagAiMetadata)
     .where(eq(flagAiMetadata.flagId, flagId))
     .limit(1);
 
-  const sourceMetadata = metadata[0] ?? null;
-  if (!hasRecommendationMetadata(sourceMetadata)) {
+  if (!hasRecommendationMetadata(sourceMetadata ?? null)) {
     return getRelatedFlags(flagId);
   }
 
@@ -791,52 +822,7 @@ export async function getExperimentalRecommendedFlags(flagId: string) {
     return getFlagsByIds(cachedRecommendationIds, userId);
   }
 
-  const candidates = await db
-    .select({
-      id: flags.id,
-      name: flags.name,
-      image: flags.image,
-      link: flags.link,
-      sources: flags.sources,
-      index: flags.index,
-      tags: flags.tags,
-      description: flags.description,
-      favorites: flags.favorites,
-      flagId: flagAiMetadata.flagId,
-      descriptionDraft: flagAiMetadata.descriptionDraft,
-      tagsDraft: flagAiMetadata.tagsDraft,
-      metaTags: flagAiMetadata.metaTags,
-      detailedDescription: flagAiMetadata.detailedDescription,
-      visualDescription: flagAiMetadata.visualDescription,
-      historicalContext: flagAiMetadata.historicalContext,
-      searchTokens: flagAiMetadata.searchTokens,
-      structuredData: flagAiMetadata.structuredData,
-    })
-    .from(flagAiMetadata)
-    .innerJoin(flags, eq(flags.id, flagAiMetadata.flagId))
-    .where(ne(flagAiMetadata.flagId, flagId));
-
-  const rankedIds = candidates
-    .map((candidate) => ({
-      id: candidate.id,
-      score: scoreMetadataRecommendation(sourceMetadata, candidate),
-      favorites: candidate.favorites,
-    }))
-    .filter((candidate) => candidate.score > 0)
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-
-      if (right.favorites !== left.favorites) {
-        return right.favorites - left.favorites;
-      }
-
-      return left.id.localeCompare(right.id);
-    })
-    .slice(0, EXPERIMENTAL_RECOMMENDATION_LIMIT)
-    .map((candidate) => candidate.id);
-
+  const rankedIds = await rankSimilarByMetadata(flagId, sourceMetadata, EXPERIMENTAL_RECOMMENDATION_LIMIT);
   if (rankedIds.length === 0) {
     return getRelatedFlags(flagId);
   }
@@ -932,15 +918,70 @@ export async function getFlagOfTheDay() {
   return flag?.[0];
 }
 
-function buildWhereClause(query?: string) {
-  if (!query) {
-    return sql`1=1`;
-  }
-  // Use ILIKE OR trigram similarity above a threshold
-  return sql`
-    lower(${flags.name}) LIKE lower(${`%${query}%`})
-    OR similarity(${flags.name}, ${query}) > 0.2
-  `;
+/** Chips picked outside the search text: colour swatches and type/symbol menus. */
+export type FlagFilters = { colors?: string[]; traits?: string[] };
+
+const like = (value: string) => `%${value.toLowerCase()}%`;
+
+/** A word that wasn't recognized as a colour, type or symbol: match names, tags and descriptions. */
+function freeWordMatch(word: string) {
+  const inText =
+    word.length >= 3
+      ? sql` OR lower(${flags.description}) LIKE ${like(word)}
+        OR EXISTS (SELECT 1 FROM ${flagAiMetadata} WHERE ${flagAiMetadata.flagId} = ${flags.id}
+          AND (lower(${flagAiMetadata.visualDescription}) LIKE ${like(word)} OR lower(${flagAiMetadata.descriptionDraft}) LIKE ${like(word)}))`
+      : sql``;
+  return sql`(lower(${flags.name}) LIKE ${like(word)}
+    OR EXISTS (SELECT 1 FROM unnest(${flags.tags}) AS tag WHERE lower(tag) = ${word})${inText})`;
+}
+
+/**
+ * Where clause and ordering for a browse search. A query like "red and white with a cross"
+ * becomes colour, type and symbol filters (see flag-search-terms.ts); flags whose name matches
+ * the whole query are always included and ranked first, so "Red Cross" still finds the Red Cross.
+ */
+function buildFlagSearch(query?: string, filters: FlagFilters = {}) {
+  const text = query?.trim() ?? '';
+  const parsed = parseFlagQuery(text);
+  const colors = Array.from(new Set([...parsed.colors, ...(filters.colors ?? []).filter(isColorFamily)]));
+  const traits = Array.from(new Set([...parsed.traits, ...(filters.traits ?? [])]))
+    .map(getTrait)
+    .filter((trait) => trait !== undefined);
+
+  const isDescribed = colors.length > 0 || traits.length > 0;
+  // Fuzzy matching a whole description ("red and white with a cross") against names only adds
+  // noise, so descriptive searches keep just names containing the exact phrase.
+  const nameMatch = !text
+    ? null
+    : isDescribed
+      ? sql`(lower(${flags.name}) LIKE ${like(text)})`
+      : sql`(lower(${flags.name}) LIKE ${like(text)} OR similarity(${flags.name}, ${text}) > 0.2)`;
+  const conditions = [
+    colors.length > 0
+      ? sql`EXISTS (SELECT 1 FROM ${flagColors} WHERE ${flagColors.flagId} = ${flags.id}
+          AND ${flagColors.families} @> ARRAY[${sql.join(colors.map((color) => sql`${color}`), sql`, `)}]::text[])`
+      : null,
+    ...traits.map(
+      (trait) => sql`EXISTS (SELECT 1 FROM ${flagAiMetadata} WHERE ${flagAiMetadata.flagId} = ${flags.id}
+        AND ${flagAiMetadata.searchTokens} && ARRAY[${sql.join(trait.tokens.map((token) => sql`${token}`), sql`, `)}]::text[])`,
+    ),
+    ...parsed.freeWords.map(freeWordMatch),
+  ].filter((condition) => condition !== null);
+
+  const described = conditions.length > 0 ? and(...conditions) : null;
+  const where =
+    nameMatch && described ? sql`(${nameMatch} OR ${described})` : (nameMatch ?? described ?? sql`1=1`);
+
+  return {
+    where,
+    orderBy(fallback: SQL) {
+      if (!nameMatch) return [fallback];
+      // Plain name searches rank by closeness; descriptive ones keep the chosen sort.
+      return isDescribed
+        ? [sql`${nameMatch} DESC`, fallback]
+        : [sql`${nameMatch} DESC`, sql`similarity(${flags.name}, ${text}) DESC`, desc(flags.favorites)];
+    },
+  };
 }
 
 function orderByClause(
@@ -966,8 +1007,9 @@ export async function getFlags(
   orderBy: keyof typeof flags.$inferSelect = 'updatedAt',
   orderDirection: 'asc' | 'desc' = 'desc',
   tag?: string,
+  filters?: FlagFilters,
 ) {
-  const whereClause = buildWhereClause(query);
+  const search = buildFlagSearch(query, filters);
 
   const boundedLimit = Math.min(limit, 100);
 
@@ -999,13 +1041,9 @@ export async function getFlags(
     })
     .from(flags)
     .where(
-      and(whereClause, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`),
+      and(search.where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`),
     )
-    .orderBy(
-      query
-        ? sql`similarity(${flags.name}, ${query}) DESC`
-        : orderByClause(orderBy, orderDirection),
-    )
+    .orderBy(...search.orderBy(orderByClause(orderBy, orderDirection)))
     .limit(boundedLimit)
     .offset((page - 1) * boundedLimit);
 
@@ -1024,7 +1062,9 @@ export async function getUserFavorites(
   orderBy: keyof typeof flags.$inferSelect = 'updatedAt',
   orderDirection: 'asc' | 'desc' = 'desc',
   tag?: string,
+  filters?: FlagFilters,
 ) {
+  const search = buildFlagSearch(query, filters);
   const user = await db
     .select()
     .from(users)
@@ -1067,16 +1107,12 @@ export async function getUserFavorites(
     )
     .where(
       and(
-        ilike(flags.name, `%${query}%`),
+        search.where,
         await isFavorite(userId),
         tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`,
       ),
     )
-    .orderBy(
-      query
-        ? sql`similarity(${flags.name}, ${query}) DESC`
-        : orderByClause(orderBy),
-    )
+    .orderBy(...search.orderBy(orderByClause(orderBy)))
     .limit(boundedLimit)
     .offset((page - 1) * boundedLimit);
 
@@ -1090,6 +1126,7 @@ export async function getFavouriteFlags(
   orderBy: keyof typeof flags.$inferSelect = 'updatedAt',
   orderDirection: 'asc' | 'desc' = 'desc',
   tag?: string,
+  filters?: FlagFilters,
 ) {
   const session = await getServerAuthSession();
   if (!session?.user) {
@@ -1104,23 +1141,24 @@ export async function getFavouriteFlags(
     orderBy,
     orderDirection,
     tag,
+    filters,
   );
 }
 
-export async function getFlagsCount(query?: string, tag?: string) {
-  const whereClause = buildWhereClause(query);
+export async function getFlagsCount(query?: string, tag?: string, filters?: FlagFilters) {
+  const { where } = buildFlagSearch(query, filters);
 
   const cnt = await db
     .select({ count: count() })
     .from(flags)
     .where(
-      and(whereClause, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`),
+      and(where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`),
     );
 
   return cnt[0].count;
 }
 
-export async function getFavoriteFlagsCount(query?: string, tag?: string) {
+export async function getFavoriteFlagsCount(query?: string, tag?: string, filters?: FlagFilters) {
   const session = await getServerAuthSession();
   if (!session?.user) {
     return 0;
@@ -1131,7 +1169,7 @@ export async function getFavoriteFlagsCount(query?: string, tag?: string) {
     .from(flags)
     .where(
       and(
-        ilike(flags.name, `%${query}%`),
+        buildFlagSearch(query, filters).where,
         await isFavorite(),
         tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`,
       ),
@@ -1174,7 +1212,11 @@ export async function createAdminFlags(flagList: Flag[]) {
       };
     });
 
-    await db.insert(flags).values(validatedFlags);
+    const created = await db
+      .insert(flags)
+      .values(validatedFlags)
+      .returning({ id: flags.id, image: flags.image });
+    for (const flag of created) saveFlagColorsLater(flag.id, flag.image);
 
     // Update tag counts for all created flags
     for (const flag of validatedFlags) {
@@ -1544,7 +1586,7 @@ export async function getFlagEditHistory(flagId: string) {
       ),
     )
     .orderBy(desc(flagRequests.createdAt))
-    .limit(20);
+    .limit(50);
 
   return history.map((item) => ({
     ...item,
@@ -1612,6 +1654,7 @@ export async function updateFlag(
       updatedAt: new Date(),
     })
     .where(eq(flags.id, flagId));
+  if (data.image && data.image !== flagToUpdate[0].image) saveFlagColorsLater(flagId, data.image);
 
   await updateTagCounts(oldTags, newTags);
 
@@ -1752,7 +1795,7 @@ export async function relateFlags(flagIds: string[]) {
       .update(flags)
       .set({ relatedFlags: nextRelated, updatedAt: new Date() })
       .where(eq(flags.id, row.id));
-    await redis.del(`recommendations-${row.id}`);
+    await redis.del(`recommendations-${row.id}`, relatedFlagsCacheKey(row.id));
   }
 
   return rows.length;
@@ -1796,19 +1839,26 @@ export async function getAdminCounts() {
     return null;
   }
 
-  const [[pending], [openReports], [allFlags]] = await Promise.all([
+  const [[pending], [openReports], [allFlags], [brokenImages]] = await Promise.all([
     db
       .select({ count: count() })
       .from(flagRequests)
       .where(and(eq(flagRequests.approved, false), eq(flagRequests.deleted, false))),
     db.select({ count: count() }).from(reports).where(eq(reports.resolved, false)),
     db.select({ count: count() }).from(flags),
+    // Before the colours table exists this fails; the count just stays hidden.
+    db
+      .select({ count: count() })
+      .from(flagColors)
+      .where(sql`jsonb_array_length(${flagColors.colors}) = 0`)
+      .catch(() => [{ count: 0 }]),
   ]);
 
   return {
     pending: pending.count,
     reports: openReports.count,
     flags: allFlags.count,
+    brokenImages: brokenImages.count,
   };
 }
 
@@ -1828,7 +1878,7 @@ export async function updateAdminFlag(
   }
 
   const [existing] = await db
-    .select({ tags: flags.tags })
+    .select({ tags: flags.tags, image: flags.image })
     .from(flags)
     .where(eq(flags.id, flagId))
     .limit(1);
@@ -1850,6 +1900,7 @@ export async function updateAdminFlag(
       updatedAt: new Date(),
     })
     .where(eq(flags.id, flagId));
+  if (data.image.trim() !== existing.image) saveFlagColorsLater(flagId, data.image.trim());
   await updateTagCounts(existing.tags, tags);
   await redis.del('tags');
 

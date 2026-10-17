@@ -267,6 +267,30 @@ export const flagViewDaily = createTable(
   }),
 );
 
+/** A colour read from a flag's image, with the share of the flag it covers (0–1). */
+export type FlagImageColor = { hex: string; name: string; share: number };
+
+/**
+ * Colours read from each flag's image. `families` holds broad colour names
+ * (red, blue…) for colours covering a meaningful share, which is what search filters on.
+ * `image` is the URL the colours were read from, so a changed image gets re-read.
+ */
+export const flagColors = createTable(
+  'flag_color',
+  {
+    flagId: uuid('flag_id')
+      .primaryKey()
+      .references(() => flags.id, { onDelete: 'cascade' }),
+    image: varchar('image', { length: 1000 }).notNull(),
+    colors: jsonb('colors').$type<FlagImageColor[]>().notNull().default([]),
+    families: text('families').array().notNull().default([]),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => ({
+    familiesIdx: index('flag_color_families_idx').using('gin', table.families),
+  }),
+);
+
 export const flagAiMetadata = createTable(
   'flag_ai_metadata',
   {

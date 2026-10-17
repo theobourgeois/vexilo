@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { flags } from '@/db/schema';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { moveFlagColors } from '@/lib/flag-palette';
 
 type MirrorableFlag = {
   id: string;
@@ -241,6 +242,7 @@ async function mirrorFlagImage(flag: MirrorableFlag): Promise<string> {
       image: targetUrl,
     })
     .where(and(eq(flags.id, flag.id), eq(flags.image, flag.image)));
+  await moveFlagColors(flag.id, flag.image, targetUrl);
 
   return targetUrl;
 }

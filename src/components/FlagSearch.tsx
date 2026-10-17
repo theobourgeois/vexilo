@@ -1,15 +1,20 @@
 'use client';
 
-import { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Heart } from '@/components/icons';
+import { ArrowLeft, ArrowRight, ChevronDown, Heart, Search, X } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import FlagCard from './FlagCard';
 import Tag from './Tag';
-import { FlagOfTheDayTile } from './flag-of-the-day-tile';
 import {
   getFavoriteFlagsCount,
   getFavouriteFlags,
@@ -18,18 +23,30 @@ import {
   getTopFlagTags,
 } from '@/actions/flags';
 import { flags } from '@/db/schema';
+import {
+  COLOR_FAMILIES,
+  FLAG_TRAITS,
+  getTrait,
+  parseFlagQuery,
+  removeFromQuery,
+} from '@/lib/flag-search-terms';
+import { FOCUS_SEARCH_KEY } from '@/lib/nav';
+import { cn } from '@/lib/utils';
 
 type OrderBy = keyof typeof flags.$inferSelect;
-type Sort = 'popular' | 'views' | 'latest' | 'az';
+type Sort = 'popular' | 'latest' | 'az';
 
 const ITEMS_PER_PAGE = 56;
+const DEBOUNCE_DELAY = 300;
 
 const SORTS: Record<Sort, { orderBy: OrderBy; direction: 'asc' | 'desc' }> = {
   popular: { orderBy: 'favorites', direction: 'desc' },
-  views: { orderBy: 'views', direction: 'desc' },
   latest: { orderBy: 'updatedAt', direction: 'desc' },
   az: { orderBy: 'name', direction: 'asc' },
 };
+
+/** Colours offered as swatches; the rest (pink, brown, grey) can still be typed. */
+const SWATCHES = COLOR_FAMILIES.filter((family) => !['pink', 'brown', 'grey'].includes(family.key));
 
 const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
 
@@ -85,20 +102,152 @@ function SimplePagination({
   );
 }
 
+const listParam = (value: string | null) => (value ? value.split(',').filter(Boolean) : []);
+
+function TraitMenu({
+  label,
+  group,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  group: 'type' | 'symbol';
+  selected: string[];
+  onToggle: (key: string) => void;
+}) {
+  const options = FLAG_TRAITS.filter((trait) => trait.group === group);
+  const count = options.filter((trait) => selected.includes(trait.key)).length;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type='button'
+          className={cn(
+            'inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors',
+            count > 0 ? 'bg-main-soft text-main shadow-[0_0_0_1px_color-mix(in_srgb,var(--main)_40%,transparent)]' : 'vx-key text-subtle hover:text-foreground',
+          )}
+        >
+          {label}
+          {count > 0 && <span className='tabular-nums'>· {count}</span>}
+          <ChevronDown className='size-3.5' />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='start' className='max-h-[360px] w-56 overflow-y-auto'>
+        {options.map((trait) => (
+          <DropdownMenuCheckboxItem
+            key={trait.key}
+            checked={selected.includes(trait.key)}
+            onSelect={(event) => event.preventDefault()}
+            onCheckedChange={() => onToggle(trait.key)}
+          >
+            {trait.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function FlagSearch() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // The search box lives in the site header and writes `q` to the URL.
   const query = searchParams.get('q') || '';
   const tag = searchParams.get('tag') || '';
+  const colorFilters = listParam(searchParams.get('color'));
+  const traitFilters = listParam(searchParams.get('trait'));
   const isFavorites = searchParams.get('favorites') === 'true';
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
   const orderBy = (searchParams.get('orderBy') as OrderBy) || 'favorites';
   const orderDirection =
     (searchParams.get('orderDirection') as 'asc' | 'desc') || 'desc';
-  const sort: Sort =
-    orderBy === 'name' ? 'az' : orderBy === 'updatedAt' ? 'latest' : orderBy === 'views' ? 'views' : 'popular';
+  const sort: Sort = orderBy === 'name' ? 'az' : orderBy === 'updatedAt' ? 'latest' : 'popular';
+  const filters = { colors: colorFilters, traits: traitFilters };
+
+  const parsed = useMemo(() => parseFlagQuery(query), [query]);
+  const activeColors = new Set([...parsed.colors, ...colorFilters]);
+  const activeTraits = new Set([...parsed.traits, ...traitFilters]);
+
+  const [value, setValue] = React.useState(query);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const updateParams = useCallback(
+    (update: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams);
+      update(params);
+      params.delete('page');
+      const qs = params.toString();
+      router.replace(qs ? `/?${qs}` : '/', { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const setListParam = (name: 'color' | 'trait', values: string[]) =>
+    updateParams((params) => {
+      if (values.length > 0) params.set(name, values.join(','));
+      else params.delete(name);
+    });
+
+  const setQuery = useCallback(
+    (next: string) =>
+      updateParams((params) => {
+        if (next.trim()) params.set('q', next);
+        else params.delete('q');
+      }),
+    [updateParams],
+  );
+
+  // Follow external URL changes (tag links, back/forward, removing a chip).
+  React.useEffect(() => {
+    setValue(query);
+  }, [query]);
+
+  React.useEffect(() => {
+    if (value === query) return;
+    const timer = setTimeout(() => setQuery(value), DEBOUNCE_DELAY);
+    return () => clearTimeout(timer);
+  }, [value, query, setQuery]);
+
+  React.useEffect(() => {
+    if (sessionStorage.getItem(FOCUS_SEARCH_KEY)) {
+      sessionStorage.removeItem(FOCUS_SEARCH_KEY);
+      inputRef.current?.focus();
+    }
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable;
+      if ((event.key === 'k' && (event.metaKey || event.ctrlKey)) || (event.key === '/' && !typing)) {
+        event.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const toggleColor = (key: string) => {
+    if (parsed.colors.includes(key as never)) setQuery(removeFromQuery(query, 'color', key));
+    else setListParam('color', colorFilters.includes(key) ? colorFilters.filter((c) => c !== key) : [...colorFilters, key]);
+  };
+  const toggleTrait = (key: string) => {
+    if (parsed.traits.includes(key)) setQuery(removeFromQuery(query, 'trait', key));
+    else setListParam('trait', traitFilters.includes(key) ? traitFilters.filter((t) => t !== key) : [...traitFilters, key]);
+  };
+
+  const chips = [
+    ...[...activeColors].map((key) => {
+      const family = COLOR_FAMILIES.find((entry) => entry.key === key);
+      return { id: `c-${key}`, label: family?.label ?? key, swatch: family?.swatch, remove: () => toggleColor(key) };
+    }),
+    ...[...activeTraits].map((key) => ({
+      id: `t-${key}`,
+      label: getTrait(key)?.label ?? key,
+      swatch: undefined,
+      remove: () => toggleTrait(key),
+    })),
+  ];
+  const hasFilters = chips.length > 0;
 
   const { data: topFlagTags } = useQuery({
     queryKey: ['topFlagTags'],
@@ -106,11 +255,11 @@ export default function FlagSearch() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const { data: flags, isLoading: flagsLoading } = useQuery({
-    queryKey: ['flags', currentPage, query, isFavorites, orderBy, orderDirection, tag],
+  const { data: flagRows, isLoading: flagsLoading } = useQuery({
+    queryKey: ['flags', currentPage, query, isFavorites, orderBy, orderDirection, tag, filters],
     queryFn: async () => {
       const fetchFn = isFavorites ? getFavouriteFlags : getFlags;
-      const results = await fetchFn(currentPage, ITEMS_PER_PAGE, query, orderBy, orderDirection, tag);
+      const results = await fetchFn(currentPage, ITEMS_PER_PAGE, query, orderBy, orderDirection, tag, filters);
       return results.map((flag) => ({
         favorites: flag.favorites,
         flagName: flag.name,
@@ -128,42 +277,109 @@ export default function FlagSearch() {
   });
 
   const { data: flagsCount } = useQuery({
-    queryKey: ['flagsCount', query, isFavorites, tag],
-    queryFn: () => (isFavorites ? getFavoriteFlagsCount : getFlagsCount)(query, tag),
+    queryKey: ['flagsCount', query, isFavorites, tag, filters],
+    queryFn: () => (isFavorites ? getFavoriteFlagsCount : getFlagsCount)(query, tag, filters),
     staleTime: 2 * 60 * 1000,
   });
 
-  const updateParams = useCallback(
-    (update: (params: URLSearchParams) => void) => {
-      const params = new URLSearchParams(searchParams);
-      update(params);
-      const qs = params.toString();
-      router.replace(qs ? `/?${qs}` : '/', { scroll: false });
-    },
-    [router, searchParams],
-  );
-
   const updatePage = (page: number) => {
-    updateParams((params) => {
-      if (page > 1) params.set('page', String(page));
-      else params.delete('page');
-    });
+    const params = new URLSearchParams(searchParams);
+    if (page > 1) params.set('page', String(page));
+    else params.delete('page');
+    router.replace(`/?${params.toString()}`, { scroll: false });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const clearAll = () => {
+    setValue('');
+    updateParams((params) => {
+      params.delete('q');
+      params.delete('color');
+      params.delete('trait');
+      params.delete('tag');
+    });
+  };
+
   const totalPages = Math.ceil((flagsCount || 0) / ITEMS_PER_PAGE);
-  const showFeatured = currentPage === 1 && !query && !tag && !isFavorites;
-  const title = query ? `Results for “${query}”` : isFavorites ? 'Favorites' : 'Browse';
+  const isSearching = Boolean(query || tag || hasFilters);
 
   return (
     <div>
-      <div className='flex flex-wrap items-center gap-x-4 gap-y-3 pb-[18px] pt-7'>
-        <h1 className='flex min-w-0 items-baseline gap-2.5 text-[22px] font-semibold tracking-[-0.03em]'>
-          <span className='truncate'>{title}</span>
-          <span className='shrink-0 tabular-nums text-[13px] font-normal tracking-normal text-muted-foreground'>
-            {flagsCount !== undefined ? `${flagsCount.toLocaleString()} flags` : ''}
-          </span>
+      <div className='flex flex-wrap items-end gap-x-4 gap-y-1 pt-8'>
+        <h1 className='text-[28px] font-semibold tracking-[-0.03em] sm:text-[30px]'>
+          {isFavorites ? 'Favorites' : 'Browse'}
         </h1>
+        <p className='pb-1.5 tabular-nums text-[13px] text-muted-foreground'>
+          {flagsCount !== undefined
+            ? isSearching
+              ? `${flagsCount.toLocaleString()} ${flagsCount === 1 ? 'flag matches' : 'flags match'}`
+              : `${flagsCount.toLocaleString()} flags, from countries to cities to fiction`
+            : ''}
+        </p>
+      </div>
+
+      <form
+        role='search'
+        className='vx-well mt-4 flex h-[52px] items-center gap-3 rounded-[13px] pl-4 pr-3 text-muted-foreground transition-shadow focus-within:shadow-[var(--sh-well),0_0_0_2px_var(--main)]'
+        onSubmit={(event) => {
+          event.preventDefault();
+          setQuery(value);
+          inputRef.current?.blur();
+        }}
+      >
+        <Search className='size-[18px] shrink-0' />
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder='Search by name, or describe a flag: “green with a star”, “red and white cross”'
+          aria-label='Search flags'
+          className='min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground'
+        />
+        {value ? (
+          <button
+            type='button'
+            aria-label='Clear search'
+            className='grid size-7 cursor-pointer place-items-center rounded-md hover:text-foreground'
+            onClick={() => {
+              setValue('');
+              setQuery('');
+              inputRef.current?.focus();
+            }}
+          >
+            <X className='size-4' />
+          </button>
+        ) : (
+          <kbd className='vx-key hidden h-[22px] min-w-[22px] place-items-center rounded-md px-1.5 text-[11px] font-medium text-subtle sm:grid'>
+            /
+          </kbd>
+        )}
+      </form>
+
+      <div className='mt-3 flex flex-wrap items-center gap-2'>
+        <TraitMenu label='Type' group='type' selected={[...activeTraits]} onToggle={toggleTrait} />
+        <TraitMenu label='Symbol' group='symbol' selected={[...activeTraits]} onToggle={toggleTrait} />
+        <span className='mx-1 hidden h-[22px] w-px bg-line sm:block' />
+        <div className='flex items-center gap-2' role='group' aria-label='Colours'>
+          {SWATCHES.map((family) => {
+            const active = activeColors.has(family.key);
+            return (
+              <button
+                key={family.key}
+                type='button'
+                title={family.label}
+                aria-label={family.label}
+                aria-pressed={active}
+                onClick={() => toggleColor(family.key)}
+                className={cn(
+                  'size-[22px] cursor-pointer rounded-full shadow-[inset_0_0_0_1px_rgb(127_127_127/0.35)] transition-shadow',
+                  active && 'shadow-[0_0_0_2px_var(--background),0_0_0_4px_var(--main)]',
+                )}
+                style={{ background: family.swatch }}
+              />
+            );
+          })}
+        </div>
         <div className='flex flex-wrap items-center gap-2 sm:ml-auto'>
           <Segmented
             aria-label='Collection'
@@ -172,7 +388,6 @@ export default function FlagSearch() {
               updateParams((params) => {
                 if (v === 'favorites') params.set('favorites', 'true');
                 else params.delete('favorites');
-                params.delete('page');
               })
             }
             options={[
@@ -187,12 +402,10 @@ export default function FlagSearch() {
               updateParams((params) => {
                 params.set('orderBy', SORTS[v].orderBy);
                 params.set('orderDirection', SORTS[v].direction);
-                params.delete('page');
               })
             }
             options={[
               { value: 'popular', label: 'Popular' },
-              { value: 'views', label: 'Most viewed' },
               { value: 'latest', label: 'Latest' },
               { value: 'az', label: 'A–Z' },
             ]}
@@ -200,12 +413,36 @@ export default function FlagSearch() {
         </div>
       </div>
 
-      <div className='-mx-4 mb-[22px] flex gap-2 overflow-x-auto px-4 pb-1 pt-0.5 [mask-image:linear-gradient(90deg,#000_calc(100%-64px),transparent)] [scrollbar-width:none] md:mx-0 md:px-0.5'>
+      {hasFilters && (
+        <div className='mt-3 flex flex-wrap items-center gap-2'>
+          <span className='text-[13px] text-muted-foreground'>Showing flags with</span>
+          {chips.map((chip) => (
+            <button
+              key={chip.id}
+              type='button'
+              onClick={chip.remove}
+              aria-label={`Remove ${chip.label}`}
+              className='inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-full bg-main-soft pl-2.5 pr-2 text-[13px] font-medium text-main shadow-[0_0_0_1px_color-mix(in_srgb,var(--main)_40%,transparent)] hover:brightness-110'
+            >
+              {chip.swatch && (
+                <span className='size-3 rounded-full shadow-[inset_0_0_0_1px_rgb(127_127_127/0.4)]' style={{ background: chip.swatch }} />
+              )}
+              {chip.label}
+              <X className='size-3' />
+            </button>
+          ))}
+          <button type='button' onClick={clearAll} className='cursor-pointer text-[13px] text-muted-foreground hover:text-foreground'>
+            Clear all
+          </button>
+        </div>
+      )}
+
+      <div className='-mx-4 mb-[22px] mt-4 flex gap-2 overflow-x-auto px-4 pb-1 pt-0.5 [mask-image:linear-gradient(90deg,#000_calc(100%-64px),transparent)] [scrollbar-width:none] md:mx-0 md:px-0.5'>
         <Tag
           variant='chip'
           text='All'
           isActive={!tag}
-          onClick={() => updateParams((params) => { params.delete('tag'); params.delete('page'); })}
+          onClick={() => updateParams((params) => params.delete('tag'))}
         />
         {tag && !topFlagTags?.some((t) => t.tag === tag) && <Tag variant='chip' text={tag} />}
         {topFlagTags?.map((t) => (
@@ -226,10 +463,9 @@ export default function FlagSearch() {
             <FlagCardSkeleton key={i} />
           ))}
         </div>
-      ) : flags && flags.length > 0 ? (
+      ) : flagRows && flagRows.length > 0 ? (
         <div id='flags' className={GRID}>
-          {showFeatured && <FlagOfTheDayTile className='sm:col-span-2 lg:row-span-2' />}
-          {flags.map((flag) => (
+          {flagRows.map((flag) => (
             <FlagCard
               id={flag.id}
               key={flag.index}
@@ -248,18 +484,18 @@ export default function FlagSearch() {
       ) : (
         <div className='vx-tile flex flex-col items-center gap-3 px-6 py-16 text-center'>
           <p className='text-[15px] font-medium'>
-            {query
-              ? `No ${isFavorites ? 'favorite ' : ''}flags match “${query}”`
+            {isSearching
+              ? `No ${isFavorites ? 'favorite ' : ''}flags match ${query ? `“${query}”` : 'those filters'}`
               : isFavorites
                 ? 'You haven’t favorited any flags yet'
                 : 'No flags found'}
           </p>
           <p className='text-sm text-muted-foreground'>
-            {query ? 'Try a different spelling or a broader term.' : 'Try clearing the tag filter.'}
+            {isSearching ? 'Try fewer colours or a broader description.' : 'Try clearing the tag filter.'}
           </p>
-          {(query || tag) && (
-            <Button variant='neutral' onClick={() => router.replace('/', { scroll: false })} className='mt-2'>
-              Clear filters
+          {isSearching && (
+            <Button variant='neutral' onClick={clearAll} className='mt-2'>
+              Clear search
             </Button>
           )}
         </div>
