@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileX, Link2, Loader2, Search, Tag, Trash2, X } from '@/components/icons';
+import { FileX, Link2, Loader2, Search, Sparkles, Tag, Trash2, X } from '@/components/icons';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -26,7 +26,25 @@ const SORT_LABELS: Record<AdminFlagsSort, string> = {
   name: 'Name A–Z',
 };
 
-type Row = AdminFlagRow & { createdAt: Date; favorites: number };
+type Row = AdminFlagRow & {
+  createdAt: Date;
+  favorites: number;
+  aiDescription: string | null;
+  aiStatus: string | null;
+  aiGeneratedAt: Date | null;
+};
+
+function AiStatus({ row }: { row: Row }) {
+  if (row.aiStatus === 'processing') return <span className='text-subtle'>Running…</span>;
+  if (row.aiStatus === 'failed') return <span className='text-bad'>Failed</span>;
+  if (row.aiGeneratedAt) {
+    return <span title={new Date(row.aiGeneratedAt).toLocaleString()}>{timeAgo(row.aiGeneratedAt)}</span>;
+  }
+  return <span className='text-muted-foreground/60'>Never</span>;
+}
+
+/** How many flags to regenerate at once; each run does its own web research. */
+const AI_CONCURRENCY = 3;
 
 function TagPopover({
   selected,
@@ -120,6 +138,7 @@ export function AllFlags() {
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string[] | null>(null);
   const [isWorking, setIsWorking] = useState(false);
+  const [aiProgress, setAiProgress] = useState<{ done: number; total: number } | null>(null);
   const lastToggledRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -205,6 +224,39 @@ export function AllFlags() {
     setIsWorking(false);
     if (result === null) return toast.error('Unauthorized');
     toast.success(`Linked ${result} flags as related to each other.`);
+  };
+
+  const regenerateAi = async () => {
+    const targets = selectedRows;
+    if (targets.length > 10 && !window.confirm(`Regenerate AI details for ${targets.length} flags? Each one runs its own web research.`)) return;
+    setAiProgress({ done: 0, total: targets.length });
+    let done = 0;
+    let costUsd = 0;
+    const failed: string[] = [];
+    const queue = [...targets];
+    const worker = async () => {
+      for (let row = queue.shift(); row; row = queue.shift()) {
+        const response = await fetch('/api/admin/flag-metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ flagId: row.id }),
+        }).catch(() => null);
+        const body = await response?.json().catch(() => null);
+        if (response?.ok) costUsd += Number(body?.estimatedCostUsd ?? 0);
+        else failed.push(row.name);
+        setAiProgress({ done: ++done, total: targets.length });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(AI_CONCURRENCY, targets.length) }, worker));
+    setAiProgress(null);
+    refresh();
+    const succeeded = targets.length - failed.length;
+    if (succeeded > 0) {
+      toast.success(`Regenerated AI details for ${succeeded} flag${succeeded === 1 ? '' : 's'}.`, {
+        description: costUsd > 0 ? `Cost about $${costUsd.toFixed(3)}.` : undefined,
+      });
+    }
+    if (failed.length > 0) toast.error(`Couldn't regenerate ${failed.join(', ')}.`);
   };
 
   const runDelete = async (ids: string[]) => {
@@ -314,20 +366,21 @@ export function AllFlags() {
               <th className='py-3 font-medium'>Name</th>
               <th className='py-3 font-medium hidden md:table-cell'>Tags</th>
               <th className='py-3 font-medium hidden lg:table-cell'>Description</th>
+              <th className='py-3 font-medium pr-4 hidden xl:table-cell whitespace-nowrap'>AI generated</th>
               <th className='py-3 font-medium text-right pr-5 hidden sm:table-cell'>Added</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={6} className='py-16 text-center'>
+                <td colSpan={7} className='py-16 text-center'>
                   <Loader2 className='size-6 animate-spin mx-auto text-muted-foreground' />
                 </td>
               </tr>
             )}
             {!isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={6} className='py-16 text-center text-muted-foreground'>
+                <td colSpan={7} className='py-16 text-center text-muted-foreground'>
                   No flags match.
                 </td>
               </tr>
@@ -364,7 +417,7 @@ export function AllFlags() {
                             setTag(tagName);
                             setPage(1);
                           }}
-                          className='text-xs font-medium rounded-full bg-foreground/[0.06] text-subtle hover:bg-main-soft hover:text-main px-2 py-0.5 cursor-pointer transition-colors'
+                          className='whitespace-nowrap text-xs font-medium rounded-full bg-foreground/[0.06] text-subtle hover:bg-main-soft hover:text-main px-2 py-0.5 cursor-pointer transition-colors'
                         >
                           {tagName}
                         </button>
@@ -372,8 +425,19 @@ export function AllFlags() {
                       {row.tags.length > 4 && <span className='tabular-nums text-xs text-muted-foreground'>+{row.tags.length - 4}</span>}
                     </div>
                   </td>
-                  <td className={cn('hidden lg:table-cell max-w-xs truncate pr-4', row.description ? 'text-subtle' : 'text-main font-medium')}>
-                    {row.description || 'Missing'}
+                  <td className={cn('hidden lg:table-cell max-w-xs truncate pr-4', row.description || row.aiDescription ? 'text-subtle' : 'text-main font-medium')}>
+                    {row.description ||
+                    (row.aiDescription ? (
+                      <>
+                        <span className='mr-1.5 rounded-[5px] bg-main-soft px-1 py-px text-[10.5px] font-semibold text-main'>AI</span>
+                        {row.aiDescription}
+                      </>
+                    ) : (
+                      'Missing'
+                    ))}
+                  </td>
+                  <td className='pr-4 tabular-nums text-xs text-muted-foreground whitespace-nowrap hidden xl:table-cell'>
+                    <AiStatus row={row} />
                   </td>
                   <td className='text-right pr-5 tabular-nums text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell'>{timeAgo(row.createdAt)}</td>
                 </tr>
@@ -401,7 +465,12 @@ export function AllFlags() {
             <SelectBox label='Clear selection' checked={true} onToggle={() => setSelected(new Map())} />
             <b className='text-sm whitespace-nowrap'>{selected.size} selected</b>
             <div className='flex-1' />
-            {confirmDelete ? (
+            {aiProgress ? (
+              <span className='flex items-center gap-2 text-sm text-subtle'>
+                <Loader2 className='size-4 animate-spin' />
+                Generating AI details · {aiProgress.done} of {aiProgress.total}
+              </span>
+            ) : confirmDelete ? (
               <>
                 <span className='text-sm font-semibold text-bad'>Delete {confirmDelete.length} flags for good?</span>
                 <Button variant='neutral' size='sm' onClick={() => setConfirmDelete(null)}>
@@ -423,6 +492,10 @@ export function AllFlags() {
                     <TagPopover selected={selectedRows} onClose={() => setIsTagPopoverOpen(false)} onApply={applyTags} />
                   )}
                 </div>
+                <Button variant='neutral' size='sm' onClick={regenerateAi} disabled={isWorking}>
+                  <Sparkles />
+                  Regenerate AI
+                </Button>
                 <Button variant='neutral' size='sm' onClick={relate} disabled={selected.size < 2 || isWorking}>
                   <Link2 />
                   Relate
@@ -446,6 +519,7 @@ export function AllFlags() {
             refresh();
           }}
           onDelete={() => window.confirm(`Delete "${editing.name}" for good?`) && runDelete([editing.id])}
+          onRegenerated={refresh}
         />
       )}
     </div>

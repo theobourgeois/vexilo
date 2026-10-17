@@ -6,7 +6,7 @@ import TagInput from '@/components/TagInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ExternalLink, Loader2, Trash2, X } from '@/components/icons';
+import { ExternalLink, Loader2, Sparkles, Trash2, X } from '@/components/icons';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -26,11 +26,13 @@ type FlagEditDrawerProps = {
   onClose: () => void;
   onSaved: () => void;
   onDelete: () => void;
+  onRegenerated?: () => void;
 };
 
-export function FlagEditDrawer({ flag, onClose, onSaved, onDelete }: FlagEditDrawerProps) {
+export function FlagEditDrawer({ flag, onClose, onSaved, onDelete, onRegenerated }: FlagEditDrawerProps) {
   const [draft, setDraft] = useState(flag);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => setDraft(flag), [flag]);
 
@@ -54,6 +56,27 @@ export function FlagEditDrawer({ flag, onClose, onSaved, onDelete }: FlagEditDra
     }
     toast.success('Flag saved.');
     onSaved();
+  };
+
+  const regenerateAi = async () => {
+    setIsGenerating(true);
+    const response = await fetch('/api/admin/flag-metadata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flagId: flag.id }),
+    }).catch(() => null);
+    const body = await response?.json().catch(() => null);
+    setIsGenerating(false);
+    if (!response?.ok) {
+      toast.error(body?.message || 'Could not generate AI details.');
+      return;
+    }
+    onRegenerated?.();
+    const cost = body?.estimatedCostUsd ? `Cost about $${Number(body.estimatedCostUsd).toFixed(3)}.` : undefined;
+    toast.success(`AI details regenerated for ${flag.name}.`, {
+      description: cost,
+      action: { label: 'View', onClick: () => window.open(`/flag/${encodeURIComponent(flag.name)}`, '_blank') },
+    });
   };
 
   return (
@@ -114,6 +137,16 @@ export function FlagEditDrawer({ flag, onClose, onSaved, onDelete }: FlagEditDra
         <Button variant='neutral' size='sm' onClick={onDelete} className='text-bad'>
           <Trash2 />
           Delete
+        </Button>
+        <Button
+          variant='neutral'
+          size='sm'
+          onClick={regenerateAi}
+          disabled={isGenerating}
+          title='Research the flag again and rewrite its description, tags, traits and search data'
+        >
+          {isGenerating ? <Loader2 className='animate-spin' /> : <Sparkles />}
+          {isGenerating ? 'Generating…' : 'Regenerate AI'}
         </Button>
         <div className='flex-1' />
         <Button variant='neutral' size='sm' onClick={onClose}>
