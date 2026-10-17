@@ -12,7 +12,7 @@ import FlagImage from '@/components/FlagImage';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
 import { cn } from '@/lib/utils';
 
-/** "Today · Bhutan" in the header, opening a small preview of the flag of the day. */
+/** "FOTD · Bhutan" in the header, opening a small preview of the flag of the day. */
 export function FlagOfTheDayPill({ className }: { className?: string }) {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
@@ -65,7 +65,7 @@ export function FlagOfTheDayPill({ className }: { className?: string }) {
             <FlagImage src={flag.image} alt='' maxHeight={20} area={30 * 20} />
           </span>
           <span className='min-w-0 truncate'>
-            <span className='text-muted-foreground'>Today</span>{' '}
+            <span className='text-muted-foreground'>FOTD</span>{' '}
             <span className='hidden font-medium sm:inline'>{flag.name}</span>
           </span>
           <ChevronDown className='size-3.5 shrink-0 text-muted-foreground' />
