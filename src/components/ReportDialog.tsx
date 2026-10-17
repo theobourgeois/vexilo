@@ -131,7 +131,7 @@ export function ReportDialog({
 													: "shadow-[inset_0_0_0_1.5px_var(--border)]",
 											)}
 										>
-											{selected && <span className="size-1.5 rounded-full bg-white" />}
+											{selected && <span className="size-1.5 rounded-full bg-main-foreground" />}
 										</span>
 										{r}
 									</label>

@@ -308,7 +308,7 @@ export default function SettingsPage() {
                             )}
                           >
                             {isCurrent && (
-                              <span className='absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-main text-white'>
+                              <span className='absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-main text-main-foreground'>
                                 <Check className='size-3' />
                               </span>
                             )}
