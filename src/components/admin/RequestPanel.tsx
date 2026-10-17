@@ -6,21 +6,26 @@ import TagInput from '@/components/TagInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { diffLists, diffWords } from '@/lib/text-diff';
 import { cn } from '@/lib/utils';
-import { Check, Copy, Equal, Loader2, Pencil, X } from '@/components/icons';
+import { Check, Copy, Loader2, Pencil, X } from '@/components/icons';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { ChipList, EditDiff, FieldLabel } from './EditDiff';
 import { isTypingTarget, needsLook, timeAgo } from './review-utils';
 
 type RequestPanelProps = {
   item: ReviewQueueItem;
   position: number;
   total: number;
+  /** Position within this creator's submission (the group the item belongs to). */
+  groupPosition: number;
+  groupTotal: number;
   onPrevious: () => void;
   onNext: () => void;
+  onPreviousInGroup: () => void;
+  onNextInGroup: () => void;
   onClose: () => void;
   onApprove: () => void;
   onDecline: () => void;
@@ -37,14 +42,6 @@ function Kbd({ children, className }: { children: React.ReactNode; className?: s
     >
       {children}
     </kbd>
-  );
-}
-
-function FieldLabel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <p className={cn('tabular-nums text-xs font-medium text-muted-foreground mb-1.5', className)}>
-      {children}
-    </p>
   );
 }
 
@@ -69,56 +66,16 @@ function FlagWell({ src, alt, className }: { src: string; alt: string; className
   );
 }
 
-function TextDiff({ before, after }: { before: string; after: string }) {
-  return (
-    <div className='text-sm rounded-[11px] bg-foreground/[0.03] border border-line px-3 py-2 leading-relaxed whitespace-pre-wrap'>
-      {diffWords(before, after).map((part, index) => (
-        <span
-          key={index}
-          className={cn(
-            part.type === 'added' && 'bg-good-soft text-good rounded px-0.5',
-            part.type === 'removed' && 'bg-bad-soft text-bad line-through decoration-bad/60 rounded px-0.5',
-          )}
-        >
-          {part.text}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function ChipList({ before, after }: { before: string[]; after: string[] }) {
-  const { kept, added, removed } = diffLists(before, after);
-  if (kept.length + added.length + removed.length === 0) {
-    return <p className='text-sm text-muted-foreground'>None</p>;
-  }
-  return (
-    <div className='flex flex-wrap gap-1.5'>
-      {kept.map((value) => (
-        <span key={`k-${value}`} className='text-xs font-medium rounded-full bg-foreground/[0.06] text-subtle px-2.5 py-1 break-all'>
-          {value}
-        </span>
-      ))}
-      {added.map((value) => (
-        <span key={`a-${value}`} className='text-xs font-medium rounded-full bg-good-soft text-good px-2.5 py-1 break-all'>
-          + {value}
-        </span>
-      ))}
-      {removed.map((value) => (
-        <span key={`r-${value}`} className='text-xs font-medium rounded-full bg-bad-soft text-bad line-through decoration-bad/60 px-2.5 py-1 break-all'>
-          {value}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export function RequestPanel({
   item,
   position,
   total,
+  groupPosition,
+  groupTotal,
   onPrevious,
   onNext,
+  onPreviousInGroup,
+  onNextInGroup,
   onClose,
   onApprove,
   onDecline,
@@ -169,24 +126,21 @@ export function RequestPanel({
       else if (key === 'e') {
         event.preventDefault();
         setIsTweaking(true);
-      } else if (key === 'j' || event.key === 'ArrowDown') onNext();
-      else if (key === 'k' || event.key === 'ArrowUp') onPrevious();
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        onNextInGroup();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        onPreviousInGroup();
+      } else if (key === 'j') onNext();
+      else if (key === 'k') onPrevious();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isTweaking, onApprove, onClose, onDecline, onNext, onPrevious]);
+  }, [isTweaking, onApprove, onClose, onDecline, onNext, onNextInGroup, onPrevious, onPreviousInGroup]);
 
   const before = item.oldFlag;
   const after = item.flag;
-  const unchanged: string[] = [];
-  if (item.isEdit && before) {
-    if ((before.sources ?? []).join() === (after.sources ?? []).join()) unchanged.push('sources');
-    if ((before.relatedFlags ?? []).map((f) => f.id).join() === (after.relatedFlags ?? []).map((f) => f.id).join())
-      unchanged.push('related flags');
-    if ((before.tags ?? []).slice().sort().join() === (after.tags ?? []).slice().sort().join()) unchanged.push('tags');
-    if ((before.description ?? '') === (after.description ?? '')) unchanged.push('description');
-  }
-
   return (
     <aside
       aria-label='Request details'
@@ -195,11 +149,35 @@ export function RequestPanel({
       <div className='px-6 pt-5 pb-4 flex items-start justify-between gap-3 border-b border-line'>
         <div className='min-w-0'>
           <p className={cn('tabular-nums text-xs font-medium', item.isEdit ? 'text-main' : 'text-good')}>
-            {item.isEdit ? 'Edit' : 'New flag'} · by {item.user.name || 'Anonymous'} · {timeAgo(item.createdAt)}
+            {item.isEdit ? 'Edit' : 'New flag'} · by {item.user.name || 'Anonymous'}
+            {groupTotal > 1 && `, ${groupPosition} of ${groupTotal}`} · {timeAgo(item.createdAt)}
           </p>
           <p className='mt-1.5 text-[17px] font-semibold tracking-[-0.02em] truncate'>{after.flagName}</p>
         </div>
         <div className='flex items-center gap-1.5 text-sm text-muted-foreground shrink-0'>
+          {groupTotal > 1 && (
+            <>
+              <button
+                type='button'
+                onClick={onPreviousInGroup}
+                disabled={groupPosition === 1}
+                className='cursor-pointer disabled:cursor-default disabled:opacity-40'
+                aria-label={`Previous from ${item.user.name || 'this creator'}`}
+              >
+                <Kbd>↑</Kbd>
+              </button>
+              <button
+                type='button'
+                onClick={onNextInGroup}
+                disabled={groupPosition === groupTotal}
+                className='cursor-pointer disabled:cursor-default disabled:opacity-40'
+                aria-label={`Next from ${item.user.name || 'this creator'}`}
+              >
+                <Kbd>↓</Kbd>
+              </button>
+              <span className='mx-1 h-4 w-px bg-line' />
+            </>
+          )}
           <span className='tabular-nums text-[13px] mr-1'>
             {position} of {total}
           </span>
@@ -280,47 +258,7 @@ export function RequestPanel({
             />
           </div>
         ) : item.isEdit && before ? (
-          <>
-            {before.flagName !== after.flagName && (
-              <div>
-                <FieldLabel>Name</FieldLabel>
-                <TextDiff before={before.flagName} after={after.flagName} />
-              </div>
-            )}
-            {!unchanged.includes('tags') && (
-              <div>
-                <FieldLabel>Tags</FieldLabel>
-                <ChipList before={before.tags ?? []} after={after.tags ?? []} />
-              </div>
-            )}
-            {!unchanged.includes('description') && (
-              <div>
-                <FieldLabel>Description</FieldLabel>
-                <TextDiff before={before.description ?? ''} after={after.description ?? ''} />
-              </div>
-            )}
-            {!unchanged.includes('sources') && (
-              <div>
-                <FieldLabel>Sources</FieldLabel>
-                <ChipList before={before.sources ?? []} after={after.sources ?? []} />
-              </div>
-            )}
-            {!unchanged.includes('related flags') && (
-              <div>
-                <FieldLabel>Related flags</FieldLabel>
-                <ChipList
-                  before={(before.relatedFlags ?? []).map((flag) => flag.name)}
-                  after={(after.relatedFlags ?? []).map((flag) => flag.name)}
-                />
-              </div>
-            )}
-            {unchanged.length > 0 && (
-              <p className='flex items-center gap-2 text-xs text-muted-foreground'>
-                <Equal className='size-3.5' />
-                {unchanged.join(', ')} unchanged
-              </p>
-            )}
-          </>
+          <EditDiff before={before} after={after} />
         ) : (
           <>
             <div>
@@ -393,7 +331,7 @@ export function RequestPanel({
             <div className='flex-1' />
             <Button size='sm' onClick={onApprove}>
               <Check />
-              Approve <Kbd className='bg-white/20 text-white'>A</Kbd>
+              Approve <Kbd className='bg-main-foreground/20 text-main-foreground'>A</Kbd>
             </Button>
           </>
         )}
