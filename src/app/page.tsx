@@ -1,40 +1,25 @@
 import { Suspense } from 'react';
 import FlagSearch from '../components/FlagSearch';
-import { HomeHighlights } from '@/components/home-highlights';
 import { ProfileFlagAlert } from '@/components/alert-banner';
 
 export default function Home() {
   return (
-    <div className='min-h-screen bg-main/10 dark:bg-transparent pt-0'>
-      <div className='pb-4'>
-        <ProfileFlagAlert />
-      </div>
-
-      <div className='max-w-7xl mx-auto px-4 mb-4'>
-        <HomeHighlights />
-      </div>
-
-      {/* Search and Results */}
-      <div className='max-w-7xl mx-auto px-4 pb-12'>
-        <Suspense
-          fallback={
-            <div className='space-y-6'>
-              <div className='animate-pulse'>
-                <div className='h-20 bg-secondary-background rounded-lg mb-6'></div>
-              </div>
-              <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className='animate-pulse'>
-                    <div className='h-48 bg-secondary-background rounded-lg'></div>
-                  </div>
-                ))}
-              </div>
+    <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
+      <ProfileFlagAlert />
+      <Suspense
+        fallback={
+          <div className='pt-7'>
+            <div className='mb-6 h-8 w-48 animate-pulse rounded-lg bg-foreground/[0.06]' />
+            <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className='vx-tile h-[292px] animate-pulse' />
+              ))}
             </div>
-          }
-        >
-          <FlagSearch />
-        </Suspense>
-      </div>
+          </div>
+        }
+      >
+        <FlagSearch />
+      </Suspense>
     </div>
   );
 }

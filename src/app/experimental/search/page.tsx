@@ -11,8 +11,17 @@ export const metadata: Metadata = {
 
 export default function ExperimentalSearchPage() {
   return (
-    <Suspense fallback={null}>
-      <ExperimentalFlagSearch />
-    </Suspense>
+    <div className='mx-auto max-w-[1312px] px-4 pb-16 md:px-8'>
+      <Suspense
+        fallback={
+          <div className='pt-7'>
+            <div className='mb-6 h-8 w-48 animate-pulse rounded-lg bg-foreground/[0.06]' />
+            <div className='mb-6 h-12 animate-pulse rounded-[13px] bg-foreground/[0.06]' />
+          </div>
+        }
+      >
+        <ExperimentalFlagSearch />
+      </Suspense>
+    </div>
   );
 }

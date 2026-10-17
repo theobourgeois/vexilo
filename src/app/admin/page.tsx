@@ -2,6 +2,7 @@
 
 import { getAdminCounts } from '@/actions/flags';
 import { AllFlags } from '@/components/admin/AllFlags';
+import { CreateFlags } from '@/components/admin/CreateFlags';
 import { CreatorsAdmin } from '@/components/admin/CreatorsAdmin';
 import { MiscTools } from '@/components/admin/MiscTools';
 import { ReviewQueue } from '@/components/admin/ReviewQueue';
@@ -9,25 +10,17 @@ import { Reports } from '@/components/Reports';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
-import {
-  FlagTriangleRight,
-  Inbox,
-  LayoutGrid,
-  Loader2,
-  Users,
-  Wrench,
-} from 'lucide-react';
+import { Loader2 } from '@/components/icons';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-const VIEWS = ['queue', 'reports', 'flags', 'creators', 'tools'] as const;
+const VIEWS = ['queue', 'reports', 'flags', 'creators', 'create', 'tools'] as const;
 type AdminView = (typeof VIEWS)[number];
 
 type NavItem = {
   view: AdminView;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
   count?: number;
 };
 
@@ -48,7 +41,7 @@ function ReportsView() {
         <Button variant='neutral' onClick={() => goTo(page - 1)} disabled={page <= 1}>
           Previous
         </Button>
-        <span className='text-sm text-foreground/60'>Page {page}</span>
+        <span className='tabular-nums text-[13px] text-muted-foreground'>Page {page}</span>
         <Button variant='neutral' onClick={() => goTo(page + 1)}>
           Next
         </Button>
@@ -75,63 +68,65 @@ function AdminContent() {
   if (status === 'loading') {
     return (
       <div className='flex justify-center py-24'>
-        <Loader2 className='size-8 animate-spin text-foreground/40' />
+        <Loader2 className='size-8 animate-spin text-muted-foreground' />
       </div>
     );
   }
 
   if (!isAdmin) {
-    return <div className='max-w-7xl mx-auto px-4 py-12'>Unauthorized</div>;
+    return <div className='mx-auto max-w-[1312px] px-4 md:px-8 pt-7 pb-12 text-subtle'>Unauthorized</div>;
   }
 
   const sections: Array<{ title: string; items: NavItem[] }> = [
     {
       title: 'Inbox',
       items: [
-        { view: 'queue', label: 'Review queue', icon: Inbox, count: counts?.pending },
-        { view: 'reports', label: 'Reports', icon: FlagTriangleRight, count: counts?.reports },
+        { view: 'queue', label: 'Review queue', count: counts?.pending },
+        { view: 'reports', label: 'Reports', count: counts?.reports },
       ],
     },
     {
       title: 'Library',
       items: [
-        { view: 'flags', label: 'All flags', icon: LayoutGrid, count: counts?.flags },
-        { view: 'creators', label: 'Creators', icon: Users },
+        { view: 'flags', label: 'All flags', count: counts?.flags },
+        { view: 'creators', label: 'Creators' },
       ],
     },
     {
       title: 'Tools',
-      items: [{ view: 'tools', label: 'Import & flag of the day', icon: Wrench }],
+      items: [
+        { view: 'create', label: 'Create flags' },
+        { view: 'tools', label: 'Import & flag of the day' },
+      ],
     },
   ];
 
   const navigate = (nextView: AdminView) => router.push(nextView === 'queue' ? '/admin' : `/admin?view=${nextView}`);
 
   return (
-    <div className='max-w-[1400px] mx-auto px-4 sm:px-8 flex flex-col md:flex-row gap-6 md:gap-8 py-6'>
-      <aside className='md:w-56 shrink-0'>
-        <nav className='flex md:flex-col gap-1 md:gap-6 overflow-x-auto md:sticky md:top-6'>
+    <div className='mx-auto max-w-[1312px] px-4 md:px-8 pt-7 pb-10 flex flex-col md:flex-row gap-6 md:gap-8'>
+      <aside className='md:w-52 shrink-0'>
+        <nav className='flex md:flex-col gap-1 md:gap-6 overflow-x-auto md:sticky md:top-24'>
           {sections.map((section) => (
             <div key={section.title} className='flex md:flex-col gap-1'>
-              <p className='hidden md:block text-[11px] font-bold uppercase tracking-wider text-foreground/50 px-3 mb-1'>
+              <p className='hidden md:block vx-label px-3 mb-1.5'>
                 {section.title}
               </p>
-              {section.items.map(({ view: itemView, label, icon: Icon, count }) => (
+              {section.items.map(({ view: itemView, label, count }) => (
                 <button
                   key={itemView}
                   type='button'
                   onClick={() => navigate(itemView)}
                   className={cn(
-                    'flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold whitespace-nowrap cursor-pointer transition-colors',
+                    'flex items-center gap-2.5 px-3 h-9 rounded-[9px] text-sm font-medium whitespace-nowrap cursor-pointer transition-colors',
                     view === itemView
-                      ? 'bg-secondary-background text-foreground shadow-sm ring-1 ring-border'
-                      : 'text-foreground/60 hover:text-foreground hover:bg-foreground/5',
+                      ? 'vx-key text-foreground'
+                      : 'text-subtle hover:text-foreground hover:bg-foreground/[0.06]',
                   )}
                 >
-                  <Icon className='size-4' />
                   {label}
                   {count !== undefined && count > 0 && (
-                    <span className='ml-auto pl-2 text-xs font-bold text-foreground/50'>{count.toLocaleString()}</span>
+                    <span className='ml-auto pl-2 tabular-nums text-xs text-muted-foreground'>{count.toLocaleString()}</span>
                   )}
                 </button>
               ))}
@@ -145,6 +140,7 @@ function AdminContent() {
         {view === 'reports' && <ReportsView />}
         {view === 'flags' && <AllFlags />}
         {view === 'creators' && <CreatorsAdmin />}
+        {view === 'create' && <CreateFlags />}
         {view === 'tools' && <MiscTools />}
       </main>
     </div>
@@ -153,7 +149,7 @@ function AdminContent() {
 
 export default function AdminPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className='mx-auto max-w-[1312px] px-4 md:px-8 pt-7 text-muted-foreground'>Loading...</div>}>
       <AdminContent />
     </Suspense>
   );

@@ -277,7 +277,7 @@ function getModelPricing(model: string): ModelPricing | null {
   return null;
 }
 
-function buildUsageLog(
+export function buildUsageLog(
   usage: UsageSnapshot,
   model: string,
   webSearchCalls = 0,

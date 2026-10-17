@@ -6,7 +6,13 @@ import TagInput from '@/components/TagInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, ArrowRight, CornerDownRight, Trash2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CornerDownRight,
+  Trash2,
+  X,
+} from '@/components/icons';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import type { BatchFlagItem } from './use-batch-flags';
@@ -26,7 +32,8 @@ type BatchFlagDetailsProps = {
 function isTypingTarget(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+    (target.isContentEditable ||
+      ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
   );
 }
 
@@ -41,7 +48,9 @@ export default function BatchFlagDetails({
   onRemove,
   onClose,
 }: BatchFlagDetailsProps) {
-  const [overrideSource, setOverrideSource] = useState(item.ownSources.length > 0);
+  const [overrideSource, setOverrideSource] = useState(
+    item.ownSources.length > 0,
+  );
 
   useEffect(() => {
     setOverrideSource(item.ownSources.length > 0);
@@ -71,55 +80,58 @@ export default function BatchFlagDetails({
   return (
     <aside
       aria-label='Flag details'
-      className='fixed z-40 inset-0 sm:inset-auto sm:top-20 sm:right-4 sm:bottom-4 sm:w-[440px] flex flex-col overflow-hidden sm:rounded-2xl border border-white/90 dark:border-white/20 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] bg-[size:256px,auto] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.35)]'
+      className='fixed inset-0 z-40 flex flex-col overflow-hidden bg-popover shadow-pop sm:inset-auto sm:bottom-4 sm:right-4 sm:top-20 sm:w-[440px] sm:rounded-[20px]'
     >
-      <div className='px-6 pt-5 pb-4 flex items-center justify-between border-b border-border/70'>
-        <div className='flex items-center gap-2 text-sm font-semibold text-foreground/60'>
-          <span>
-            {position} of {total}
-          </span>
-          <button
-            type='button'
+      <div className='flex items-center justify-between border-b border-line px-5 py-3.5'>
+        <div className='flex items-center gap-1.5'>
+          <Button
+            variant='neutral'
+            size='icon-sm'
             onClick={onPrevious}
             aria-label='Previous flag'
-            className='size-7 rounded-md border border-border flex items-center justify-center hover:bg-foreground/5 cursor-pointer'
           >
-            <ArrowLeft className='size-3.5' />
-          </button>
-          <button
-            type='button'
+            <ArrowLeft />
+          </Button>
+          <Button
+            variant='neutral'
+            size='icon-sm'
             onClick={onNext}
             aria-label='Next flag'
-            className='size-7 rounded-md border border-border flex items-center justify-center hover:bg-foreground/5 cursor-pointer'
           >
-            <ArrowRight className='size-3.5' />
-          </button>
+            <ArrowRight />
+          </Button>
+          <span className='ml-1.5 tabular-nums text-xs text-muted-foreground'>
+            {position} / {total}
+          </span>
         </div>
-        <button
-          type='button'
+        <Button
+          variant='ghost'
+          size='icon-sm'
           onClick={onClose}
           aria-label='Close details'
-          className='text-foreground/60 hover:text-foreground cursor-pointer'
         >
-          <X className='size-5' />
-        </button>
+          <X />
+        </Button>
       </div>
 
-      <div className='flex-1 overflow-y-auto px-6 py-5 space-y-5'>
-        <div className='h-44 rounded-xl bg-foreground/5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.08)] flex items-center justify-center'>
+      <div className='flex-1 space-y-5 overflow-y-auto px-5 py-5'>
+        <div className='grid h-44 place-items-center rounded-[14px] bg-stage'>
           {item.previewUrl && (
             <Image
               src={item.previewUrl}
               alt={item.name || 'Flag preview'}
               width={320}
               height={200}
-              className='max-h-32 w-auto max-w-[85%] object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.18)]'
+              className='max-h-32 w-auto max-w-[85%] object-contain drop-shadow-[0_2px_6px_rgb(0_0_0/0.18)]'
             />
           )}
         </div>
 
         <div className='space-y-1.5'>
-          <label htmlFor='batch-flag-name' className='text-sm font-semibold'>
+          <label
+            htmlFor='batch-flag-name'
+            className='block text-[13px] font-medium'
+          >
             Name
           </label>
           <Input
@@ -129,8 +141,8 @@ export default function BatchFlagDetails({
             placeholder='Flag name'
           />
           {item.origin && (
-            <p className='text-xs text-foreground/60 truncate'>
-              From <span className='font-mono'>{item.origin}</span>
+            <p className='truncate text-xs text-muted-foreground'>
+              From <span className='tabular-nums'>{item.origin}</span>
             </p>
           )}
         </div>
@@ -140,22 +152,23 @@ export default function BatchFlagDetails({
             <SourcesInput
               sources={item.ownSources}
               onSourcesChange={(sources) => onChange({ ownSources: sources })}
-              placeholder='Enter URL (must start with http:// or https://)...'
+              placeholder='https://…'
               label='Sources'
             />
           ) : (
             <>
-              <p className='text-sm font-semibold'>Source</p>
-              <div className='min-h-10 rounded-lg border border-dashed border-border px-3 py-2 flex items-center gap-2 text-sm text-foreground/60'>
+              <p className='text-[13px] font-medium'>Source</p>
+              <div className='flex min-h-10 items-center gap-2 rounded-[11px] border border-dashed border-border px-3 py-2 text-[13px] text-muted-foreground'>
                 <CornerDownRight className='size-4 shrink-0' />
-                <span className='truncate'>
-                  {sharedSource.trim() ? 'Using the shared source' : 'No shared source yet'}
+                <span className='flex-1 truncate'>
+                  {sharedSource.trim()
+                    ? 'Using the shared source'
+                    : 'No shared source yet'}
                 </span>
-                <span>·</span>
                 <button
                   type='button'
                   onClick={() => setOverrideSource(true)}
-                  className='font-semibold text-main hover:underline cursor-pointer shrink-0'
+                  className='shrink-0 cursor-pointer font-medium text-foreground underline-offset-2 hover:underline'
                 >
                   Add its own
                 </button>
@@ -164,54 +177,71 @@ export default function BatchFlagDetails({
           )}
         </div>
 
-        <div className='pt-1 space-y-4'>
-          <p className='text-xs font-bold uppercase tracking-wider text-foreground/50'>
-            Optional
-          </p>
+        <div className='space-y-5 border-t border-line pt-5'>
+          <p className='vx-label'>Optional</p>
           <TagInput
             tags={item.tags}
             onTagsChange={(tags) => onChange({ tags })}
-            placeholder='Enter tags...'
+            placeholder='Add a tag...'
           />
-          <div className='space-y-2'>
-            <label htmlFor='batch-flag-description' className='text-sm font-semibold'>
+          <div className='space-y-1.5'>
+            <label
+              htmlFor='batch-flag-description'
+              className='block text-[13px] font-medium'
+            >
               Description
             </label>
             <Textarea
               id='batch-flag-description'
               value={item.description}
-              onChange={(event) => onChange({ description: event.target.value })}
+              onChange={(event) =>
+                onChange({ description: event.target.value })
+              }
               placeholder='Describe the flag, its history, or any interesting facts...'
             />
           </div>
-          <div className='space-y-2'>
-            <p className='text-sm font-semibold'>Related flags</p>
+          <div className='space-y-1.5'>
+            <p className='text-[13px] font-medium'>Related flags</p>
             <RelatedFlagInput
               relatedFlags={item.relatedFlags}
-              onAdd={(flag) => onChange({ relatedFlags: [...item.relatedFlags, flag] })}
+              onAdd={(flag) =>
+                onChange({ relatedFlags: [...item.relatedFlags, flag] })
+              }
               onRemove={(id) =>
                 onChange({
-                  relatedFlags: item.relatedFlags.filter((flag) => flag.id !== id),
+                  relatedFlags: item.relatedFlags.filter(
+                    (flag) => flag.id !== id,
+                  ),
                 })
               }
             />
           </div>
-          <div className='space-y-2'>
-            <label htmlFor='batch-flag-message' className='text-sm font-semibold'>
+          <div className='space-y-1.5'>
+            <label
+              htmlFor='batch-flag-message'
+              className='block text-[13px] font-medium'
+            >
               Note for moderators
             </label>
             <Textarea
               id='batch-flag-message'
               value={item.userMessage}
-              onChange={(event) => onChange({ userMessage: event.target.value })}
+              onChange={(event) =>
+                onChange({ userMessage: event.target.value })
+              }
               placeholder='Anything the moderators should know?'
             />
           </div>
         </div>
       </div>
 
-      <div className='px-6 py-4 border-t border-border/70 flex items-center gap-3'>
-        <Button variant='neutral' size='sm' onClick={onRemove} className='text-red-600'>
+      <div className='flex items-center gap-2 border-t border-line px-5 py-3.5'>
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={onRemove}
+          className='text-bad hover:text-bad'
+        >
           <Trash2 />
           Remove
         </Button>

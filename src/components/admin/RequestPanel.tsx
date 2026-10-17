@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { diffLists, diffWords } from '@/lib/text-diff';
 import { cn } from '@/lib/utils';
-import { Check, Copy, Equal, Loader2, Pencil, X } from 'lucide-react';
+import { Check, Copy, Equal, Loader2, Pencil, X } from '@/components/icons';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -31,8 +31,8 @@ function Kbd({ children, className }: { children: React.ReactNode; className?: s
   return (
     <kbd
       className={cn(
-        'text-[11px] font-bold px-1.5 py-px rounded-md border border-border bg-secondary-background text-foreground/70 shadow-[0_2px_0_var(--border)]',
-        className,
+        'inline-flex min-w-5 justify-center rounded-[6px] px-1.5 py-px tabular-nums text-[10.5px] font-medium leading-4',
+        className ?? 'vx-key text-subtle',
       )}
     >
       {children}
@@ -42,7 +42,7 @@ function Kbd({ children, className }: { children: React.ReactNode; className?: s
 
 function FieldLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className={cn('text-[11px] font-bold uppercase tracking-wider text-foreground/50 mb-1.5', className)}>
+    <p className={cn('tabular-nums text-xs font-medium text-muted-foreground mb-1.5', className)}>
       {children}
     </p>
   );
@@ -52,7 +52,7 @@ function FlagWell({ src, alt, className }: { src: string; alt: string; className
   return (
     <div
       className={cn(
-        'h-32 rounded-xl bg-foreground/5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.08)] flex items-center justify-center',
+        'h-32 rounded-[14px] bg-well shadow-well flex items-center justify-center',
         className,
       )}
     >
@@ -71,13 +71,13 @@ function FlagWell({ src, alt, className }: { src: string; alt: string; className
 
 function TextDiff({ before, after }: { before: string; after: string }) {
   return (
-    <div className='text-sm rounded-lg bg-secondary-background border border-border px-3 py-2 leading-relaxed whitespace-pre-wrap'>
+    <div className='text-sm rounded-[11px] bg-foreground/[0.03] border border-line px-3 py-2 leading-relaxed whitespace-pre-wrap'>
       {diffWords(before, after).map((part, index) => (
         <span
           key={index}
           className={cn(
-            part.type === 'added' && 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 rounded px-0.5',
-            part.type === 'removed' && 'bg-red-100 text-red-700 line-through dark:bg-red-900/40 dark:text-red-200 rounded px-0.5',
+            part.type === 'added' && 'bg-good-soft text-good rounded px-0.5',
+            part.type === 'removed' && 'bg-bad-soft text-bad line-through decoration-bad/60 rounded px-0.5',
           )}
         >
           {part.text}
@@ -90,22 +90,22 @@ function TextDiff({ before, after }: { before: string; after: string }) {
 function ChipList({ before, after }: { before: string[]; after: string[] }) {
   const { kept, added, removed } = diffLists(before, after);
   if (kept.length + added.length + removed.length === 0) {
-    return <p className='text-sm text-foreground/50'>None</p>;
+    return <p className='text-sm text-muted-foreground'>None</p>;
   }
   return (
     <div className='flex flex-wrap gap-1.5'>
       {kept.map((value) => (
-        <span key={`k-${value}`} className='text-xs font-semibold rounded-full bg-foreground/5 px-2.5 py-1 break-all'>
+        <span key={`k-${value}`} className='text-xs font-medium rounded-full bg-foreground/[0.06] text-subtle px-2.5 py-1 break-all'>
           {value}
         </span>
       ))}
       {added.map((value) => (
-        <span key={`a-${value}`} className='text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 px-2.5 py-1 break-all'>
+        <span key={`a-${value}`} className='text-xs font-medium rounded-full bg-good-soft text-good px-2.5 py-1 break-all'>
           + {value}
         </span>
       ))}
       {removed.map((value) => (
-        <span key={`r-${value}`} className='text-xs font-semibold rounded-full bg-red-100 text-red-700 line-through dark:bg-red-900/40 dark:text-red-200 px-2.5 py-1 break-all'>
+        <span key={`r-${value}`} className='text-xs font-medium rounded-full bg-bad-soft text-bad line-through decoration-bad/60 px-2.5 py-1 break-all'>
           {value}
         </span>
       ))}
@@ -190,17 +190,17 @@ export function RequestPanel({
   return (
     <aside
       aria-label='Request details'
-      className='fixed z-40 inset-0 sm:inset-auto sm:top-20 sm:right-4 sm:bottom-4 sm:w-[520px] flex flex-col overflow-hidden sm:rounded-2xl border border-white/90 dark:border-white/20 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] bg-[size:256px,auto] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.35)]'
+      className='fixed z-40 inset-0 sm:inset-auto sm:top-20 sm:right-4 sm:bottom-4 sm:w-[520px] flex flex-col overflow-hidden sm:rounded-[18px] bg-secondary-background shadow-pop'
     >
-      <div className='px-6 pt-5 pb-4 flex items-start justify-between gap-3 border-b border-border/70'>
+      <div className='px-6 pt-5 pb-4 flex items-start justify-between gap-3 border-b border-line'>
         <div className='min-w-0'>
-          <p className={cn('text-xs font-bold uppercase tracking-wider', item.isEdit ? 'text-main' : 'text-green-600 dark:text-green-400')}>
+          <p className={cn('tabular-nums text-xs font-medium', item.isEdit ? 'text-main' : 'text-good')}>
             {item.isEdit ? 'Edit' : 'New flag'} · by {item.user.name || 'Anonymous'} · {timeAgo(item.createdAt)}
           </p>
-          <p className='text-lg font-bold truncate'>{after.flagName}</p>
+          <p className='mt-1.5 text-[17px] font-semibold tracking-[-0.02em] truncate'>{after.flagName}</p>
         </div>
-        <div className='flex items-center gap-1.5 text-sm text-foreground/60 shrink-0'>
-          <span className='font-semibold mr-1'>
+        <div className='flex items-center gap-1.5 text-sm text-muted-foreground shrink-0'>
+          <span className='tabular-nums text-[13px] mr-1'>
             {position} of {total}
           </span>
           <button type='button' onClick={onNext} className='cursor-pointer' aria-label='Next request'>
@@ -217,8 +217,8 @@ export function RequestPanel({
 
       <div className='flex-1 overflow-y-auto px-6 py-5 space-y-5'>
         {warning && (
-          <div className='rounded-xl border px-3 py-2.5 text-sm border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100 flex items-center gap-2'>
-            <Copy className='size-4 shrink-0' />
+          <div className='rounded-[11px] px-3 py-2.5 text-sm bg-main-soft text-foreground shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--main)_30%,transparent)] flex items-center gap-2'>
+            <Copy className='size-4 shrink-0 text-main' />
             <span>
               {warning}
               {item.duplicateOf && (
@@ -240,8 +240,8 @@ export function RequestPanel({
               <FlagWell src={before.flagImage} alt='Before' />
             </div>
             <div>
-              <FieldLabel className='text-green-700 dark:text-green-400'>After</FieldLabel>
-              <FlagWell src={after.flagImage} alt='After' className='ring-2 ring-green-400' />
+              <FieldLabel className='text-good'>After</FieldLabel>
+              <FlagWell src={after.flagImage} alt='After' className='ring-2 ring-good' />
             </div>
           </div>
         ) : (
@@ -315,7 +315,7 @@ export function RequestPanel({
               </div>
             )}
             {unchanged.length > 0 && (
-              <p className='flex items-center gap-2 text-xs text-foreground/50'>
+              <p className='flex items-center gap-2 text-xs text-muted-foreground'>
                 <Equal className='size-3.5' />
                 {unchanged.join(', ')} unchanged
               </p>
@@ -336,7 +336,7 @@ export function RequestPanel({
                   ))}
                 </ul>
               ) : (
-                <p className='text-sm text-amber-700 dark:text-amber-400 font-semibold'>No source</p>
+                <p className='text-sm text-main font-medium'>No source</p>
               )}
             </div>
             <div>
@@ -345,8 +345,8 @@ export function RequestPanel({
             </div>
             <div>
               <FieldLabel>Description</FieldLabel>
-              <p className='text-sm text-foreground/80 whitespace-pre-wrap'>
-                {after.description || <span className='text-foreground/40'>None</span>}
+              <p className='text-sm text-subtle whitespace-pre-wrap'>
+                {after.description || <span className='text-muted-foreground'>None</span>}
               </p>
             </div>
             {(after.relatedFlags ?? []).length > 0 && (
@@ -362,13 +362,13 @@ export function RequestPanel({
         )}
 
         {item.userMessage && (
-          <div className='rounded-xl bg-blue-50 border border-blue-200 dark:bg-blue-950/40 dark:border-blue-800 px-3 py-2.5 text-sm text-blue-900 dark:text-blue-100'>
-            <b>Note from {item.user.name || 'the creator'}:</b> {item.userMessage}
+          <div className='rounded-[11px] bg-foreground/[0.04] border border-line px-3 py-2.5 text-sm text-subtle'>
+            <b className='font-semibold text-foreground'>Note from {item.user.name || 'the creator'}:</b> {item.userMessage}
           </div>
         )}
       </div>
 
-      <div className='px-6 py-4 border-t border-border/70 flex items-center gap-3'>
+      <div className='px-6 py-4 border-t border-line flex items-center gap-3'>
         {isTweaking ? (
           <>
             <Button variant='neutral' size='sm' onClick={() => setIsTweaking(false)}>
@@ -382,7 +382,7 @@ export function RequestPanel({
           </>
         ) : (
           <>
-            <Button variant='neutral' size='sm' onClick={onDecline} className='text-red-600'>
+            <Button variant='neutral' size='sm' onClick={onDecline} className='text-bad'>
               <X />
               Decline <Kbd>D</Kbd>
             </Button>
@@ -393,7 +393,7 @@ export function RequestPanel({
             <div className='flex-1' />
             <Button size='sm' onClick={onApprove}>
               <Check />
-              Approve <Kbd className='bg-white/20 border-white/30 shadow-none text-white'>A</Kbd>
+              Approve <Kbd className='bg-white/20 text-white'>A</Kbd>
             </Button>
           </>
         )}

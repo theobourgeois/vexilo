@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { X, Plus } from 'lucide-react';
+import { Plus } from '@/components/icons';
+import { RemovablePill } from './TagInput';
 
 type SourcesInputProps = {
   sources: string[];
@@ -14,7 +14,7 @@ type SourcesInputProps = {
 export default function SourcesInput({
   sources,
   onSourcesChange,
-  placeholder = 'Enter URL (must start with http:// or https://)...',
+  placeholder = 'https://…',
   label = 'Sources',
 }: SourcesInputProps) {
   const [inputValue, setInputValue] = useState('');
@@ -52,54 +52,49 @@ export default function SourcesInput({
   };
 
   return (
-    <div className='space-y-2'>
-      <label htmlFor='sources' className='text-sm font-semibold'>
+    <div className='space-y-1.5'>
+      <label htmlFor='sources' className='block text-[13px] font-medium'>
         {label}
       </label>
-      <div className='space-y-3'>
-        <div className='flex gap-2'>
-          <Input
-            id='sources'
-            placeholder={placeholder}
-            value={inputValue}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            className='flex-1'
-          />
-          <Button
-            type='button'
-            onClick={addSource}
-            disabled={!inputValue.trim()}
-            size='sm'
-            className='px-3 min-w-[80px]'
-          >
-            <Plus className='h-4 w-4 mr-1' />
-            Add
-          </Button>
-        </div>
-        {sources.length === 0 && (
-          <p className='text-sm text-muted-foreground'>
-            Enter a URL above and click &quot;Add&quot; or press Enter to add
-            your first source
-          </p>
-        )}
-        {sources.length > 0 && (
-          <div className='flex flex-wrap gap-2'>
-            {sources.map((source) => (
-              <Badge key={source} variant='neutral' className='gap-1'>
-                {source}
-                <button
-                  type='button'
-                  onClick={() => removeSource(source)}
-                  className='ml-1 hover:bg-foreground/10 rounded-full p-0.5'
-                >
-                  <X className='h-3 w-3' />
-                </button>
-              </Badge>
-            ))}
-          </div>
-        )}
+      <div className='flex gap-2'>
+        <Input
+          id='sources'
+          placeholder={placeholder}
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          className='flex-1'
+        />
+        <Button
+          type='button'
+          variant='neutral'
+          onClick={addSource}
+          disabled={!inputValue.trim()}
+          className='h-10'
+        >
+          <Plus />
+          Add
+        </Button>
       </div>
+      {sources.length === 0 ? (
+        <p className='text-xs text-muted-foreground'>
+          Paste a link and press Enter. At least one source is required.
+        </p>
+      ) : (
+        <div className='flex flex-wrap gap-1.5 pt-1'>
+          {sources.map((source) => (
+            <RemovablePill
+              key={source}
+              title={source}
+              onRemove={() => removeSource(source)}
+              removeLabel={`Remove source ${source}`}
+              className='max-w-[320px]'
+            >
+              <span className='truncate'>{source.replace(/^https?:\/\/(www\.)?/, '')}</span>
+            </RemovablePill>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

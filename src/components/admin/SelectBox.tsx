@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Check, Minus } from 'lucide-react';
+import { Check, Minus } from '@/components/icons';
 
 type SelectBoxProps = {
   checked: boolean | 'mixed';
@@ -12,9 +12,9 @@ type SelectBoxProps = {
 
 function boxClassName(active: boolean, className?: string) {
   return cn(
-    'size-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-colors cursor-pointer',
+    'size-5 shrink-0 rounded-[6px] border-[1.5px] flex items-center justify-center transition-colors cursor-pointer',
     active
-      ? 'bg-main border-[oklch(50%_0.15_259)] text-white'
+      ? 'bg-main border-main text-main-foreground'
       : 'bg-secondary-background border-foreground/25 hover:border-foreground/50',
     className,
   );

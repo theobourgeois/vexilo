@@ -10,32 +10,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import FlagCard from '@/components/FlagCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import Image from 'next/image';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Flag,
-  User,
-  ArrowLeft,
-  ArrowRight,
-  Edit,
-  Loader2,
-  Heart,
-} from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Segmented } from '@/components/ui/segmented';
+import FlagImage from '@/components/FlagImage';
+import { ArrowLeft, ArrowRight, Edit, Flag, Heart, Link as LinkIcon, Settings } from '@/components/icons';
 import Link from 'next/link';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { useSession } from 'next-auth/react';
+import { toast } from 'sonner';
 import { getUserByUserNumber } from '@/actions/users';
 import { useCallback } from 'react';
 
@@ -128,314 +109,219 @@ export default function ProfilePage() {
     [router, searchParams, userNumber],
   );
 
-  // Skeletons
-  function UserInfoSkeleton() {
-    return (
-      <Card className='p-6'>
-        <div className='flex items-center space-x-4'>
-          <Skeleton className='h-20 w-20 rounded-full' />
-          <div className='space-y-2'>
-            <Skeleton className='h-8 w-48' />
-            <Skeleton className='h-4 w-32' />
-          </div>
-        </div>
-      </Card>
-    );
-  }
+  const { data: session } = useSession();
 
-  function FlagsSkeleton() {
-    return (
-      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className='h-64 w-full' />
-        ))}
+  const message = (emoji: React.ReactNode, title: string, body?: string) => (
+    <div className='mx-auto max-w-[1312px] px-4 pt-10 md:px-8'>
+      <div className='vx-tile flex flex-col items-center gap-3 px-6 py-16 text-center'>
+        <div className='text-muted-foreground'>{emoji}</div>
+        <h2 className='text-lg font-semibold'>{title}</h2>
+        {body && <p className='text-sm text-muted-foreground'>{body}</p>}
+        <Button variant='neutral' asChild className='mt-2'>
+          <Link href='/'>Back to browse</Link>
+        </Button>
       </div>
-    );
+    </div>
+  );
+
+  if (userError || requestsError) {
+    return message(<Flag className='size-8' />, 'Something went wrong');
   }
 
-  // Error handling for user query
-  if (userError) {
-    return (
-      <div className='container mx-auto px-4 py-8 max-w-7xl'>
-        <Card className='p-6'>
-          <div className='text-center space-y-4'>
-            <div className='text-6xl'>👤</div>
-            <h2 className='text-2xl font-bold text-foreground'>
-              Oops! Something went wrong
-            </h2>
-            <Button asChild>
-              <Link href='/'>Go Home</Link>
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  // Error handling for flags query
-  if (requestsError) {
-    return (
-      <div className='container mx-auto px-4 py-8 max-w-7xl'>
-        <Card className='p-6'>
-          <div className='text-center space-y-4'>
-            <div className='text-6xl'>🚩</div>
-            <h2 className='text-2xl font-bold text-foreground'>
-              Oops! Something went wrong
-            </h2>
-            <Button asChild>
-              <Link href='/'>Go Home</Link>
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  // User not found
   if (!userLoading && !userData?.user) {
-    return (
-      <div className='container mx-auto px-4 py-8 max-w-7xl'>
-        <Card className='p-6'>
-          <div className='text-center space-y-4'>
-            <div className='text-6xl'>👤</div>
-            <h2 className='text-2xl font-bold text-foreground'>
-              User Not Found
-            </h2>
-            <p className='text-muted-foreground'>
-              This user doesn&apos;t exist or their profile is private.
-            </p>
-            <Button asChild>
-              <Link href='/'>Go Home</Link>
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
+    return message(<Flag className='size-8' />, 'User not found', "This user doesn't exist or their profile is private.");
   }
 
   const user = userData?.user;
+  const isOwnProfile = !!session?.user && !!user && session.user.id === user.id;
   const totalPages = Math.ceil((totalFlagsCount || 0) / 12);
 
-  const handlePageChange = (page: number) => {
+  const handlePageChange = (nextPage: number) => {
     const params = new URLSearchParams(searchParams);
-    params.set('page', page.toString());
-    router.replace(`/profile/${userNumber}?${params.toString()}`, {
-      scroll: false,
-    });
+    params.set('page', nextPage.toString());
+    router.replace(`/profile/${userNumber}?${params.toString()}`, { scroll: false });
   };
 
-  function PaginationComponent() {
-    if (totalPages > 1) {
-      return (
-        <div className='flex items-center justify-center gap-4'>
-          <Button
-            disabled={page === 1}
-            onClick={() => handlePageChange(page - 1)}
-          >
-            <ArrowLeft className='w-4 h-4' /> Previous
-          </Button>
-          <span className='text-sm'>
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            disabled={page === totalPages}
-            onClick={() => handlePageChange(page + 1)}
-          >
-            Next <ArrowRight className='w-4 h-4' />
-          </Button>
-        </div>
-      );
-    }
-    return null;
-  }
+  const pagination =
+    totalPages > 1 ? (
+      <div className='mt-7 flex items-center justify-center gap-3'>
+        <Button variant='neutral' size='icon' disabled={page === 1} onClick={() => handlePageChange(page - 1)} aria-label='Previous page'>
+          <ArrowLeft />
+        </Button>
+        <span className='min-w-24 text-center tabular-nums text-xs text-muted-foreground'>
+          {page} / {totalPages}
+        </span>
+        <Button variant='neutral' size='icon' disabled={page === totalPages} onClick={() => handlePageChange(page + 1)} aria-label='Next page'>
+          <ArrowRight />
+        </Button>
+      </div>
+    ) : null;
+
+  const stats: [string, React.ReactNode][] = [
+    ['Flags contributed', contributionCountsLoading ? '…' : totalContributionsCount.toLocaleString()],
+    ['Edits', contributionCountsLoading ? '…' : totalEditCount.toLocaleString()],
+    [
+      'Member since',
+      user ? new Date(user.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '…',
+    ],
+  ];
 
   return (
-    <div className='container mx-auto px-4 py-8 max-w-7xl'>
-      <div className='space-y-8'>
-        {/* User Info Section */}
-        {userLoading ? (
-          <UserInfoSkeleton />
-        ) : user ? (
-          <Card className='p-6'>
-            <div className='flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6'>
-              <div className='relative'>
-                <Avatar className='h-24 w-24 border-2 border-white/20 shadow-[inset_0_2px_4px_oklch(0%_0_0/0.2),0_4px_8px_oklch(0%_0_0/0.3)]'>
-                  <AvatarImage
-                    src={user.image || ''}
-                    alt={user.name || 'User'}
-                  />
-                  <AvatarFallback className='text-2xl font-bold bg-main text-main-foreground'>
-                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                {/* Favorite Flag Badge */}
+    <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
+      <section className='vx-tile mt-7 grid overflow-hidden md:grid-cols-[400px_1fr]'>
+        <div className='bg-stage relative h-[220px] border-b border-line [container-type:size] md:h-auto md:min-h-[260px] md:border-b-0 md:border-r'>
+          {user?.favoriteFlag ? (
+            <Link
+              href={`/flag/${encodeURIComponent(user.favoriteFlag.name)}`}
+              className='flag-stage absolute inset-0 p-8'
+              title={user.favoriteFlag.name}
+            >
+              <FlagImage src={user.favoriteFlag.image} alt={user.favoriteFlag.name} maxHeight={170} area={280 * 170} />
+            </Link>
+          ) : (
+            <div className='absolute inset-0 grid place-items-center text-sm text-muted-foreground'>
+              {isOwnProfile ? (
+                <Button variant='neutral' asChild>
+                  <Link href='/settings'>
+                    <Flag />
+                    Choose a profile flag
+                  </Link>
+                </Button>
+              ) : (
+                'No profile flag yet'
+              )}
+            </div>
+          )}
+          {user?.favoriteFlag && <span className='vx-label absolute right-3.5 top-3.5'>Profile flag</span>}
+        </div>
+
+        <div className='flex flex-col p-6 sm:p-7'>
+          {userLoading || !user ? (
+            <div className='flex items-center gap-4'>
+              <div className='size-16 animate-pulse rounded-full bg-foreground/[0.06]' />
+              <div className='space-y-2'>
+                <div className='h-6 w-40 animate-pulse rounded bg-foreground/[0.06]' />
+                <div className='h-4 w-24 animate-pulse rounded bg-foreground/[0.06]' />
+              </div>
+            </div>
+          ) : (
+            <div className='flex flex-wrap items-center gap-4'>
+              <Avatar className='size-16 text-xl'>
+                <AvatarImage src={user.image || ''} alt={user.name || 'User'} />
+                <AvatarFallback>{user.name ? user.name.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
+              </Avatar>
+              <div className='min-w-0 flex-1'>
+                <h1 className='truncate text-[26px] font-semibold tracking-[-0.035em]'>{user.name || 'Anonymous user'}</h1>
                 {user.favoriteFlag && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link
-                        href={`/flag/${encodeURIComponent(user.favoriteFlag.name)}`}
-                        className='absolute -bottom-1 -right-1 w-9 h-7 rounded border border-white/30 shadow-[0_2px_4px_oklch(0%_0_0/0.4)] overflow-hidden bg-background hover:scale-110 transition-transform'
-                      >
-                        <Image
-                          src={user.favoriteFlag.image}
-                          alt={user.favoriteFlag.name}
-                          fill
-                          className='object-cover'
-                        />
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent>{user.favoriteFlag.name}</TooltipContent>
-                  </Tooltip>
+                  <p className='truncate text-[13px] text-muted-foreground'>Flies {user.favoriteFlag.name}</p>
                 )}
               </div>
-
-              <div className='flex-1 text-center sm:text-left space-y-2'>
-                <div className='flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0'>
-                  <h1 className='text-3xl font-bold text-foreground'>
-                    {user.name || 'Anonymous User'}
-                  </h1>
-                </div>
-
-                <div className='flex flex-wrap items-center justify-center sm:justify-start space-x-6 text-sm text-muted-foreground'>
-                  {contributionCountsLoading ? (
-                    <Loader2 className='w-4 h-4 animate-spin' />
-                  ) : (
-                    <>
-                      <div className='flex items-center space-x-2'>
-                        <Flag className='w-4 h-4' />
-                        <span>{totalContributionsCount} flags contributed</span>
-                      </div>
-                      <div className='flex items-center space-x-2'>
-                        <Edit className='w-4 h-4' />
-                        <span>{totalEditCount} edits contributed</span>
-                      </div>
-                    </>
-                  )}
-                  <div className='flex items-center space-x-2'>
-                    <User className='w-4 h-4' />
-                    <span>
-                      Member since{' '}
-                      {new Date(
-                        user.createdAt || Date.now(),
-                      ).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
+              <div className='flex gap-2 self-start'>
+                {isOwnProfile && (
+                  <Button variant='neutral' asChild>
+                    <Link href='/settings'>
+                      <Settings />
+                      Settings
+                    </Link>
+                  </Button>
+                )}
+                <Button
+                  variant='neutral'
+                  size='icon-sm'
+                  title='Copy profile link'
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(window.location.href);
+                    toast.success('Profile link copied');
+                  }}
+                >
+                  <LinkIcon />
+                </Button>
               </div>
             </div>
-          </Card>
-        ) : null}
-
-        {/* Flags Section */}
-        <div className='space-y-6'>
-          <div className='flex flex-wrap items-center justify-center gap-2 [@media(min-width:340px)]:justify-between'>
-            <h2 className='text-2xl font-bold text-foreground'>
-              Flag Collection
-            </h2>
-            {/* Mobile: Select dropdown */}
-            <div className='sm:hidden'>
-              <Select
-                value={viewMode}
-                onValueChange={(v) => handleViewModeChange(v as ViewMode)}
-              >
-                <SelectTrigger className='bg-[image:var(--background-image-noise),var(--background-image-glossy-neutral)] bg-[size:256px,auto] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-neutral-dark)] text-foreground font-bold rounded-xl border border-[oklch(72%_0.01_255)] dark:border-black shadow-[inset_0_1px_1px_rgba(255,255,255,1),inset_0_4px_8px_rgba(255,255,255,0.9),inset_0_-4px_8px_rgba(0,0,0,0.12),0_4px_0_oklch(60%_0.01_260),0_12px_20px_oklch(0%_0_0/0.15),0_2px_0_1px_oklch(100%_0_0/0.7)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.1),inset_0_-4px_8px_rgba(0,0,0,0.4),0_4px_0_oklch(15%_0.004_255),0_12px_20px_oklch(0%_0_0/0.4),0_2px_0_1px_rgba(255,255,255,0.15)] h-10 px-4'>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className='bg-[image:var(--background-image-noise),var(--background-image-glossy-neutral)] bg-[size:256px,auto] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-neutral-dark)] border-[oklch(72%_0.01_255)] dark:border-black rounded-xl shadow-[0_12px_20px_oklch(0%_0_0/0.15)] dark:shadow-[0_12px_20px_oklch(0%_0_0/0.4)]'>
-                  <SelectItem value='contributed'>
-                    <Flag className='w-4 h-4' />
-                    Contributed ({totalContributionsCount})
-                  </SelectItem>
-                  <SelectItem value='edited'>
-                    <Edit className='w-4 h-4' />
-                    Edited ({totalEditCount})
-                  </SelectItem>
-                  <SelectItem value='favorites'>
-                    <Heart className='w-4 h-4' />
-                    Favorites
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Desktop: Buttons */}
-            <div className='hidden sm:flex gap-2'>
-              <Button
-                variant={viewMode === 'contributed' ? 'default' : 'neutral'}
-                onClick={() => handleViewModeChange('contributed')}
-              >
-                <Flag className='w-4 h-4' />
-                Contributed ({totalContributionsCount})
-              </Button>
-              <Button
-                variant={viewMode === 'edited' ? 'default' : 'neutral'}
-                onClick={() => handleViewModeChange('edited')}
-              >
-                <Edit className='w-4 h-4' />
-                Edited ({totalEditCount})
-              </Button>
-              <Button
-                variant={viewMode === 'favorites' ? 'default' : 'neutral'}
-                onClick={() => handleViewModeChange('favorites')}
-              >
-                <Heart className='w-4 h-4' />
-                Favorites
-              </Button>
-            </div>
+          )}
+          <div className='mt-auto grid grid-cols-3 gap-2.5 pt-6'>
+            {stats.map(([label, value]) => (
+              <div key={label} className='vx-well rounded-[14px] px-4 py-3.5'>
+                <b className='block tabular-nums text-[22px] font-semibold leading-tight tracking-[-0.03em]'>{value}</b>
+                <span className='text-[12.5px] text-muted-foreground'>{label}</span>
+              </div>
+            ))}
           </div>
-
-          {/* Pagination */}
-          <PaginationComponent />
-
-          {requestsLoading ? (
-            <FlagsSkeleton />
-          ) : Array.isArray(userFlags) && userFlags.length === 0 ? (
-            <Card className='p-12'>
-              <div className='text-center space-y-4'>
-                <div className='text-6xl'>🏳️</div>
-                <h3 className='text-xl font-semibold text-foreground'>
-                  No flags yet
-                </h3>
-                <p className='text-muted-foreground'>
-                  {viewMode === 'favorites'
-                    ? "This user hasn't favorited any flags yet."
-                    : viewMode === 'edited'
-                      ? "This user hasn't edited any flags yet."
-                      : "This user hasn't contributed any flags yet."}
-                </p>
-              </div>
-            </Card>
-          ) : userFlags && Array.isArray(userFlags) ? (
-            <>
-              <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-                {userFlags.map((flag, index) => {
-                  // Handle different property names based on the data source
-                  const flagName =
-                    'flagName' in flag ? flag.flagName : flag.name;
-                  const flagImage =
-                    'flagImage' in flag ? flag.flagImage : flag.image;
-
-                  return (
-                    <FlagCard
-                      key={`${flagName}-${index}`}
-                      id={flag.id}
-                      sources={[]}
-                      flagName={flagName}
-                      flagImage={flagImage}
-                      link={flag.link}
-                      index={flag.index}
-                      tags={flag.tags || []}
-                      description={flag.description || ''}
-                      favorites={flag.favorites}
-                      isFavorite={flag.isFavorite}
-                    />
-                  );
-                })}
-              </div>
-              <PaginationComponent />
-            </>
-          ) : null}
         </div>
+      </section>
+
+      <div className='mb-4 mt-9 flex flex-wrap items-center gap-3'>
+        <Segmented
+          aria-label='Collection'
+          value={viewMode}
+          onChange={handleViewModeChange}
+          options={[
+            {
+              value: 'contributed',
+              icon: <Flag />,
+              label: (
+                <>
+                  Contributed <span className='tabular-nums text-[11px] text-muted-foreground'>{totalContributionsCount}</span>
+                </>
+              ),
+            },
+            {
+              value: 'edited',
+              icon: <Edit />,
+              label: (
+                <>
+                  Edited <span className='tabular-nums text-[11px] text-muted-foreground'>{totalEditCount}</span>
+                </>
+              ),
+            },
+            { value: 'favorites', icon: <Heart />, label: 'Favorites' },
+          ]}
+        />
       </div>
+
+      {requestsLoading ? (
+        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className='vx-tile h-[292px] animate-pulse' />
+          ))}
+        </div>
+      ) : Array.isArray(userFlags) && userFlags.length === 0 ? (
+        <div className='vx-tile px-6 py-14 text-center'>
+          <p className='font-medium'>Nothing here yet</p>
+          <p className='mt-1 text-sm text-muted-foreground'>
+            {viewMode === 'favorites'
+              ? "This user hasn't favorited any flags yet."
+              : viewMode === 'edited'
+                ? "This user hasn't edited any flags yet."
+                : "This user hasn't contributed any flags yet."}
+          </p>
+        </div>
+      ) : userFlags && Array.isArray(userFlags) ? (
+        <>
+          <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+            {userFlags.map((flag, index) => {
+              const flagName = 'flagName' in flag ? flag.flagName : flag.name;
+              const flagImage = 'flagImage' in flag ? flag.flagImage : flag.image;
+              return (
+                <FlagCard
+                  key={`${flagName}-${index}`}
+                  id={flag.id}
+                  sources={[]}
+                  flagName={flagName}
+                  flagImage={flagImage}
+                  link={flag.link}
+                  index={flag.index}
+                  tags={flag.tags || []}
+                  description={flag.description || ''}
+                  favorites={flag.favorites}
+                  isFavorite={flag.isFavorite}
+                />
+              );
+            })}
+          </div>
+          {pagination}
+        </>
+      ) : null}
     </div>
   );
 }

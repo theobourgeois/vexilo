@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, ShieldCheck } from 'lucide-react';
+import { Search, ShieldCheck } from '@/components/icons';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -92,13 +92,13 @@ export function CreatorsAdmin() {
     <div className='space-y-4'>
       <div className='flex flex-col sm:flex-row sm:items-end justify-between gap-3'>
         <div>
-          <h2 className='text-2xl font-bold'>Creators</h2>
-          <p className='text-sm text-foreground/60'>
+          <h2 className='text-[22px] font-semibold tracking-[-0.03em]'>Creators</h2>
+          <p className='mt-0.5 text-[13px] text-muted-foreground'>
             Trusted creators skip review: their new flags and edits are approved automatically.
           </p>
         </div>
         <div className='relative sm:w-80'>
-          <Search className='absolute left-4 top-1/2 -translate-y-1/2 size-4 text-foreground/50' />
+          <Search className='absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground' />
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -110,18 +110,18 @@ export function CreatorsAdmin() {
 
       <Card className='py-2 gap-0'>
         <CardContent className='px-2'>
-          {isLoading && <p className='p-4 text-sm text-foreground/60'>Loading...</p>}
+          {isLoading && <p className='p-4 text-sm text-muted-foreground'>Loading...</p>}
           {data?.users.length === 0 && (
-            <p className='p-4 text-sm text-foreground/60'>No creators found.</p>
+            <p className='p-4 text-sm text-muted-foreground'>No creators found.</p>
           )}
-          <ul className='divide-y divide-border/60'>
+          <ul className='divide-y divide-line'>
             {data?.users.map((user) => (
               <li key={user.id} className='flex items-center gap-3 px-3 py-3'>
                 {user.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={user.image} alt='' referrerPolicy='no-referrer' className='size-9 rounded-full shrink-0' />
                 ) : (
-                  <div className='size-9 rounded-full bg-foreground/10 shrink-0' />
+                  <div className='size-9 rounded-full bg-foreground/[0.06] shrink-0' />
                 )}
                 <div className='flex-1 min-w-0'>
                   <div className='flex items-center gap-2 flex-wrap'>
@@ -140,7 +140,7 @@ export function CreatorsAdmin() {
                       </Badge>
                     )}
                   </div>
-                  <p className='text-xs text-foreground/60 truncate'>
+                  <p className='text-xs text-muted-foreground truncate'>
                     {user.email} · {user.contributions} contribution
                     {user.contributions === 1 ? '' : 's'}
                     {user.pending > 0 && ` · ${user.pending} pending`}
@@ -173,7 +173,7 @@ export function CreatorsAdmin() {
         <Button variant='neutral' onClick={() => setPage(page - 1)} disabled={page <= 1}>
           Previous
         </Button>
-        <span className='text-sm text-foreground/60'>
+        <span className='tabular-nums text-[13px] text-muted-foreground'>
           Page {page} of {totalPages}
         </span>
         <Button

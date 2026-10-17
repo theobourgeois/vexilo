@@ -62,25 +62,25 @@ export function MiscTools() {
 
   return (
     <div className='space-y-6'>
-      <h2 className='text-2xl font-bold'>Miscellaneous Actions</h2>
+      <h2 className='text-[22px] font-semibold tracking-[-0.03em]'>Miscellaneous Actions</h2>
 
-      <div className='space-y-4'>
-        <div className='space-y-2'>
-          <h3 className='text-lg font-semibold'>Import Flags</h3>
-          <p className='text-sm text-muted-foreground'>
+      <div className='grid gap-4 lg:grid-cols-2'>
+        <div className='vx-tile p-5 space-y-3'>
+          <h3 className='text-sm font-semibold'>Import Flags</h3>
+          <p className='text-[13px] text-muted-foreground'>
             Upload a JSON file containing flag data to import into the database.
           </p>
           <Input
-            className='w-min'
+            className='w-full max-w-sm text-sm file:mr-3 file:text-foreground'
             type='file'
             accept='.json'
             onChange={handleImportFlags}
           />
         </div>
 
-        <div className='space-y-2'>
-          <h3 className='text-lg font-semibold'>Generate Flag of the Day</h3>
-          <p className='text-sm text-muted-foreground'>
+        <div className='vx-tile p-5 space-y-3'>
+          <h3 className='text-sm font-semibold'>Generate Flag of the Day</h3>
+          <p className='text-[13px] text-muted-foreground'>
             Manually generate a new flag of the day. This will replace the
             current flag of the day.
           </p>

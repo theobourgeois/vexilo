@@ -1,153 +1,98 @@
-"use client";
+'use client';
 
-import { useSession, signOut, signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "./ui/button";
-import { FcGoogle } from "react-icons/fc";
-import { LogOut, Loader2, Shield, Settings, User, Sun, Moon } from "lucide-react";
-import { useTheme } from "next-themes";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { useSession, signOut, signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from './ui/button';
+import { GoogleLogo, LogOut, Moon, Settings, Shield, Sun, User } from '@/components/icons';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import { getUserData } from "@/actions/users";
-import { useQuery } from "@tanstack/react-query";
-import Image from "next/image";
-import { ThemeToggle } from "./theme-toggle";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import { getUserData } from '@/actions/users';
+import FlagImage from './FlagImage';
 
 export function AuthHeader() {
-    const { data: session, status } = useSession();
-    const { data: userData, isLoading: userDataLoading } = useQuery({
-        queryKey: ["userData"],
-        queryFn: getUserData,
-    });
-    const router = useRouter();
-    const { theme, setTheme } = useTheme();
+  const { data: session, status } = useSession();
+  const { data: userData } = useQuery({
+    queryKey: ['userData'],
+    queryFn: getUserData,
+    enabled: !!session?.user,
+  });
+  const router = useRouter();
+  const { resolvedTheme, setTheme } = useTheme();
 
-    const handleSignIn = async () => {
-        await signIn("google", { callbackUrl: "/" });
-    };
+  if (status === 'loading') {
+    return <div className='size-[34px] animate-pulse rounded-full bg-foreground/[0.07]' />;
+  }
 
-    const handleSignOut = async () => {
-        await signOut({ callbackUrl: "/" });
-    };
-
-    if (status === "loading" || userDataLoading) {
-        return (
-            <div className="flex items-center gap-2 h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-main" />
-            </div>
-        );
-    }
-
-    if (!session) {
-        return (
-            <div className="flex items-center gap-2">
-                <ThemeToggle />
-                <Button
-                    className="inline-flex gap-1 bg-secondary-background"
-                    onClick={handleSignIn}
-                    variant="neutral"
-                >
-                    Sign in with Google <FcGoogle size="20" />
-                </Button>
-            </div>
-        );
-    }
-
+  if (!session) {
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-4">
-                    <div className="relative">
-                        <Avatar className="h-10 w-10 cursor-pointer">
-                            <AvatarImage
-                                src={session.user?.image || ""}
-                                alt={session.user?.name || ""}
-                            />
-                            <AvatarFallback>
-                                {session.user?.name?.charAt(0) || "U"}
-                            </AvatarFallback>
-                        </Avatar>
-                        {/* Favorite Flag Badge */}
-                        {userData?.user?.favoriteFlag && (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Link
-                                        href={`/flag/${encodeURIComponent(userData.user.favoriteFlag.name)}`}
-                                        className="absolute -bottom-1 -right-1 w-5 h-4 rounded border border-border shadow-sm overflow-hidden bg-background hover:scale-110 transition-transform"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <Image
-                                            src={userData.user.favoriteFlag.image}
-                                            alt={userData.user.favoriteFlag.name}
-                                            fill
-                                            className="object-cover"
-                                        />
-                                    </Link>
-                                </TooltipTrigger>
-                                <TooltipContent>{userData.user.favoriteFlag.name}</TooltipContent>
-                            </Tooltip>
-                        )}
-                    </div>
-                </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-secondary-background">
-                <div className="px-2 py-1.5 text-sm font-medium text-foreground border-b border-border">
-                    {userData?.user?.name || session.user?.name || "User"}
-                </div>
-                <DropdownMenuItem
-                    onClick={() => router.push(`/profile/${userData?.user?.userNumber || "me"}`)}
-                    className="bg-secondary-background"
-                >
-                    <User className="h-4 w-4" />
-                    Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                    onClick={() => router.push("/settings")}
-                    className="bg-secondary-background"
-                >
-                    <Settings className="h-4 w-4" />
-                    Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                    onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                    className="bg-secondary-background"
-                >
-                    {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                    {theme === "dark" ? "Light Mode" : "Dark Mode"}
-                </DropdownMenuItem>
-                {session.user?.isAdmin && (
-                    <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            onClick={() => router.push("/admin")}
-                            className="bg-secondary-background"
-                        >
-                            <Shield className="h-4 w-4" />
-                            Admin
-                        </DropdownMenuItem>
-                    </>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                    onClick={handleSignOut}
-                    className="text-red-500 focus:text-red-400 focus:bg-red-500/10 bg-secondary-background"
-                >
-                    <LogOut className="h-4 w-4" />
-                    Logout
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+      <Button variant='neutral' onClick={() => signIn('google', { callbackUrl: '/' })}>
+        <GoogleLogo />
+        Sign in
+      </Button>
     );
+  }
+
+  const name = userData?.user?.name || session.user?.name || 'User';
+  const profileFlag = userData?.user?.favoriteFlag;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className='relative cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'>
+          <Avatar className='size-[34px]'>
+            <AvatarImage src={session.user?.image || ''} alt={name} />
+            <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+          </Avatar>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end' className='w-60'>
+        <div className='flex items-center gap-3 px-2.5 pb-2.5 pt-1.5'>
+          <div className='min-w-0 flex-1'>
+            <div className='truncate text-sm font-semibold'>{name}</div>
+            {profileFlag && (
+              <div className='truncate text-xs text-muted-foreground'>{profileFlag.name}</div>
+            )}
+          </div>
+          {profileFlag && (
+            <FlagImage src={profileFlag.image} alt={profileFlag.name} maxHeight={22} fixed />
+          )}
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push(`/profile/${userData?.user?.userNumber || 'me'}`)}>
+          <User />
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push('/settings')}>
+          <Settings />
+          Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
+          {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
+          {resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </DropdownMenuItem>
+        {session.user?.isAdmin && (
+          <DropdownMenuItem onClick={() => router.push('/admin')}>
+            <Shield />
+            Admin
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => signOut({ callbackUrl: '/' })}
+          className='text-bad focus:bg-bad-soft focus:text-bad'
+        >
+          <LogOut />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }

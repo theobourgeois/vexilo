@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tom.b — Vexilo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link rel="stylesheet" href="v2.css" />
+<style>
+  .hero { margin-top: 28px; display: grid; grid-template-columns: 420px 1fr; overflow: hidden; }
+  .hero .stage-panel { height: 100%; min-height: 260px; border-right: 1px solid var(--line); }
+  .hero .mast { position: absolute; left: 56px; top: 44px; bottom: 0; }
+  .hero .pf-label { position: absolute; top: 14px; right: 14px; display: flex; gap: 10px; align-items: center; }
+  .me { padding: 26px 28px; display: flex; flex-direction: column; }
+  .me .row { display: flex; align-items: center; gap: 16px; }
+  .me .avatar { width: 64px; height: 64px; font-size: 22px; box-shadow: 0 0 0 3px var(--surface), 0 0 0 4px var(--line-2); }
+  .me h1 { margin: 0; font-size: 26px; font-weight: 650; letter-spacing: -0.035em; }
+  .me .sub { color: var(--muted); font-size: 13px; margin-top: 2px; display: flex; gap: 10px; align-items: center; }
+  .me .row .actions { margin-left: auto; display: flex; gap: 8px; align-self: flex-start; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: auto; padding-top: 24px; }
+  .st { padding: 14px 16px; border-radius: 14px; background: var(--well); box-shadow: var(--shadow-well); }
+  .st b { display: block; font: 600 22px/1.1 var(--mono); letter-spacing: -0.03em; }
+  .st span { font-size: 12.5px; color: var(--muted); }
+
+  .tabs { display: flex; align-items: center; gap: 12px; margin: 36px 0 16px; }
+  .tabs .seg .n { font: 500 11px/1 var(--mono); color: var(--muted); }
+  .tabs .right { margin-left: auto; display: flex; gap: 8px; }
+
+  .cols { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
+  .cols .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .activity { padding: 18px 18px 8px; }
+  .activity h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .act { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-2); }
+  .act:first-of-type { border-top: 0; }
+  .act b { color: var(--text); font-weight: 550; }
+  .act .when { font: 400 11.5px/1 var(--mono); color: var(--muted); margin-top: 5px; }
+  .act .ic { width: 28px; height: 28px; border-radius: 8px; flex: none; display: grid; place-items: center; background: var(--well); box-shadow: var(--shadow-well); font-size: 14px; }
+  .act .ic.ok { color: var(--good); }
+  .act .ic.pend { color: var(--accent); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="tile hero">
+    <div class="stage-panel">
+      <div class="mast" id="mast"></div>
+      <div class="pf-label"><span class="label">Profile flag</span><button class="btn btn--sm">Change</button></div>
+    </div>
+    <div class="me">
+      <div class="row">
+        <span class="avatar" style="background:#0E7490">TB</span>
+        <div>
+          <h1>tom.b</h1>
+          <div class="sub"><span>Joined Jun 2025</span><span>·</span><span>Rank <b class="mono" style="color:var(--text)">#9</b> this month</span></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn--sm"><i class="ph-bold ph-pencil-simple"></i>Edit profile</button>
+          <button class="btn btn--sm btn--icon"><i class="ph-bold ph-share-network"></i></button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="st"><b>298</b><span>Contributions</span></div>
+        <div class="st"><b>271</b><span>Approved</span></div>
+        <div class="st"><b>64</b><span>Favorites</span></div>
+        <div class="st"><b>31</b><span>Best quiz streak</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="tabs">
+    <div class="seg">
+      <button class="on"><i class="ph-bold ph-heart"></i>Favorites <span class="n">64</span></button>
+      <button><i class="ph-bold ph-flag"></i>Contributions <span class="n">298</span></button>
+      <button><i class="ph-bold ph-hourglass-medium"></i>Pending <span class="n">3</span></button>
+    </div>
+    <div class="right">
+      <div class="seg"><button class="on">Recent</button><button>A–Z</button></div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="grid" id="grid"></div>
+    <aside class="tile activity">
+      <h2>Activity</h2>
+      <div class="act"><span class="ic ok"><i class="ph-bold ph-check"></i></span><div><b>Greenland</b> approved<div class="when">2h ago</div></div></div>
+      <div class="act"><span class="ic pend"><i class="ph-bold ph-hourglass-medium"></i></span><div>Edit to <b>Kiribati</b> pending review<div class="when">yesterday</div></div></div>
+      <div class="act"><span class="ic"><i class="ph-bold ph-heart"></i></span><div>Favorited <b>Seychelles</b><div class="when">Oct 13</div></div></div>
+      <div class="act"><span class="ic ok"><i class="ph-bold ph-check"></i></span><div><b>Sri Lanka</b> tags updated<div class="when">Oct 11</div></div></div>
+      <div class="act"><span class="ic"><i class="ph-bold ph-fire"></i></span><div>New quiz best: <b class="mono">31</b><div class="when">Oct 9</div></div></div>
+    </aside>
+  </div>
+</main>
+
+<script src="../shared/flags.js"></script>
+<script src="v2.js"></script>
+<script>
+  V.mount('profile');
+  document.getElementById('mast').innerHTML = `<div class="pole"></div>${V.cloth('ca', 2, 'Canada', { h: 150, size: 'lg', live: true })}`;
+  const favs = ['sc', 'gl', 'lk', 'jp', 'ch', 'qa'].map(c => FLAGS.find(f => f.code === c));
+  document.getElementById('grid').innerHTML = favs.map(f => `
+    <article class="tile card">
+      <div class="stage">${V.cloth(f.code, f.ratio, f.name, { h: V.fitH(f.ratio, 180 * 116, 220, 140), size: 'md' })}</div>
+      <div class="meta"><div><div class="name">${f.name}</div><div class="sub">#${V.pad(f.index)} · ${f.tags[0]}</div></div>
+        <span class="fav is-on"><i class="ph-fill ph-heart"></i>${f.favs}</span></div>
+    </article>`).join('');
+</script>
+</body>
+</html>

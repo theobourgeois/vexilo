@@ -949,3 +949,64 @@ export async function addTagsToFlagRequests(ids: string[], tags: string[]) {
 
   return true;
 }
+
+export type AiFlagDraftSubmission = {
+  flagName: string;
+  flagImage: string;
+  sources: string[];
+  tags: string[];
+  description: string;
+  imageOrigin: 'commons' | 'drawn';
+};
+
+/**
+ * Adds AI-generated drafts to the review queue. Unlike createFlagRequests these are
+ * never auto-approved, even for trusted admins, so every generated flag gets a look.
+ * Drawn fictional flags may have no sources.
+ */
+export async function submitAiFlagDrafts(drafts: AiFlagDraftSubmission[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return { success: false as const, message: 'Only admins can add generated flags.' };
+  }
+  if (drafts.length === 0) {
+    return { success: false as const, message: 'Select at least one draft.' };
+  }
+
+  const invalid = drafts.find(
+    (draft) =>
+      !draft.flagName.trim() ||
+      !draft.flagImage.startsWith(`${CLOUD_FRONT_URL}/`) ||
+      (draft.imageOrigin === 'commons' && draft.sources.length === 0),
+  );
+  if (invalid) {
+    return {
+      success: false as const,
+      message: `"${invalid.flagName || 'Untitled flag'}" needs a name, an image and a source.`,
+    };
+  }
+
+  await db.insert(flagRequests).values(
+    drafts.map((draft) => ({
+      userId: session.user.id,
+      flagId: null,
+      oldFlag: null,
+      userMessage:
+        draft.imageOrigin === 'drawn'
+          ? 'Created with AI. The image was drawn by AI, so check it closely.'
+          : 'Created with AI. Image from Wikimedia Commons.',
+      flag: {
+        flagName: draft.flagName.trim(),
+        flagImage: draft.flagImage,
+        link: '',
+        sources: draft.sources.filter((source) => /^https?:\/\//.test(source)),
+        tags: draft.tags,
+        description: draft.description.trim(),
+        relatedFlags: [],
+        index: -1,
+      },
+    })),
+  );
+
+  return { success: true as const, created: drafts.length };
+}

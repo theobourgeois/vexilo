@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileX, Link2, Loader2, Search, Tag, Trash2, X } from 'lucide-react';
+import { FileX, Link2, Loader2, Search, Tag, Trash2, X } from '@/components/icons';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -64,7 +64,7 @@ function TagPopover({
   };
 
   return (
-    <div className='absolute bottom-12 left-0 w-80 rounded-2xl border border-border bg-secondary-background p-3 shadow-xl text-sm'>
+    <div className='absolute bottom-12 left-0 w-80 rounded-[14px] bg-popover p-3 shadow-pop text-sm'>
       <input
         autoFocus
         value={search}
@@ -74,10 +74,10 @@ function TagPopover({
           if (event.key === 'Enter' && query) toggleTag(query);
         }}
         placeholder='Search or create a tag...'
-        className='w-full h-9 rounded-lg border border-border bg-background px-3 focus:outline-none focus:ring-2 focus:ring-main'
+        className='w-full h-9 rounded-[9px] bg-well shadow-well px-3 text-sm placeholder:text-muted-foreground outline-none focus:shadow-[var(--sh-well),0_0_0_2px_var(--main)]'
       />
       <div className='mt-2 space-y-0.5 max-h-64 overflow-y-auto'>
-        {tagOptions.length === 0 && <p className='px-2 py-1.5 text-foreground/50'>Type to find a tag.</p>}
+        {tagOptions.length === 0 && <p className='px-2 py-1.5 text-muted-foreground'>Type to find a tag.</p>}
         {tagOptions.map((tag) => {
           const count = counts.get(tag) ?? 0;
           const state = count === 0 ? false : count === selected.length ? true : 'mixed';
@@ -87,7 +87,7 @@ function TagPopover({
               type='button'
               onClick={() => toggleTag(tag)}
               disabled={busyTag !== null}
-              className='w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-foreground/5 cursor-pointer text-left'
+              className='w-full flex items-center gap-2 px-2 py-1.5 rounded-[9px] hover:bg-foreground/[0.06] cursor-pointer text-left'
             >
               {busyTag === tag ? (
                 <Loader2 className='size-5 animate-spin' />
@@ -95,14 +95,14 @@ function TagPopover({
                 <SelectBoxIndicator checked={state} />
               )}
               <span className='flex-1 truncate'>{tag}</span>
-              <span className='text-xs text-foreground/50'>
+              <span className='tabular-nums text-[11px] text-muted-foreground'>
                 {count === selected.length ? `on all ${count}` : `on ${count} of ${selected.length}`}
               </span>
             </button>
           );
         })}
       </div>
-      <p className='mt-2 px-2 text-xs text-foreground/50'>Click to add to all selected, or remove if all have it.</p>
+      <p className='mt-2 px-2 text-xs text-muted-foreground'>Click to add to all selected, or remove if all have it.</p>
     </div>
   );
 }
@@ -243,30 +243,30 @@ export function AllFlags() {
   return (
     <div className='pb-32'>
       <div className='mb-5'>
-        <h1 className='text-3xl font-bold tracking-tight'>All flags</h1>
-        <p className='text-foreground/60 mt-1'>{data ? `${data.total.toLocaleString()} flags` : 'Loading...'}</p>
+        <h1 className='text-[22px] font-semibold tracking-[-0.03em]'>All flags</h1>
+        <p className='mt-0.5 text-[13px] text-muted-foreground'>{data ? `${data.total.toLocaleString()} flags` : 'Loading...'}</p>
       </div>
 
       <div className='flex flex-col lg:flex-row gap-2 mb-4'>
-        <div className='flex-1 h-11 rounded-xl bg-secondary-background border border-border px-4 flex items-center gap-2 text-sm focus-within:ring-2 focus-within:ring-main'>
-          <Search className='size-4 text-foreground/50 shrink-0' />
+        <div className='flex-1 h-10 rounded-[11px] bg-well shadow-well px-3.5 flex items-center gap-2 text-sm transition-shadow focus-within:shadow-[var(--sh-well),0_0_0_2px_var(--main)]'>
+          <Search className='size-4 text-muted-foreground shrink-0' />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder='Search by name, or tag:spain'
-            className='flex-1 bg-transparent outline-none min-w-0'
+            className='flex-1 bg-transparent outline-none min-w-0 placeholder:text-muted-foreground'
           />
           {tag && (
             <button
               type='button'
               onClick={() => setTag('')}
-              className='rounded-full bg-main/10 text-main font-semibold px-2 py-0.5 text-xs flex items-center gap-1 cursor-pointer shrink-0'
+              className='rounded-full bg-main-soft text-main font-medium px-2 py-0.5 text-xs flex items-center gap-1 cursor-pointer shrink-0'
             >
               tag: {tag}
               <X className='size-3' />
             </button>
           )}
-          {isFetching && <Loader2 className='size-4 animate-spin text-foreground/40 shrink-0' />}
+          {isFetching && <Loader2 className='size-4 animate-spin text-muted-foreground shrink-0' />}
         </div>
         <button
           type='button'
@@ -275,8 +275,8 @@ export function AllFlags() {
             setPage(1);
           }}
           className={cn(
-            'h-11 px-3 rounded-xl border flex items-center gap-1.5 text-sm font-semibold cursor-pointer',
-            missingDescription ? 'bg-foreground text-background border-foreground' : 'bg-secondary-background border-border',
+            'h-10 px-3 rounded-[11px] flex items-center gap-1.5 text-sm font-medium cursor-pointer',
+            missingDescription ? 'bg-foreground text-background' : 'vx-key text-foreground',
           )}
         >
           <FileX className='size-4' />
@@ -288,7 +288,7 @@ export function AllFlags() {
             setSort(event.target.value as AdminFlagsSort);
             setPage(1);
           }}
-          className='h-11 px-3 rounded-xl bg-secondary-background border border-border text-sm font-semibold cursor-pointer'
+          className='h-10 px-3 rounded-[11px] vx-key text-foreground text-sm font-medium cursor-pointer'
           aria-label='Sort'
         >
           {Object.entries(SORT_LABELS).map(([value, label]) => (
@@ -302,7 +302,7 @@ export function AllFlags() {
       <Card className='py-0 gap-0 overflow-x-auto'>
         <table className='w-full text-sm'>
           <thead>
-            <tr className='text-left text-foreground/60 border-b border-border/70'>
+            <tr className='text-left text-muted-foreground border-b border-line tabular-nums text-xs font-medium'>
               <th className='py-3 pl-4 w-10'>
                 <SelectBox
                   label='Select page'
@@ -311,23 +311,23 @@ export function AllFlags() {
                 />
               </th>
               <th className='py-3 w-20' />
-              <th className='py-3 font-semibold'>Name</th>
-              <th className='py-3 font-semibold hidden md:table-cell'>Tags</th>
-              <th className='py-3 font-semibold hidden lg:table-cell'>Description</th>
-              <th className='py-3 font-semibold text-right pr-5 hidden sm:table-cell'>Added</th>
+              <th className='py-3 font-medium'>Name</th>
+              <th className='py-3 font-medium hidden md:table-cell'>Tags</th>
+              <th className='py-3 font-medium hidden lg:table-cell'>Description</th>
+              <th className='py-3 font-medium text-right pr-5 hidden sm:table-cell'>Added</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
                 <td colSpan={6} className='py-16 text-center'>
-                  <Loader2 className='size-6 animate-spin mx-auto text-foreground/40' />
+                  <Loader2 className='size-6 animate-spin mx-auto text-muted-foreground' />
                 </td>
               </tr>
             )}
             {!isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={6} className='py-16 text-center text-foreground/60'>
+                <td colSpan={6} className='py-16 text-center text-muted-foreground'>
                   No flags match.
                 </td>
               </tr>
@@ -339,17 +339,17 @@ export function AllFlags() {
                   key={row.id}
                   onClick={() => setEditing(row)}
                   className={cn(
-                    'border-b border-border/50 cursor-pointer hover:bg-foreground/[0.03]',
-                    isSelected && 'bg-main/5',
-                    editing?.id === row.id && 'bg-main/10',
+                    'border-b border-line last:border-b-0 cursor-pointer hover:bg-foreground/[0.03]',
+                    isSelected && 'bg-main/[0.05]',
+                    editing?.id === row.id && 'bg-main-soft',
                   )}
                 >
                   <td className='py-2.5 pl-4'>
                     <SelectBox label={`Select ${row.name}`} checked={isSelected} onToggle={(event) => toggle(row, event.shiftKey)} />
                   </td>
                   <td>
-                    <div className='h-10 w-14 rounded-lg bg-foreground/5 flex items-center justify-center'>
-                      <Image src={row.image} alt='' width={56} height={40} className='max-h-6 w-auto max-w-[80%] object-contain' />
+                    <div className='h-8 w-12 rounded-[8px] bg-well shadow-well flex items-center justify-center'>
+                      <Image src={row.image} alt='' width={56} height={40} className='max-h-5 w-auto max-w-[80%] object-contain' />
                     </div>
                   </td>
                   <td className='font-semibold pr-4 max-w-[16rem] truncate'>{row.name}</td>
@@ -364,18 +364,18 @@ export function AllFlags() {
                             setTag(tagName);
                             setPage(1);
                           }}
-                          className='text-xs font-semibold rounded-full bg-foreground/5 hover:bg-main/10 px-2 py-0.5 cursor-pointer'
+                          className='text-xs font-medium rounded-full bg-foreground/[0.06] text-subtle hover:bg-main-soft hover:text-main px-2 py-0.5 cursor-pointer transition-colors'
                         >
                           {tagName}
                         </button>
                       ))}
-                      {row.tags.length > 4 && <span className='text-xs text-foreground/50'>+{row.tags.length - 4}</span>}
+                      {row.tags.length > 4 && <span className='tabular-nums text-xs text-muted-foreground'>+{row.tags.length - 4}</span>}
                     </div>
                   </td>
-                  <td className={cn('hidden lg:table-cell max-w-xs truncate pr-4', row.description ? 'text-foreground/60' : 'text-amber-700 dark:text-amber-400 font-semibold')}>
+                  <td className={cn('hidden lg:table-cell max-w-xs truncate pr-4', row.description ? 'text-subtle' : 'text-main font-medium')}>
                     {row.description || 'Missing'}
                   </td>
-                  <td className='text-right pr-5 text-foreground/60 whitespace-nowrap hidden sm:table-cell'>{timeAgo(row.createdAt)}</td>
+                  <td className='text-right pr-5 tabular-nums text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell'>{timeAgo(row.createdAt)}</td>
                 </tr>
               );
             })}
@@ -387,7 +387,7 @@ export function AllFlags() {
         <Button variant='neutral' onClick={() => setPage(page - 1)} disabled={page <= 1}>
           Previous
         </Button>
-        <span className='text-sm text-foreground/60'>
+        <span className='tabular-nums text-[13px] text-muted-foreground'>
           Page {page} of {totalPages.toLocaleString()}
         </span>
         <Button variant='neutral' onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
@@ -403,11 +403,11 @@ export function AllFlags() {
             <div className='flex-1' />
             {confirmDelete ? (
               <>
-                <span className='text-sm font-semibold text-red-600'>Delete {confirmDelete.length} flags for good?</span>
+                <span className='text-sm font-semibold text-bad'>Delete {confirmDelete.length} flags for good?</span>
                 <Button variant='neutral' size='sm' onClick={() => setConfirmDelete(null)}>
                   Cancel
                 </Button>
-                <Button size='sm' onClick={() => runDelete(confirmDelete)} disabled={isWorking} className='bg-none bg-red-600 border-red-800'>
+                <Button variant='danger' size='sm' onClick={() => runDelete(confirmDelete)} disabled={isWorking}>
                   {isWorking && <Loader2 className='animate-spin' />}
                   Delete
                 </Button>
@@ -427,7 +427,7 @@ export function AllFlags() {
                   <Link2 />
                   Relate
                 </Button>
-                <Button variant='neutral' size='sm' onClick={() => setConfirmDelete(selectedRows.map((row) => row.id))} className='text-red-600'>
+                <Button variant='neutral' size='sm' onClick={() => setConfirmDelete(selectedRows.map((row) => row.id))} className='text-bad'>
                   <Trash2 />
                   Delete
                 </Button>

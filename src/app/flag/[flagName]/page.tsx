@@ -3,24 +3,16 @@ import {
   getRelatedFlags,
   getFlagEditHistory,
 } from '@/actions/flags';
-import Image from 'next/image';
 import Link from 'next/link';
-import {
-  ExternalLink,
-  Flag,
-  Star,
-  Eye,
-  ArrowLeft,
-  History,
-} from 'lucide-react';
+import { ArrowLeft, ChevronRight } from '@/components/icons';
 import { after } from 'next/server';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { notFound } from 'next/navigation';
 import FlagActions from './FlagActions';
 import ExpandableDescription from './ExpandableDescription';
+import FlagViewer from './FlagViewer';
+import type { FlagAiStructuredData } from '@/db/schema';
 import FlagCard from '@/components/FlagCard';
 import { Metadata } from 'next';
 import Tag from '@/components/Tag';
@@ -100,6 +92,91 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+const COLOR_HEX: Record<string, string> = {
+  red: '#D52B1E',
+  blue: '#1F4E9C',
+  green: '#1B8A3F',
+  yellow: '#F7C600',
+  white: '#FFFFFF',
+  black: '#111111',
+  orange: '#F07C1B',
+  purple: '#6A2C8F',
+  brown: '#7A4B26',
+  gold: '#C9A13B',
+  silver: '#B9BCC0',
+  maroon: '#7A1F2B',
+  light_blue: '#6CACE4',
+};
+
+const humanize = (value: string) =>
+  value.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+function Block({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className='mt-7'>
+      <h2 className='mb-2.5 flex items-baseline gap-2 text-sm font-semibold'>
+        {title}
+        {aside !== undefined && <span className='tabular-nums text-[13px] font-normal text-muted-foreground'>{aside}</span>}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function SpecRows({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <dl className='grid grid-cols-[38%_1fr] text-[13.5px]'>
+      {rows.map(([k, v]) => (
+        <div key={k} className='contents [&>*]:border-b [&>*]:border-line'>
+          <dt className='py-2.5 pr-4 text-muted-foreground'>{k}</dt>
+          <dd className='min-w-0 truncate py-2.5'>{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function ColoursBlock({ data }: { data: FlagAiStructuredData }) {
+  const colors = [...new Set([...(data.dominantColors ?? []), ...(data.secondaryColors ?? [])])];
+  if (colors.length === 0) return null;
+  return (
+    <Block title='Colours'>
+      <div className='flex flex-wrap gap-2.5'>
+        {colors.map((c) => (
+          <div key={c} className='vx-tile flex items-center gap-2.5 rounded-[10px] py-1.5 pl-1.5 pr-3'>
+            <span
+              className='size-[26px] rounded-[6px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.1)]'
+              style={{ background: COLOR_HEX[c] ?? c }}
+            />
+            <span className='leading-tight'>
+              <span className='block text-[13px]'>{humanize(c)}</span>
+              <span className='block tabular-nums text-xs text-muted-foreground'>
+                {(COLOR_HEX[c] ?? c).toUpperCase()}
+                {(data.dominantColors ?? []).includes(c) ? ' · dominant' : ''}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Block>
+  );
+}
+
+function TraitsBlock({ data }: { data: FlagAiStructuredData }) {
+  const rows: [string, React.ReactNode][] = [];
+  if (data.layoutType) rows.push(['Layout', humanize(data.layoutType)]);
+  if (data.patternType) rows.push(['Pattern', humanize(data.patternType)]);
+  if (data.primarySymbols?.length) rows.push(['Symbols', data.primarySymbols.map(humanize).join(', ')]);
+  if (data.emblemPlacement && data.emblemPlacement !== 'none') rows.push(['Emblem', humanize(data.emblemPlacement)]);
+  if (data.hasText !== undefined) rows.push(['Text', data.hasText ? humanize(data.textType ?? 'yes') : 'None']);
+  if (rows.length === 0) return null;
+  return (
+    <Block title='Traits'>
+      <SpecRows rows={rows} />
+    </Block>
+  );
+}
+
 // Separate component for related flags to enable streaming
 async function RelatedFlagsSection({ flagId }: { flagId: string }) {
   const relatedFlags = await getRelatedFlags(flagId);
@@ -109,33 +186,26 @@ async function RelatedFlagsSection({ flagId }: { flagId: string }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className='flex items-center gap-2'>
-          <Star className='w-5 h-5' />
-          Related Flags
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-          {relatedFlags.map((relatedFlag) => (
-            <FlagCard
-              key={relatedFlag.id}
-              id={relatedFlag.id}
-              flagName={relatedFlag.name}
-              flagImage={relatedFlag.image}
-              sources={relatedFlag.sources}
-              favorites={relatedFlag.favorites}
-              isFavorite={relatedFlag.isFavorite}
-              link={relatedFlag.link}
-              index={relatedFlag.index}
-              tags={relatedFlag.tags}
-              description={relatedFlag.description}
-            />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <section className='mt-14'>
+      <h2 className='mb-4 text-[17px] font-semibold tracking-[-0.02em]'>Related flags</h2>
+      <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+        {relatedFlags.map((relatedFlag) => (
+          <FlagCard
+            key={relatedFlag.id}
+            id={relatedFlag.id}
+            flagName={relatedFlag.name}
+            flagImage={relatedFlag.image}
+            sources={relatedFlag.sources}
+            favorites={relatedFlag.favorites}
+            isFavorite={relatedFlag.isFavorite}
+            link={relatedFlag.link}
+            index={relatedFlag.index}
+            tags={relatedFlag.tags}
+            description={relatedFlag.description}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -152,25 +222,17 @@ function EditHistoryEntry({
   };
 }) {
   return (
-    <div className='flex items-center gap-3 py-2 border-b border-border/50 last:border-0'>
+    <div className='flex items-center gap-3 border-b border-line py-2.5'>
       <Link href={`/profile/${edit.userNumber}`}>
-        <Avatar className='w-6 h-6'>
+        <Avatar className='size-6'>
           <AvatarImage src={edit.userImage || ''} alt={edit.userName || 'User'} />
-          <AvatarFallback className='text-xs'>
-            {edit.userName?.charAt(0) || 'U'}
-          </AvatarFallback>
+          <AvatarFallback className='text-[10px]'>{edit.userName?.charAt(0) || 'U'}</AvatarFallback>
         </Avatar>
       </Link>
-      <div className='flex-1 min-w-0'>
-        <Link
-          href={`/profile/${edit.userNumber}`}
-          className='text-sm font-medium hover:underline'
-        >
-          {edit.userName || 'Unknown User'}
-        </Link>
-        <span className='text-sm text-muted-foreground ml-2'>edited this flag</span>
-      </div>
-      <time className='text-xs text-muted-foreground whitespace-nowrap'>
+      <Link href={`/profile/${edit.userNumber}`} className='min-w-0 flex-1 truncate text-[13px] font-medium hover:underline'>
+        {edit.userName || 'Unknown user'}
+      </Link>
+      <time className='shrink-0 tabular-nums text-[11.5px] text-muted-foreground'>
         {new Date(edit.createdAt).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -191,39 +253,28 @@ async function EditHistorySection({ flagId }: { flagId: string }) {
 
   const initialEdits = editHistory.slice(0, 5);
   const remainingEdits = editHistory.slice(5);
-  const hasMore = remainingEdits.length > 0;
 
   return (
-    <Card className='mt-8'>
-      <CardHeader className='pb-3'>
-        <CardTitle className='flex items-center gap-2 text-base font-medium text-muted-foreground'>
-          <History className='w-4 h-4' />
-          Edit History
-        </CardTitle>
-      </CardHeader>
-      <CardContent className='pt-0'>
-        <div className='space-y-2'>
-          {initialEdits.map((edit) => (
-            <EditHistoryEntry key={edit.id} edit={edit} />
-          ))}
-          {hasMore && (
-            <details className='group'>
-              <summary className='flex items-center justify-center py-2 text-sm text-muted-foreground hover:text-foreground cursor-pointer list-none'>
-                <span className='group-open:hidden'>
-                  Show {remainingEdits.length} more edit{remainingEdits.length > 1 ? 's' : ''}
-                </span>
-                <span className='hidden group-open:inline'>Show less</span>
-              </summary>
-              <div className='space-y-2'>
-                {remainingEdits.map((edit) => (
-                  <EditHistoryEntry key={edit.id} edit={edit} />
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <Block title='Edit history' aside={editHistory.length}>
+      <div>
+        {initialEdits.map((edit) => (
+          <EditHistoryEntry key={edit.id} edit={edit} />
+        ))}
+        {remainingEdits.length > 0 && (
+          <details className='group'>
+            <summary className='cursor-pointer list-none pt-2 text-center text-[13px] text-muted-foreground hover:text-foreground'>
+              <span className='group-open:hidden'>
+                Show {remainingEdits.length} more
+              </span>
+              <span className='hidden group-open:inline'>Show less</span>
+            </summary>
+            {remainingEdits.map((edit) => (
+              <EditHistoryEntry key={edit.id} edit={edit} />
+            ))}
+          </details>
+        )}
+      </div>
+    </Block>
   );
 }
 
@@ -256,20 +307,17 @@ export default async function FlagPage({
 
   if (mode === 'edit') {
     return (
-      <div className='container mx-auto px-4 py-8 max-w-6xl'>
-        <div className='flex justify-between items-center mb-8'>
-          <h1 className='text-4xl md:text-5xl font-bold tracking-tight'>
-            Edit Flag
+      <div className='mx-auto max-w-[1100px] px-4 py-7 md:px-8'>
+        <div className='mb-6 flex items-center justify-between gap-4'>
+          <h1 className='text-[22px] font-semibold tracking-[-0.03em]'>
+            Edit {flag.name}
           </h1>
-          <Link
-            className='flex items-center gap-2'
-            href={`/flag/${encodeURIComponent(flag.name)}`}
-          >
-            <Button>
-              <ArrowLeft className='w-4 h-4 mr-2' />
+          <Button variant='neutral' asChild>
+            <Link href={`/flag/${encodeURIComponent(flag.name)}`}>
+              <ArrowLeft />
               Back
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
 
         <FlagFieldsForm
@@ -289,124 +337,105 @@ export default async function FlagPage({
     );
   }
 
+  const structured = flag.metadata?.structuredData ?? null;
+  const firstTag = flag.displayTags.find((t) => t.toLowerCase() !== flag.name.toLowerCase());
+  const details: [string, React.ReactNode][] = [
+    ['Catalogue', <span key='i' className='tabular-nums'>#{String(flag.index).padStart(4, '0')}</span>],
+    ['Favorites', <span key='f' className='tabular-nums'>{flag.favorites}</span>],
+  ];
+  if (flag.link) {
+    details.push([
+      'Image source',
+      <a key='l' href={flag.link} target='_blank' rel='noopener noreferrer' className='border-b border-border hover:border-foreground'>
+        {(() => {
+          try {
+            return new URL(flag.link).hostname.replace(/^www\./, '');
+          } catch {
+            return flag.link;
+          }
+        })()}
+      </a>,
+    ]);
+  }
+
   return (
-    <div className='container mx-auto px-4 py-8 max-w-6xl'>
-      {/* Header */}
-      <div className='text-center space-y-4 mb-8'>
-        <Badge variant='neutral' className='mb-2 gap-2 pl-1.5 pr-3'>
-          <span className='relative inline-block w-5 h-3.5 rounded-[2px] overflow-hidden border border-border/60'>
-            <Image src={flag.image} alt={`${flag.name} flag`} fill className='object-cover' sizes='20px' />
-          </span>
-          Flag #{flag.index}
-        </Badge>
-        <h1 className='text-4xl md:text-5xl font-bold tracking-tight'>{flag.name}</h1>
-        {/* Tags before description */}
-        {flag.displayTags.length > 0 && (
-          <div className='flex flex-wrap gap-2 justify-center mb-2'>
-            {flag.displayTags.map((tag: string) => (
-              <Tag key={tag} text={tag} />
-            ))}
-          </div>
+    <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
+      <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
+        <Link href='/' className='hover:text-foreground'>
+          Browse
+        </Link>
+        {firstTag && (
+          <>
+            <ChevronRight className='size-3' />
+            <Link href={`/?tag=${encodeURIComponent(firstTag)}`} className='hover:text-foreground'>
+              {firstTag}
+            </Link>
+          </>
         )}
-        {flag.displayDescription && (
-          <ExpandableDescription description={flag.displayDescription} />
-        )}
-        {/* Sources */}
-        {flag.sources && flag.sources.length > 0 && (
-          <div className='flex flex-wrap gap-2 justify-center mt-4'>
-            {flag.sources.map((source, index) => (
-              <SourceBadge key={`source-${index}`} source={source} />
-            ))}
+        <ChevronRight className='size-3' />
+        <span className='truncate font-medium text-foreground'>{flag.name}</span>
+      </nav>
+
+      <div className='grid items-start gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:gap-10'>
+        <div className='min-w-0'>
+          <FlagViewer image={flag.image} name={flag.name} />
+          {structured && <ColoursBlock data={structured} />}
+        </div>
+
+        <div className='min-w-0 lg:pt-1'>
+          <p className='text-[13px] text-muted-foreground'>
+            #{String(flag.index).padStart(4, '0')}
+            {firstTag ? ` · ${firstTag}` : ''}
+          </p>
+          <h1 className='mt-1.5 text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[38px]'>
+            {flag.name}
+          </h1>
+          {flag.displayDescription && (
+            <div className='mt-4'>
+              <ExpandableDescription description={flag.displayDescription} />
+            </div>
+          )}
+          <div className='mt-5'>
+            <FlagActions flag={{ ...flag, relatedFlags: [] }} />
           </div>
-        )}
-      </div>
-
-      {/* Actions - positioned prominently below header */}
-      <div className='flex justify-center mb-8'>
-        <FlagActions
-          flag={{
-            ...flag,
-            relatedFlags: [], // We'll load related flags separately
-          }}
-        />
-      </div>
-
-      {/* Flag Display - Full Width */}
-      <Card className='mb-8'>
-        <CardContent className='p-6'>
-          <div className='relative aspect-[3/2] md:w-3/4 mx-auto w-full rounded-lg overflow-hidden'>
-            <Image
-              src={flag.image}
-              alt={flag.name}
-              fill
-              className='object-contain'
-              sizes='(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 60vw'
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* View Options */}
-      <Card className='mb-8'>
-        <CardHeader>
-          <CardTitle className='text-center flex items-center justify-center gap-2'>
-            <Eye className='w-5 h-5' />
-            View Options
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className='grid sm:grid-cols-2 gap-4'>
-            <Button asChild variant='neutral' size='lg'>
-              <Link href={flag.image} target='_blank' rel='noopener noreferrer'>
-                <ExternalLink className='w-4 h-4 mr-2' />
-                Full Size Image
-              </Link>
-            </Button>
-            <Button asChild variant='neutral' size='lg'>
-              <Link
-                href={`https://krikienoid.github.io/flagwaver/#?src=${encodeURIComponent(
-                  flag.image,
-                )}`}
-                target='_blank'
-                rel='noopener noreferrer'
-              >
-                <Flag className='w-4 h-4 mr-2' />
-                Flag Waver
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Related Flags - Loaded separately for better performance */}
-      <Suspense
-        fallback={
-          <Card>
-            <CardHeader>
-              <CardTitle className='flex items-center gap-2'>
-                <Star className='w-5 h-5' />
-                Related Flags
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-                {Array.from({ length: 4 }, (_, i) => (
-                  <div
-                    key={`skeleton-${Date.now()}-${i}`}
-                    className='h-48 bg-muted animate-pulse rounded-lg'
-                  />
+          {flag.displayTags.length > 0 && (
+            <Block title='Tags'>
+              <div className='flex flex-wrap gap-1.5'>
+                {flag.displayTags.map((tag: string) => (
+                  <Tag key={tag} text={tag} />
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </Block>
+          )}
+          <Block title='Details'>
+            <SpecRows rows={details} />
+          </Block>
+          {structured && <TraitsBlock data={structured} />}
+          {flag.sources && flag.sources.length > 0 && (
+            <Block title='Sources'>
+              <div className='flex flex-wrap gap-2'>
+                {flag.sources.map((source, index) => (
+                  <SourceBadge key={`source-${index}`} source={source} />
+                ))}
+              </div>
+            </Block>
+          )}
+          <Suspense fallback={null}>
+            <EditHistorySection flagId={flag.id} />
+          </Suspense>
+        </div>
+      </div>
+
+      <Suspense
+        fallback={
+          <div className='mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className='vx-tile h-[292px] animate-pulse' />
+            ))}
+          </div>
         }
       >
         <RelatedFlagsSection flagId={flag.id} />
-      </Suspense>
-
-      {/* Edit History */}
-      <Suspense fallback={null}>
-        <EditHistorySection flagId={flag.id} />
       </Suspense>
     </div>
   );

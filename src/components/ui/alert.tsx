@@ -5,12 +5,12 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 const alertVariants = cva(
-  "relative w-full rounded-lg border border-white/30 px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current shadow-[inset_0_1px_1px_oklch(100%_0_0/0.4),0_2px_4px_oklch(0%_0_0/0.2)] backdrop-blur-md",
+  "relative w-full rounded-[14px] px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current",
   {
     variants: {
       variant: {
-        default: "bg-[image:var(--background-image-noise),var(--background-image-glossy-main)] bg-[size:256px,auto] text-main-foreground border border-[oklch(45%_0.15_259)]",
-        destructive: "bg-[image:var(--background-image-noise),linear-gradient(to_bottom,#ef4444_0%,#dc2626_45%,#b91c1c_50%,#991b1b_100%)] bg-[size:256px,auto] text-white border-red-700",
+        default: "vx-tile text-foreground",
+        destructive: "bg-bad-soft text-bad shadow-[inset_0_0_0_1px_var(--bad)]",
       },
     },
     defaultVariants: {

@@ -7,7 +7,7 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot='card'
       className={cn(
-        'relative overflow-hidden rounded-2xl flex flex-col shadow-[inset_0_2px_4px_rgba(255,255,255,1),inset_0_6px_16px_rgba(255,255,255,0.8),inset_0_-6px_14px_rgba(0,0,0,0.06),0_1px_0_rgba(255,255,255,1),0_8px_0_-1px_oklch(80%_0.012_258),0_10px_0_-1px_oklch(75%_0.015_260),0_24px_40px_-8px_rgba(0,0,0,0.15),0_2px_0_1px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(255,255,255,0.25),inset_0_6px_14px_rgba(255,255,255,0.1),inset_0_-6px_14px_rgba(0,0,0,0.4),0_1px_0_rgba(255,255,255,0.08),0_8px_0_-1px_oklch(12%_0.006_255),0_10px_0_-1px_oklch(8%_0.004_255),0_24px_40px_-8px_rgba(0,0,0,0.6),0_2px_0_1px_rgba(255,255,255,0.12)] border border-white/90 dark:border-white/20 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] bg-[size:256px,auto] text-foreground font-base py-6 gap-6 before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-32 before:rounded-b-[2.5rem] before:bg-[linear-gradient(to_bottom,rgba(255,255,255,1)_0%,rgba(255,255,255,0.5)_25%,rgba(255,255,255,0)_100%)] dark:before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.25)_0%,rgba(255,255,255,0.1)_25%,rgba(255,255,255,0)_100%)] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-[linear-gradient(to_top,rgba(0,0,0,0.05),rgba(0,0,0,0))] dark:after:bg-[linear-gradient(to_top,rgba(0,0,0,0.2),rgba(0,0,0,0))]',
+        'relative flex flex-col gap-6 py-6 text-foreground vx-tile',
         className,
       )}
       {...props}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Heart, Edit, Trash2, AlertTriangle, UserCircle, Check } from 'lucide-react';
+import { Heart, Edit, Trash2, AlertTriangle, UserCircle, Check } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { toggleFavoriteFlag, deleteFlag } from '@/actions/flags';
 import { changeFavoriteFlag, getUserData } from '@/actions/users';
@@ -115,64 +115,47 @@ export default function FlagActions({ flag }: FlagActionsProps) {
     }
   };
 
-  return (
-    <div className='flex items-center gap-2 justify-center flex-wrap'>
-      <Button
-        variant='neutral'
-        size='sm'
-        onClick={handleFavoriteToggle}
-        className='flex items-center gap-2'
-      >
-        <Heart
-          className={`w-4 ${isFavorite ? 'fill-red-500' : 'text-gray-600'}`}
-        />
-        {isFavorite ? 'Favorited' : 'Favorite'}
-      </Button>
+  const favoriteCount = Math.max(
+    0,
+    (flag.favorites ?? 0) + (isFavorite === Boolean(flag.isFavorite) ? 0 : isFavorite ? 1 : -1),
+  );
 
+  return (
+    <div className='flex flex-wrap items-center gap-2'>
+      <Button
+        variant={isFavorite ? 'default' : 'neutral'}
+        onClick={handleFavoriteToggle}
+        aria-pressed={isFavorite}
+      >
+        <Heart weight={isFavorite ? 'fill' : 'bold'} />
+        {isFavorite ? 'Favorited' : 'Favorite'}
+        <span className='tabular-nums text-xs opacity-75'>{favoriteCount}</span>
+      </Button>
+      <Button variant='neutral' onClick={handleEditClick}>
+        <Edit />
+        Suggest edit
+      </Button>
+      <span className='flex-1' />
       {session.data?.user && (
         <Button
-          variant={isCurrentProfileFlag ? 'default' : 'neutral'}
-          size='sm'
+          variant='neutral'
+          size='icon'
           onClick={handleSetProfileFlag}
           disabled={isSettingProfileFlag}
-          className='flex items-center gap-2'
+          title={isCurrentProfileFlag ? 'Your profile flag' : 'Set as profile flag'}
+          className={isCurrentProfileFlag ? 'text-main' : undefined}
         >
-          {isCurrentProfileFlag ? (
-            <Check className='w-4 h-4' />
-          ) : (
-            <UserCircle className='w-4 h-4' />
-          )}
-          {isCurrentProfileFlag ? 'Your Profile Flag' : 'Set as Profile Flag'}
+          {isCurrentProfileFlag ? <Check /> : <UserCircle />}
         </Button>
       )}
-
       <ReportDialog flagId={flag.id} flagName={flag.name}>
-        <Button variant='neutral' size='sm' className='flex items-center gap-2'>
-          <AlertTriangle className='w-4 h-4' />
-          Report
+        <Button variant='neutral' size='icon' title='Report'>
+          <AlertTriangle />
         </Button>
       </ReportDialog>
-
-      {session && (
-        <Button
-          variant='neutral'
-          size='sm'
-          onClick={handleEditClick}
-          className='flex items-center gap-2 ml-2'
-        >
-          <Edit className='w-4 h-4' />
-          Edit
-        </Button>
-      )}
       {session.data?.user?.isAdmin && (
-        <Button
-          variant='neutral'
-          size='sm'
-          onClick={handleDeleteClick}
-          className='flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white border-red-50'
-        >
-          <Trash2 className='w-4 h-4' />
-          Delete
+        <Button variant='danger' size='icon' onClick={handleDeleteClick} title='Delete flag'>
+          <Trash2 />
         </Button>
       )}
     </div>

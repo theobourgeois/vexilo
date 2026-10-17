@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getFlagOfTheDay } from '@/actions/flags';
 import { Skeleton } from './ui/skeleton';
 import Link from 'next/link';
-import { History } from 'lucide-react';
+import { History } from '@/components/icons';
 
 export function FlagOfTheDay() {
   const { data: flagOfTheDay } = useQuery({

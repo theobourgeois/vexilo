@@ -1,36 +1,21 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowLeft,
   ArrowRight,
-  ExternalLink,
-  Flag,
-  Globe,
-  Palette,
+  Loader2,
   Search,
-  Sparkles,
-  Star,
-  Text,
   X,
-} from 'lucide-react';
+} from '@/components/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
 import { getExperimentalFlagSearchResults } from '@/actions/flag-smart-search';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import FlagCard from '@/components/FlagCard';
+import Tag from '@/components/Tag';
 
 const ITEMS_PER_PAGE = 24;
 const DEBOUNCE_DELAY = 250;
@@ -45,19 +30,26 @@ const EXAMPLE_QUERIES = [
   'black yellow diagonal',
 ];
 
-function ResultSkeleton() {
+const HINTS = [
+  { title: 'Colours', body: 'Combine dominant colours like red, white, gold or light blue.', example: 'red white blue star' },
+  { title: 'Layouts', body: 'Tricolors, nordic crosses, diagonals and cantons.', example: 'scandinavian cross' },
+  { title: 'Symbols', body: 'Stars, crescents, crowns, plants, animals and more.', example: 'green flag with crescent' },
+  { title: 'Context', body: 'Regional, stylistic and period clues from the metadata.', example: 'african tricolor' },
+];
+
+const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+
+function FlagCardSkeleton() {
   return (
-    <Card className='h-full p-0'>
-      <div className='aspect-[3/2] animate-pulse bg-muted/60' />
-      <CardContent className='space-y-4 pt-6'>
-        <div className='h-6 w-2/3 animate-pulse rounded bg-muted/60' />
-        <div className='h-16 animate-pulse rounded bg-muted/50' />
-        <div className='flex gap-2'>
-          <div className='h-6 w-20 animate-pulse rounded-full bg-muted/60' />
-          <div className='h-6 w-24 animate-pulse rounded-full bg-muted/60' />
-        </div>
-      </CardContent>
-    </Card>
+    <div className='vx-tile flex h-[292px] flex-col'>
+      <div className='grid flex-1 place-items-center'>
+        <div className='h-[110px] w-[170px] animate-pulse rounded-sm bg-foreground/[0.06]' />
+      </div>
+      <div className='space-y-2 px-4 pb-4'>
+        <div className='h-4 w-2/3 animate-pulse rounded bg-foreground/[0.06]' />
+        <div className='h-3 w-1/3 animate-pulse rounded bg-foreground/[0.06]' />
+      </div>
+    </div>
   );
 }
 
@@ -75,50 +67,47 @@ function SimplePagination({
   }
 
   return (
-    <div className='flex items-center justify-center gap-4'>
+    <div className='flex items-center justify-center gap-3'>
       <Button
         variant='neutral'
+        size='icon'
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
+        aria-label='Previous page'
       >
-        <ArrowLeft className='h-4 w-4' />
-        Previous
+        <ArrowLeft />
       </Button>
-      <span className='text-sm text-muted-foreground'>
-        Page {currentPage} of {totalPages}
+      <span className='min-w-28 text-center tabular-nums text-xs text-muted-foreground'>
+        {currentPage} / {totalPages}
       </span>
       <Button
         variant='neutral'
+        size='icon'
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
+        aria-label='Next page'
       >
-        Next
-        <ArrowRight className='h-4 w-4' />
+        <ArrowRight />
       </Button>
     </div>
   );
 }
 
-function InsightChips({
-  title,
-  items,
-}: {
-  title: string;
-  items: string[];
-}) {
+function InsightGroup({ title, items }: { title: string; items: string[] }) {
   if (!items.length) {
     return null;
   }
 
   return (
-    <div className='flex flex-wrap items-center gap-2'>
-      <span className='text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground'>
-        {title}
-      </span>
+    <div className='flex flex-wrap items-center gap-1.5'>
+      <span className='mr-1 text-[12.5px] text-muted-foreground'>{title}</span>
       {items.map((item) => (
-        <Badge key={`${title}-${item}`} variant='neutral'>
+        <span
+          key={`${title}-${item}`}
+          className='inline-flex h-[26px] items-center rounded-full px-2.5 text-[12.5px] font-medium text-subtle shadow-[inset_0_0_0_1px_var(--border)]'
+        >
           {item}
-        </Badge>
+        </span>
       ))}
     </div>
   );
@@ -209,362 +198,177 @@ export default function ExperimentalFlagSearch() {
   const resultCount = data?.total || 0;
   const isExpShortcut = debouncedQuery.trim().toLowerCase() === 'exp';
 
+  const insights = data?.insights;
+  const hasInsights =
+    !!insights &&
+    [
+      insights.colors,
+      insights.layouts,
+      insights.patterns,
+      insights.symbols,
+      insights.text,
+      insights.freeText,
+    ].some((items) => items.length > 0);
+
   return (
-    <div className='min-h-screen bg-background pb-20'>
-      <div className='border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60'>
-        <div className='container mx-auto flex h-14 max-w-6xl items-center px-4'>
-          <Link
-            href='/'
-            className='inline-flex items-center text-sm font-medium text-muted-foreground transition-colors hover:text-foreground'
-          >
-            <ArrowLeft className='mr-2 h-4 w-4' />
-            Back home
-          </Link>
-        </div>
+    <div>
+      <div className='flex flex-wrap items-center gap-x-4 gap-y-3 pb-[18px] pt-7'>
+        <h1 className='flex min-w-0 items-baseline gap-2.5 text-[22px] font-semibold tracking-[-0.03em]'>
+          <span className='truncate'>
+            {hasQuery ? `Results for “${debouncedQuery}”` : 'Smart search'}
+          </span>
+          <span className='shrink-0 tabular-nums text-[13px] font-normal tracking-normal text-muted-foreground'>
+            {hasQuery && data
+              ? `${resultCount.toLocaleString()} ${resultCount === 1 ? 'flag' : 'flags'}`
+              : ''}
+          </span>
+          {isFetching && <Loader2 className='size-3.5 shrink-0 animate-spin self-center text-muted-foreground' />}
+        </h1>
+        <span className='rounded-md bg-main-soft px-1.5 py-1 tabular-nums text-xs font-medium leading-none text-main sm:ml-auto'>
+          Experimental
+        </span>
       </div>
 
-      <section className='border-b border-border/40 bg-muted/20 py-16 sm:py-24'>
-        <div className='container mx-auto max-w-6xl px-4'>
-          <div className='mx-auto max-w-3xl text-center'>
-            <Badge className='mb-5'>
-              <Sparkles className='h-3 w-3' />
-              Experimental smart search
-            </Badge>
-            <h1 className='text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl'>
-              Search by meaning, not just by name
-            </h1>
-            <p className='mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl'>
-              This search blends fuzzy name matching with AI-generated flag
-              metadata, so it can understand colors, layouts, symbols, regions,
-              and style clues.
-            </p>
-            <p className='mt-3 text-sm text-muted-foreground'>
-              Type <code>exp</code> to browse only flags that already have an
-              experimental metadata row.
+      <div className='relative'>
+        <Search className='pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground' />
+        <input
+          value={searchQuery}
+          onChange={(event) => {
+            setSearchQuery(event.target.value);
+            updatePage(1);
+          }}
+          placeholder='Describe a flag'
+          aria-label='Smart search'
+          className='vx-well h-12 w-full rounded-[13px] pl-11 pr-12 text-[15px] text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:shadow-[var(--sh-well),0_0_0_2px_var(--main)]'
+        />
+        {searchQuery && (
+          <button
+            type='button'
+            onClick={() => {
+              setSearchQuery('');
+              updatePage(1);
+            }}
+            className='absolute right-2.5 top-1/2 grid size-8 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground'
+            aria-label='Clear search'
+          >
+            <X className='size-4' />
+          </button>
+        )}
+      </div>
+
+      <div className='-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 pt-0.5 [scrollbar-width:none] md:mx-0 md:px-0.5'>
+        {EXAMPLE_QUERIES.map((example) => (
+          <Tag
+            key={example}
+            variant='chip'
+            text={example}
+            isActive={debouncedQuery === example}
+            onClick={() => setExampleQuery(example)}
+          />
+        ))}
+      </div>
+
+      {hasQuery && hasInsights && insights && (
+        <div className='mt-4 flex flex-wrap items-center gap-x-5 gap-y-2.5 border-t border-line pt-4'>
+          <span className='vx-label'>Understood</span>
+          <InsightGroup title='Colours' items={insights.colors} />
+          <InsightGroup title='Layouts' items={insights.layouts} />
+          <InsightGroup title='Patterns' items={insights.patterns} />
+          <InsightGroup title='Symbols' items={insights.symbols} />
+          <InsightGroup title='Text' items={insights.text} />
+          <InsightGroup title='Keywords' items={insights.freeText} />
+        </div>
+      )}
+
+      <div className='mt-[22px]'>
+        {!hasQuery && (
+          <div className='vx-tile grid sm:grid-cols-2 lg:grid-cols-4'>
+            {HINTS.map((hint, i) => (
+              <div
+                key={hint.title}
+                className={`flex flex-col gap-1.5 p-5 ${i > 0 ? 'border-t border-line sm:border-t-0' : ''} ${
+                  i % 2 === 1 ? 'sm:border-l sm:border-line' : ''
+                } ${i >= 2 ? 'sm:border-t sm:border-line lg:border-t-0' : ''} ${i === 2 ? 'lg:border-l lg:border-line' : ''}`}
+              >
+                <h2 className='text-sm font-semibold tracking-[-0.01em]'>{hint.title}</h2>
+                <p className='text-[13px] leading-relaxed text-muted-foreground'>{hint.body}</p>
+                <button
+                  type='button'
+                  onClick={() => setExampleQuery(hint.example)}
+                  className='mt-1.5 inline-flex w-fit cursor-pointer items-center gap-1 tabular-nums text-xs text-subtle transition-colors hover:text-foreground'
+                >
+                  {hint.example}
+                  <ArrowRight className='size-3' />
+                </button>
+              </div>
+            ))}
+            <p className='border-t border-line px-5 py-3.5 text-[13px] text-muted-foreground sm:col-span-2 lg:col-span-4'>
+              Type <code className='tabular-nums text-foreground'>exp</code> to list only flags that already have experimental metadata.
             </p>
           </div>
+        )}
 
-          <Card className='mx-auto mt-10 max-w-4xl'>
-            <CardHeader className='space-y-4'>
-              <div className='relative'>
-                <Search className='absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-muted-foreground' />
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => {
-                    setSearchQuery(event.target.value);
-                    updatePage(1);
-                  }}
-                  placeholder='Try “green flag with crescent”, “african tricolor”, or “scandinavian cross”'
-                  className={cn(
-                    'h-14 rounded-2xl border-border/70 bg-background pl-12 pr-12 text-base',
-                    searchQuery && 'pr-14',
-                  )}
-                />
-                {searchQuery && (
-                  <button
-                    type='button'
-                    onClick={() => {
-                      setSearchQuery('');
-                      updatePage(1);
-                    }}
-                    className='absolute top-1/2 right-4 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground'
-                    aria-label='Clear search'
-                  >
-                    <X className='h-4 w-4' />
-                  </button>
-                )}
+        {hasQuery && isLoading && (
+          <div className={GRID}>
+            {Array.from({ length: 8 }).map((_, index) => (
+              <FlagCardSkeleton key={`smart-result-skeleton-${index}`} />
+            ))}
+          </div>
+        )}
+
+        {hasQuery && !isLoading && data && data.results.length === 0 && (
+          <div className='vx-tile flex flex-col items-center gap-3 px-6 py-16 text-center'>
+            <p className='text-[15px] font-medium'>No smart matches for “{debouncedQuery}”</p>
+            <p className='text-sm text-muted-foreground'>
+              {isExpShortcut
+                ? 'No flags have experimental metadata yet.'
+                : 'Try describing visible features instead of a country name.'}
+            </p>
+            <Button
+              variant='neutral'
+              onClick={() => {
+                setSearchQuery('');
+                updatePage(1);
+              }}
+              className='mt-2'
+            >
+              Clear search
+            </Button>
+          </div>
+        )}
+
+        {hasQuery && !isLoading && data && data.results.length > 0 && (
+          <div className={GRID}>
+            {data.results.map((result) => (
+              <div key={result.id} className='flex flex-col gap-2'>
+                <div className='flex-1'>
+                  <FlagCard
+                    id={result.id}
+                    flagName={result.flagName}
+                    flagImage={result.flagImage}
+                    link={result.link}
+                    index={result.index}
+                    tags={result.tags}
+                    description={result.description}
+                    favorites={result.favorites}
+                    sources={[]}
+                  />
+                </div>
+                <Link
+                  href={`/flag/${encodeURIComponent(result.flagName)}/experimental`}
+                  className='group flex min-w-0 items-center gap-1.5 px-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground'
+                  title={result.matchReasons.join(' · ')}
+                >
+                  <span className='truncate'>{result.matchReasons.join(' · ')}</span>
+                  <ArrowRight className='size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100' />
+                </Link>
               </div>
-
-              <div className='flex flex-wrap gap-2'>
-                {EXAMPLE_QUERIES.map((example) => (
-                  <Button
-                    key={example}
-                    variant='neutral'
-                    size='sm'
-                    onClick={() => setExampleQuery(example)}
-                  >
-                    {example}
-                  </Button>
-                ))}
-              </div>
-
-              <div className='flex flex-wrap items-center gap-3 text-sm text-muted-foreground'>
-                <span>Understands:</span>
-                <Badge variant='neutral'>
-                  <Palette className='h-3 w-3' />
-                  Colors
-                </Badge>
-                <Badge variant='neutral'>
-                  <Flag className='h-3 w-3' />
-                  Layouts
-                </Badge>
-                <Badge variant='neutral'>
-                  <Star className='h-3 w-3' />
-                  Symbols
-                </Badge>
-                <Badge variant='neutral'>
-                  <Globe className='h-3 w-3' />
-                  Regions
-                </Badge>
-                <Badge variant='neutral'>
-                  <Text className='h-3 w-3' />
-                  Text and mottos
-                </Badge>
-              </div>
-            </CardHeader>
-          </Card>
-        </div>
-      </section>
-
-      <section className='container mx-auto mt-12 max-w-6xl px-4'>
-        {!hasQuery && (
-          <div className='grid gap-6 md:grid-cols-2 xl:grid-cols-4'>
-            <Card>
-              <CardHeader>
-                <CardTitle>Color-aware</CardTitle>
-                <CardDescription>
-                  Combine dominant colors like red, white, gold, or light blue.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant='neutral'
-                  size='sm'
-                  onClick={() => setExampleQuery('red white blue star')}
-                >
-                  red white blue star
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Layout-aware</CardTitle>
-                <CardDescription>
-                  Search for tricolors, nordic crosses, diagonals, or cantons.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant='neutral'
-                  size='sm'
-                  onClick={() => setExampleQuery('scandinavian cross')}
-                >
-                  scandinavian cross
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Symbol-aware</CardTitle>
-                <CardDescription>
-                  Match stars, crescents, crowns, plants, animals, and more.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant='neutral'
-                  size='sm'
-                  onClick={() => setExampleQuery('green flag with crescent')}
-                >
-                  green flag with crescent
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Context-aware</CardTitle>
-                <CardDescription>
-                  Metadata can surface regional, stylistic, and period-based
-                  clues too.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant='neutral'
-                  size='sm'
-                  onClick={() => setExampleQuery('african tricolor')}
-                >
-                  african tricolor
-                </Button>
-              </CardContent>
-            </Card>
+            ))}
           </div>
         )}
 
         {hasQuery && (
-          <div className='space-y-6'>
-            <Card>
-              <CardHeader className='gap-4'>
-                <div className='flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between'>
-                  <div>
-                    <CardTitle className='text-2xl tracking-tight'>
-                      Smart results for “{debouncedQuery}”
-                    </CardTitle>
-                    <CardDescription className='mt-2 text-base text-muted-foreground'>
-                      {isExpShortcut
-                        ? `${resultCount} flag${
-                            resultCount === 1 ? '' : 's'
-                          } with experimental metadata.`
-                        : `${resultCount} flag${
-                            resultCount === 1 ? '' : 's'
-                          } matched across names, tags, and AI metadata.`}
-                      {isFetching && (
-                        <span className='ml-2 font-medium text-main'>
-                          Updating…
-                        </span>
-                      )}
-                    </CardDescription>
-                  </div>
-                </div>
-
-                <div className='space-y-3'>
-                  <InsightChips title='Colors' items={data?.insights.colors || []} />
-                  <InsightChips title='Layouts' items={data?.insights.layouts || []} />
-                  <InsightChips
-                    title='Patterns'
-                    items={data?.insights.patterns || []}
-                  />
-                  <InsightChips title='Symbols' items={data?.insights.symbols || []} />
-                  <InsightChips title='Text' items={data?.insights.text || []} />
-                  <InsightChips
-                    title='Keywords'
-                    items={data?.insights.freeText || []}
-                  />
-                </div>
-              </CardHeader>
-            </Card>
-
-            <SimplePagination
-              currentPage={Math.max(1, currentPage)}
-              totalPages={data?.totalPages || 0}
-              onPageChange={updatePage}
-            />
-
-            {isLoading && (
-              <div className='grid gap-6 sm:grid-cols-2 xl:grid-cols-3'>
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <ResultSkeleton key={`smart-result-skeleton-${index}`} />
-                ))}
-              </div>
-            )}
-
-            {!isLoading && data && data.results.length === 0 && (
-              <Card>
-                <CardContent className='py-14 text-center'>
-                  <div className='mx-auto max-w-2xl space-y-4'>
-                    <h2 className='text-2xl font-bold tracking-tight'>
-                      No smart matches yet
-                    </h2>
-                    <p className='text-muted-foreground'>
-                      Try describing visible features instead of a country name,
-                      or start with one of the example searches above.
-                    </p>
-                    <div className='flex flex-wrap justify-center gap-2'>
-                      {EXAMPLE_QUERIES.slice(0, 4).map((example) => (
-                        <Button
-                          key={`empty-${example}`}
-                          variant='neutral'
-                          size='sm'
-                          onClick={() => setExampleQuery(example)}
-                        >
-                          {example}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {!isLoading && data && data.results.length > 0 && (
-              <div className='grid gap-6 sm:grid-cols-2 xl:grid-cols-3'>
-                {data.results.map((result) => (
-                  <Card
-                    key={result.id}
-                    className='overflow-hidden p-0 transition-transform duration-300 hover:-translate-y-1'
-                  >
-                    <Link
-                      href={`/flag/${encodeURIComponent(result.flagName)}/experimental`}
-                      className='group block'
-                    >
-                      <div className='relative aspect-[3/2] overflow-hidden border-b border-border/40 bg-black/5 dark:bg-white/5'>
-                        <Image
-                          src={result.flagImage}
-                          alt={result.flagName}
-                          fill
-                          className='object-contain p-4 transition-transform duration-300 group-hover:scale-105'
-                          sizes='(max-width: 1280px) 50vw, 33vw'
-                        />
-                      </div>
-                    </Link>
-
-                    <CardContent className='space-y-4 pt-6'>
-                      <div className='space-y-2'>
-                        <div className='flex items-start justify-between gap-3'>
-                          <div>
-                            <h2 className='text-xl font-bold tracking-tight'>
-                              {result.flagName}
-                            </h2>
-                            <p className='text-sm text-muted-foreground'>
-                              #{result.index} in the collection
-                            </p>
-                          </div>
-                          <Badge>{result.matchReasons.length} smart hit{result.matchReasons.length === 1 ? '' : 's'}</Badge>
-                        </div>
-
-                        <p className='line-clamp-3 text-sm leading-6 text-muted-foreground'>
-                          {result.headline}
-                        </p>
-                      </div>
-
-                      <div className='space-y-3'>
-                        <div className='flex flex-wrap gap-2'>
-                          {result.matchReasons.map((reason) => (
-                            <Badge key={`${result.id}-${reason}`}>{reason}</Badge>
-                          ))}
-                        </div>
-
-                        <div className='flex flex-wrap gap-2'>
-                          {result.metadataChips.map((chip) => (
-                            <Badge
-                              key={`${result.id}-meta-${chip}`}
-                              variant='neutral'
-                            >
-                              {chip}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className='flex flex-wrap gap-3 pt-2'>
-                        <Button asChild>
-                          <Link
-                            href={`/flag/${encodeURIComponent(result.flagName)}/experimental`}
-                          >
-                            Explore match
-                            <ArrowRight className='h-4 w-4' />
-                          </Link>
-                        </Button>
-                        <Button variant='neutral' asChild>
-                          <a
-                            href={result.link}
-                            target='_blank'
-                            rel='noreferrer'
-                          >
-                            Source
-                            <ExternalLink className='h-4 w-4' />
-                          </a>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-
+          <div className='mt-7'>
             <SimplePagination
               currentPage={Math.max(1, currentPage)}
               totalPages={data?.totalPages || 0}
@@ -572,7 +376,7 @@ export default function ExperimentalFlagSearch() {
             />
           </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }

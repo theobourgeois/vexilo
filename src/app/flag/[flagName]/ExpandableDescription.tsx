@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
-const MAX_HEIGHT = 72; // ~3 lines of text at text-lg
+const MAX_HEIGHT = 100; // ~4 lines
 
 export default function ExpandableDescription({
   description,
@@ -22,12 +22,12 @@ export default function ExpandableDescription({
   }, [description]);
 
   return (
-    <div className='max-w-3xl mx-auto'>
+    <div>
       <p
         ref={textRef}
         className={cn(
-          'text-lg text-muted-foreground transition-all',
-          !isExpanded && isClamped && 'line-clamp-3',
+          'text-[15px] leading-relaxed text-subtle',
+          !isExpanded && isClamped && 'line-clamp-4',
         )}
       >
         {description}
@@ -35,7 +35,7 @@ export default function ExpandableDescription({
       {isClamped && (
         <button
           onClick={() => setIsExpanded((prev) => !prev)}
-          className='text-sm text-muted-foreground hover:text-foreground mt-1 cursor-pointer underline underline-offset-2'
+          className='mt-1.5 cursor-pointer text-[13px] font-medium text-muted-foreground hover:text-foreground'
         >
           {isExpanded ? 'See less' : 'See more'}
         </button>
