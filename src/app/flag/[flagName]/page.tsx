@@ -4,23 +4,24 @@ import {
   getFlagEditHistory,
 } from '@/actions/flags';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight, Clock, Eye } from '@/components/icons';
+import { ArrowLeft, BookOpen, ChevronRight } from '@/components/icons';
 import { after } from 'next/server';
 import { Button } from '@/components/ui/button';
 import { notFound } from 'next/navigation';
-import Contributors, { type Contributor } from './Contributors';
+import Contributors, { type Contributor, type EditEntry } from './Contributors';
 import FlagActions from './FlagActions';
 import ExpandableDescription from './ExpandableDescription';
 import FlagViewer from './FlagViewer';
 import FlagViewTracker from './FlagViewTracker';
-import type { FlagAiStructuredData } from '@/db/schema';
+import type { FlagAiResearchSource, FlagAiStructuredData } from '@/db/schema';
 import FlagCard from '@/components/FlagCard';
 import { Metadata } from 'next';
 import Tag from '@/components/Tag';
 import { Suspense } from 'react';
 import FlagFieldsForm from '@/components/FlagFieldsForm';
 import SourceBadge from '@/components/SourceBadge';
-import { getFlagPalette } from '@/lib/flag-palette';
+import { describeEdit } from '@/lib/edit-changes';
+import { getFlagColors } from '@/lib/flag-palette';
 import { ensureFlagImageSelfHosted } from '@/lib/storage/flag-image-mirror';
 
 export type RelatedFlag = {
@@ -97,9 +98,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 const formatDate = (date: Date) =>
   new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-const formatMonth = (date: Date) =>
-  new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
 const formatShare = (share: number) => (share < 0.01 ? '<1%' : `${Math.round(share * 100)}%`);
 
 const humanize = (value: string) =>
@@ -131,8 +129,8 @@ function SpecRows({ rows }: { rows: [string, React.ReactNode][] }) {
 }
 
 // Colours are read from the image itself (cached), so they stream in after the page.
-async function ColoursPanel({ image }: { image: string }) {
-  const palette = await getFlagPalette(image);
+async function ColoursPanel({ flag }: { flag: { id: string; image: string } }) {
+  const palette = await getFlagColors(flag);
   if (palette.length === 0) return null;
   const total = palette.reduce((sum, color) => sum + color.share, 0);
   return (
@@ -231,14 +229,70 @@ async function ContributorsSection({ flagId }: { flagId: string }) {
       });
   }
   const contributors = [...byUser.values()].sort((a, b) => b.edits - a.edits);
-  // getFlagEditHistory caps at 20 rows.
-  const totalEdits = editHistory.length >= 20 ? '20+' : String(editHistory.length);
+  // getFlagEditHistory caps at 50 rows.
+  const totalEdits = editHistory.length >= 50 ? '50+' : String(editHistory.length);
+  const edits: EditEntry[] = editHistory.map((edit) => ({
+    id: edit.id,
+    user: { userNumber: edit.userNumber, name: edit.userName, image: edit.userImage },
+    createdAt: edit.createdAt,
+    changes: describeEdit(edit.oldFlag, edit.newFlag),
+  }));
 
   return (
-    <div>
+    <div className='mt-7 border-t border-line pt-5'>
       <h2 className='mb-2.5 text-sm font-semibold'>Contributors</h2>
-      <Contributors contributors={contributors} totalEdits={totalEdits} />
+      <Contributors contributors={contributors} totalEdits={totalEdits} edits={edits} />
     </div>
+  );
+}
+
+const normalizeUrl = (url: string) => url.trim().replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '').toLowerCase();
+
+/** The flag's own sources plus the pages its history was researched from, without dead redirect links. */
+function collectSources(own: string[], researched: FlagAiResearchSource[]) {
+  const urls = [
+    ...own,
+    ...researched
+      .filter((source) => source.type !== 'llm' && source.url && /^https?:\/\//.test(source.url))
+      .map((source) => source.url as string)
+      // Search-grounding redirects expire, so they make poor links.
+      .filter((url) => !url.includes('vertexaisearch.cloud.google.com')),
+  ];
+  const seen = new Set<string>();
+  return urls.filter((url) => {
+    const key = normalizeUrl(url);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function HistoryAndSources({ history, sources }: { history: string; sources: string[] }) {
+  if (!history && sources.length === 0) return null;
+  return (
+    <section className='mt-12 max-w-[780px]'>
+      {history && (
+        <>
+          <h2 className='flex items-center gap-2 text-[17px] font-semibold tracking-[-0.02em]'>
+            <BookOpen className='size-[18px] text-muted-foreground' />
+            History
+          </h2>
+          <div className='mt-3.5'>
+            <ExpandableDescription description={history} lines={8} />
+          </div>
+        </>
+      )}
+      {sources.length > 0 && (
+        <div className={history ? 'mt-7' : ''}>
+          <h2 className='mb-2.5 text-sm font-semibold'>Sources</h2>
+          <div className='flex flex-wrap gap-2'>
+            {sources.map((source) => (
+              <SourceBadge key={source} source={source} />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -305,7 +359,6 @@ export default async function FlagPage({
   const firstTag = flag.displayTags.find((t) => t.toLowerCase() !== flag.name.toLowerCase());
   const details: [string, React.ReactNode][] = [
     ['Catalogue', <span key='i' className='tabular-nums'>#{String(flag.index).padStart(4, '0')}</span>],
-    ['Views', <span key='v' className='tabular-nums'>{flag.views.toLocaleString()}</span>],
     ['Favorites', <span key='f' className='tabular-nums'>{flag.favorites}</span>],
     ['Added', formatDate(flag.createdAt)],
   ];
@@ -361,16 +414,6 @@ export default async function FlagPage({
               <ExpandableDescription description={flag.displayDescription} />
             </div>
           )}
-          <div className='mt-4 flex flex-wrap gap-x-[18px] gap-y-1 text-[13px] text-subtle [&_svg]:size-[15px] [&_svg]:text-muted-foreground'>
-            <span className='flex items-center gap-1.5 tabular-nums'>
-              <Eye />
-              {flag.views.toLocaleString()} view{flag.views === 1 ? '' : 's'}
-            </span>
-            <span className='flex items-center gap-1.5'>
-              <Clock />
-              Added {formatMonth(flag.createdAt)}
-            </span>
-          </div>
           <div className='mt-5'>
             <FlagActions flag={{ ...flag, relatedFlags: [] }} />
           </div>
@@ -381,33 +424,26 @@ export default async function FlagPage({
               ))}
             </div>
           )}
-          <div className='mt-7 grid grid-cols-1 gap-6 border-t border-line pt-5 empty:hidden sm:grid-cols-2'>
-            <Suspense fallback={null}>
-              <ContributorsSection flagId={flag.id} />
-            </Suspense>
-            {flag.sources && flag.sources.length > 0 && (
-              <div className='min-w-0'>
-                <h2 className='mb-2.5 text-sm font-semibold'>Sources</h2>
-                <div className='flex flex-col items-start gap-1.5'>
-                  {flag.sources.map((source, index) => (
-                    <SourceBadge key={`source-${index}`} source={source} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <Suspense fallback={null}>
+            <ContributorsSection flagId={flag.id} />
+          </Suspense>
         </div>
       </div>
 
       <div className={`mt-5 grid gap-4 md:grid-cols-2 ${structured ? 'lg:grid-cols-3' : ''}`}>
         <Suspense fallback={<PanelSkeleton />}>
-          <ColoursPanel image={flag.image} />
+          <ColoursPanel flag={flag} />
         </Suspense>
         {structured && <TraitsPanel data={structured} />}
         <Panel title='Details'>
           <SpecRows rows={details} />
         </Panel>
       </div>
+
+      <HistoryAndSources
+        history={flag.metadata?.historicalContext ?? ''}
+        sources={collectSources(flag.sources ?? [], flag.metadata?.researchSources ?? [])}
+      />
 
       <Suspense
         fallback={

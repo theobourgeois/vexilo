@@ -3,12 +3,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
-const MAX_HEIGHT = 100; // ~4 lines
+const LINE_HEIGHT = 25;
 
 export default function ExpandableDescription({
   description,
+  lines = 4,
 }: {
   description: string;
+  /** Lines shown before "See more". */
+  lines?: 4 | 8;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isClamped, setIsClamped] = useState(false);
@@ -17,17 +20,17 @@ export default function ExpandableDescription({
   useEffect(() => {
     const el = textRef.current;
     if (el) {
-      setIsClamped(el.scrollHeight > MAX_HEIGHT);
+      setIsClamped(el.scrollHeight > lines * LINE_HEIGHT);
     }
-  }, [description]);
+  }, [description, lines]);
 
   return (
     <div>
       <p
         ref={textRef}
         className={cn(
-          'text-[15px] leading-relaxed text-subtle',
-          !isExpanded && isClamped && 'line-clamp-4',
+          'whitespace-pre-line text-[15px] leading-relaxed text-subtle',
+          !isExpanded && isClamped && (lines === 8 ? 'line-clamp-[8]' : 'line-clamp-4'),
         )}
       >
         {description}
