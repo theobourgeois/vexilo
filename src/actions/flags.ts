@@ -619,6 +619,7 @@ async function getFlagDetailFromNameQuery(flagName: string, userId?: string) {
       description: flags.description,
       favorites: flags.favorites,
       views: flags.views,
+      createdAt: flags.createdAt,
       relatedFlags: flags.relatedFlags,
       isFavorite: userId
         ? sql<boolean>`EXISTS (
@@ -679,6 +680,7 @@ export async function getFlagDetailFromName(flagName: string) {
     description: row.description,
     favorites: row.favorites,
     views: row.views,
+    createdAt: row.createdAt,
     relatedFlags: row.relatedFlags,
     isFavorite: row.isFavorite,
     metadata,
@@ -1637,7 +1639,10 @@ export async function getAdminFlags(params: {
   const where = and(
     query ? ilike(flags.name, `%${query}%`) : undefined,
     tag ? sql`${tag} = any(${flags.tags})` : undefined,
-    params.missingDescription ? eq(flags.description, '') : undefined,
+    // The page shows the AI description when the flag has none of its own.
+    params.missingDescription
+      ? sql`${flags.description} = '' and coalesce(${flagAiMetadata.descriptionDraft}, '') = ''`
+      : undefined,
   );
   const orderBy =
     params.sort === 'oldest'
@@ -1657,15 +1662,23 @@ export async function getAdminFlags(params: {
         tags: flags.tags,
         sources: flags.sources,
         description: flags.description,
+        aiDescription: flagAiMetadata.descriptionDraft,
+        aiStatus: flagAiMetadata.generationStatus,
+        aiGeneratedAt: flagAiMetadata.generatedAt,
         favorites: flags.favorites,
         createdAt: flags.createdAt,
       })
       .from(flags)
+      .leftJoin(flagAiMetadata, eq(flagAiMetadata.flagId, flags.id))
       .where(where)
       .orderBy(orderBy, asc(flags.id))
       .limit(ADMIN_FLAGS_PAGE_SIZE)
       .offset((page - 1) * ADMIN_FLAGS_PAGE_SIZE),
-    db.select({ total: count() }).from(flags).where(where),
+    db
+      .select({ total: count() })
+      .from(flags)
+      .leftJoin(flagAiMetadata, eq(flagAiMetadata.flagId, flags.id))
+      .where(where),
   ]);
 
   return { flags: rows, total, pageSize: ADMIN_FLAGS_PAGE_SIZE };

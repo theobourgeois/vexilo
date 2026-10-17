@@ -4,11 +4,11 @@ import {
   getFlagEditHistory,
 } from '@/actions/flags';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight } from '@/components/icons';
+import { ArrowLeft, ChevronRight, Clock, Eye } from '@/components/icons';
 import { after } from 'next/server';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { notFound } from 'next/navigation';
+import Contributors, { type Contributor } from './Contributors';
 import FlagActions from './FlagActions';
 import ExpandableDescription from './ExpandableDescription';
 import FlagViewer from './FlagViewer';
@@ -20,6 +20,7 @@ import Tag from '@/components/Tag';
 import { Suspense } from 'react';
 import FlagFieldsForm from '@/components/FlagFieldsForm';
 import SourceBadge from '@/components/SourceBadge';
+import { getFlagPalette } from '@/lib/flag-palette';
 import { ensureFlagImageSelfHosted } from '@/lib/storage/flag-image-mirror';
 
 export type RelatedFlag = {
@@ -93,29 +94,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const COLOR_HEX: Record<string, string> = {
-  red: '#D52B1E',
-  blue: '#1F4E9C',
-  green: '#1B8A3F',
-  yellow: '#F7C600',
-  white: '#FFFFFF',
-  black: '#111111',
-  orange: '#F07C1B',
-  purple: '#6A2C8F',
-  brown: '#7A4B26',
-  gold: '#C9A13B',
-  silver: '#B9BCC0',
-  maroon: '#7A1F2B',
-  light_blue: '#6CACE4',
-};
+const formatDate = (date: Date) =>
+  new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+const formatMonth = (date: Date) =>
+  new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+const formatShare = (share: number) => (share < 0.01 ? '<1%' : `${Math.round(share * 100)}%`);
 
 const humanize = (value: string) =>
   value.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
-function Block({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
+function Panel({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className='mt-7'>
-      <h2 className='mb-2.5 flex items-baseline gap-2 text-sm font-semibold'>
+    <section className='vx-tile px-[22px] py-5'>
+      <h2 className='mb-2 flex items-baseline gap-2 text-sm font-semibold'>
         {title}
         {aside !== undefined && <span className='tabular-nums text-[13px] font-normal text-muted-foreground'>{aside}</span>}
       </h2>
@@ -126,44 +119,52 @@ function Block({ title, aside, children }: { title: string; aside?: React.ReactN
 
 function SpecRows({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
-    <dl className='grid grid-cols-[38%_1fr] text-[13.5px]'>
+    <dl className='grid grid-cols-[auto_minmax(0,1fr)] text-[13.5px]'>
       {rows.map(([k, v]) => (
-        <div key={k} className='contents [&>*]:border-b [&>*]:border-line'>
-          <dt className='py-2.5 pr-4 text-muted-foreground'>{k}</dt>
-          <dd className='min-w-0 truncate py-2.5'>{v}</dd>
+        <div key={k} className='contents [&>*]:border-b [&>*]:border-line [&:last-child>*]:border-0'>
+          <dt className='py-2.5 pr-6 text-muted-foreground'>{k}</dt>
+          <dd className='min-w-0 truncate py-2.5 text-right'>{v}</dd>
         </div>
       ))}
     </dl>
   );
 }
 
-function ColoursBlock({ data }: { data: FlagAiStructuredData }) {
-  const colors = [...new Set([...(data.dominantColors ?? []), ...(data.secondaryColors ?? [])])];
-  if (colors.length === 0) return null;
+// Colours are read from the image itself (cached), so they stream in after the page.
+async function ColoursPanel({ image }: { image: string }) {
+  const palette = await getFlagPalette(image);
+  if (palette.length === 0) return null;
+  const total = palette.reduce((sum, color) => sum + color.share, 0);
   return (
-    <Block title='Colours'>
-      <div className='flex flex-wrap gap-2.5'>
-        {colors.map((c) => (
-          <div key={c} className='vx-tile flex items-center gap-2.5 rounded-[10px] py-1.5 pl-1.5 pr-3'>
-            <span
-              className='size-[26px] rounded-[6px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.1)]'
-              style={{ background: COLOR_HEX[c] ?? c }}
-            />
-            <span className='leading-tight'>
-              <span className='block text-[13px]'>{humanize(c)}</span>
-              <span className='block tabular-nums text-xs text-muted-foreground'>
-                {(COLOR_HEX[c] ?? c).toUpperCase()}
-                {(data.dominantColors ?? []).includes(c) ? ' · dominant' : ''}
-              </span>
-            </span>
-          </div>
+    <Panel title='Colours' aside={palette.length}>
+      <div className='relative mt-1 mb-1.5 flex h-3.5 overflow-hidden rounded-full after:absolute after:inset-0 after:rounded-full after:shadow-[inset_0_0_0_1px_var(--border)]'>
+        {palette.map((color) => (
+          <span key={color.hex} style={{ flex: color.share / total, minWidth: 4, background: color.hex }} />
         ))}
       </div>
-    </Block>
+      <ul className='text-[13.5px]'>
+        {palette.map((color) => (
+          <li key={color.hex} className='flex items-center gap-2.5 border-b border-line py-2.5 last:border-0'>
+            <span
+              className='size-3.5 shrink-0 rounded-[4px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.15)]'
+              style={{ background: color.hex }}
+            />
+            <span className='flex-1'>{color.name}</span>
+            <span className='tabular-nums text-muted-foreground'>
+              {color.hex} · {formatShare(color.share)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   );
 }
 
-function TraitsBlock({ data }: { data: FlagAiStructuredData }) {
+function PanelSkeleton() {
+  return <div className='vx-tile h-[260px] animate-pulse' />;
+}
+
+function TraitsPanel({ data }: { data: FlagAiStructuredData }) {
   const rows: [string, React.ReactNode][] = [];
   if (data.layoutType) rows.push(['Layout', humanize(data.layoutType)]);
   if (data.patternType) rows.push(['Pattern', humanize(data.patternType)]);
@@ -172,9 +173,9 @@ function TraitsBlock({ data }: { data: FlagAiStructuredData }) {
   if (data.hasText !== undefined) rows.push(['Text', data.hasText ? humanize(data.textType ?? 'yes') : 'None']);
   if (rows.length === 0) return null;
   return (
-    <Block title='Traits'>
+    <Panel title='Traits'>
       <SpecRows rows={rows} />
-    </Block>
+    </Panel>
   );
 }
 
@@ -210,72 +211,34 @@ async function RelatedFlagsSection({ flagId }: { flagId: string }) {
   );
 }
 
-// Single edit entry component
-function EditHistoryEntry({
-  edit,
-}: {
-  edit: {
-    id: string;
-    userName: string | null;
-    userImage: string | null;
-    userNumber: string;
-    createdAt: Date;
-  };
-}) {
-  return (
-    <div className='flex items-center gap-3 border-b border-line py-2.5'>
-      <Link href={`/profile/${edit.userNumber}`}>
-        <Avatar className='size-6'>
-          <AvatarImage src={edit.userImage || ''} alt={edit.userName || 'User'} />
-          <AvatarFallback className='text-[10px]'>{edit.userName?.charAt(0) || 'U'}</AvatarFallback>
-        </Avatar>
-      </Link>
-      <Link href={`/profile/${edit.userNumber}`} className='min-w-0 flex-1 truncate text-[13px] font-medium hover:underline'>
-        {edit.userName || 'Unknown user'}
-      </Link>
-      <time className='shrink-0 tabular-nums text-[11.5px] text-muted-foreground'>
-        {new Date(edit.createdAt).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })}
-      </time>
-    </div>
-  );
-}
-
-// Edit history section
-async function EditHistorySection({ flagId }: { flagId: string }) {
+// Streams in after the page so the edit history query doesn't block it.
+async function ContributorsSection({ flagId }: { flagId: string }) {
   const editHistory = await getFlagEditHistory(flagId);
+  if (!editHistory || editHistory.length === 0) return null;
 
-  if (!editHistory || editHistory.length === 0) {
-    return null;
+  // History is newest first, so the first edit seen per user is their latest.
+  const byUser = new Map<string, Contributor>();
+  for (const edit of editHistory) {
+    const existing = byUser.get(edit.userNumber);
+    if (existing) existing.edits++;
+    else
+      byUser.set(edit.userNumber, {
+        userNumber: edit.userNumber,
+        name: edit.userName,
+        image: edit.userImage,
+        edits: 1,
+        lastEditedAt: edit.createdAt,
+      });
   }
-
-  const initialEdits = editHistory.slice(0, 5);
-  const remainingEdits = editHistory.slice(5);
+  const contributors = [...byUser.values()].sort((a, b) => b.edits - a.edits);
+  // getFlagEditHistory caps at 20 rows.
+  const totalEdits = editHistory.length >= 20 ? '20+' : String(editHistory.length);
 
   return (
-    <Block title='Edit history' aside={editHistory.length}>
-      <div>
-        {initialEdits.map((edit) => (
-          <EditHistoryEntry key={edit.id} edit={edit} />
-        ))}
-        {remainingEdits.length > 0 && (
-          <details className='group'>
-            <summary className='cursor-pointer list-none pt-2 text-center text-[13px] text-muted-foreground hover:text-foreground'>
-              <span className='group-open:hidden'>
-                Show {remainingEdits.length} more
-              </span>
-              <span className='hidden group-open:inline'>Show less</span>
-            </summary>
-            {remainingEdits.map((edit) => (
-              <EditHistoryEntry key={edit.id} edit={edit} />
-            ))}
-          </details>
-        )}
-      </div>
-    </Block>
+    <div>
+      <h2 className='mb-2.5 text-sm font-semibold'>Contributors</h2>
+      <Contributors contributors={contributors} totalEdits={totalEdits} />
+    </div>
   );
 }
 
@@ -344,6 +307,7 @@ export default async function FlagPage({
     ['Catalogue', <span key='i' className='tabular-nums'>#{String(flag.index).padStart(4, '0')}</span>],
     ['Views', <span key='v' className='tabular-nums'>{flag.views.toLocaleString()}</span>],
     ['Favorites', <span key='f' className='tabular-nums'>{flag.favorites}</span>],
+    ['Added', formatDate(flag.createdAt)],
   ];
   if (flag.link) {
     details.push([
@@ -379,10 +343,9 @@ export default async function FlagPage({
         <span className='truncate font-medium text-foreground'>{flag.name}</span>
       </nav>
 
-      <div className='grid items-start gap-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:gap-10'>
+      <div className='grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-10'>
         <div className='min-w-0'>
           <FlagViewer image={flag.image} name={flag.name} />
-          {structured && <ColoursBlock data={structured} />}
         </div>
 
         <div className='min-w-0 lg:pt-1'>
@@ -398,35 +361,52 @@ export default async function FlagPage({
               <ExpandableDescription description={flag.displayDescription} />
             </div>
           )}
+          <div className='mt-4 flex flex-wrap gap-x-[18px] gap-y-1 text-[13px] text-subtle [&_svg]:size-[15px] [&_svg]:text-muted-foreground'>
+            <span className='flex items-center gap-1.5 tabular-nums'>
+              <Eye />
+              {flag.views.toLocaleString()} view{flag.views === 1 ? '' : 's'}
+            </span>
+            <span className='flex items-center gap-1.5'>
+              <Clock />
+              Added {formatMonth(flag.createdAt)}
+            </span>
+          </div>
           <div className='mt-5'>
             <FlagActions flag={{ ...flag, relatedFlags: [] }} />
           </div>
           {flag.displayTags.length > 0 && (
-            <Block title='Tags'>
-              <div className='flex flex-wrap gap-1.5'>
-                {flag.displayTags.map((tag: string) => (
-                  <Tag key={tag} text={tag} />
-                ))}
-              </div>
-            </Block>
+            <div className='mt-6 flex flex-wrap gap-1.5'>
+              {flag.displayTags.map((tag: string) => (
+                <Tag key={tag} text={tag} />
+              ))}
+            </div>
           )}
-          <Block title='Details'>
-            <SpecRows rows={details} />
-          </Block>
-          {structured && <TraitsBlock data={structured} />}
-          {flag.sources && flag.sources.length > 0 && (
-            <Block title='Sources'>
-              <div className='flex flex-wrap gap-2'>
-                {flag.sources.map((source, index) => (
-                  <SourceBadge key={`source-${index}`} source={source} />
-                ))}
+          <div className='mt-7 grid grid-cols-1 gap-6 border-t border-line pt-5 empty:hidden sm:grid-cols-2'>
+            <Suspense fallback={null}>
+              <ContributorsSection flagId={flag.id} />
+            </Suspense>
+            {flag.sources && flag.sources.length > 0 && (
+              <div className='min-w-0'>
+                <h2 className='mb-2.5 text-sm font-semibold'>Sources</h2>
+                <div className='flex flex-col items-start gap-1.5'>
+                  {flag.sources.map((source, index) => (
+                    <SourceBadge key={`source-${index}`} source={source} />
+                  ))}
+                </div>
               </div>
-            </Block>
-          )}
-          <Suspense fallback={null}>
-            <EditHistorySection flagId={flag.id} />
-          </Suspense>
+            )}
+          </div>
         </div>
+      </div>
+
+      <div className={`mt-5 grid gap-4 md:grid-cols-2 ${structured ? 'lg:grid-cols-3' : ''}`}>
+        <Suspense fallback={<PanelSkeleton />}>
+          <ColoursPanel image={flag.image} />
+        </Suspense>
+        {structured && <TraitsPanel data={structured} />}
+        <Panel title='Details'>
+          <SpecRows rows={details} />
+        </Panel>
       </div>
 
       <Suspense

@@ -7,7 +7,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { describeEditChanges, isTypingTarget, needsLook } from './review-utils';
+import { EditDiff } from './EditDiff';
+import { isTypingTarget, needsLook } from './review-utils';
 
 type Decision = 'approved' | 'declined';
 
@@ -247,43 +248,37 @@ export function FocusMode({ items: initialItems, onApprove, onDecline, onPatched
             />
 
             <div className='mt-6 space-y-4 text-sm'>
-              {item.isEdit && (
-                <div>
-                  <p className='tabular-nums text-xs font-medium text-white/40 mb-1.5'>Changes</p>
-                  <div className='flex flex-wrap gap-1.5'>
-                    {describeEditChanges(item).map((change) => (
-                      <span key={change} className='rounded-full bg-main-soft text-main px-2.5 py-1 text-xs font-medium'>
-                        {change}
-                      </span>
-                    ))}
+              {item.isEdit && item.oldFlag ? (
+                <EditDiff before={item.oldFlag} after={item.flag} labelClassName='text-white/40' />
+              ) : (
+                <>
+                  <div>
+                    <p className='tabular-nums text-xs font-medium text-white/40 mb-1'>Source</p>
+                    {(item.flag.sources ?? []).length > 0 ? (
+                      item.flag.sources.map((source) => (
+                        <a key={source} href={source} target='_blank' rel='noopener noreferrer' className='block truncate text-main underline underline-offset-2'>
+                          {source.replace(/^https?:\/\/(www\.)?/, '')}
+                        </a>
+                      ))
+                    ) : (
+                      <p className='text-main font-medium'>No source</p>
+                    )}
                   </div>
-                </div>
+                  {(item.flag.tags ?? []).length > 0 && (
+                    <div>
+                      <p className='tabular-nums text-xs font-medium text-white/40 mb-1.5'>Tags</p>
+                      <div className='flex flex-wrap gap-1.5'>
+                        {item.flag.tags.map((tag) => (
+                          <span key={tag} className='rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium'>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {item.flag.description && <p className='text-white/70 line-clamp-4'>{item.flag.description}</p>}
+                </>
               )}
-              <div>
-                <p className='tabular-nums text-xs font-medium text-white/40 mb-1'>Source</p>
-                {(item.flag.sources ?? []).length > 0 ? (
-                  item.flag.sources.map((source) => (
-                    <a key={source} href={source} target='_blank' rel='noopener noreferrer' className='block truncate text-main underline underline-offset-2'>
-                      {source.replace(/^https?:\/\/(www\.)?/, '')}
-                    </a>
-                  ))
-                ) : (
-                  <p className='text-main font-medium'>No source</p>
-                )}
-              </div>
-              {(item.flag.tags ?? []).length > 0 && (
-                <div>
-                  <p className='tabular-nums text-xs font-medium text-white/40 mb-1.5'>Tags</p>
-                  <div className='flex flex-wrap gap-1.5'>
-                    {item.flag.tags.map((tag) => (
-                      <span key={tag} className='rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium'>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {item.flag.description && <p className='text-white/70 line-clamp-4'>{item.flag.description}</p>}
               {warning ? (
                 <div className='rounded-[11px] bg-main-soft border border-main/35 px-3 py-2.5 flex items-center gap-2 text-white/90'>
                   <Copy className='size-4 shrink-0 text-main' />

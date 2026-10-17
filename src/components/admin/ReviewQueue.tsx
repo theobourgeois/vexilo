@@ -183,6 +183,20 @@ export function ReviewQueue() {
 
   const panelIndex = ordered.findIndex((item) => item.id === panelId);
   const panelItem = panelIndex === -1 ? null : ordered[panelIndex];
+  const panelGroup = panelItem ? groups.find((group) => group.items.includes(panelItem)) : undefined;
+  const panelGroupIndex = panelGroup && panelItem ? panelGroup.items.indexOf(panelItem) : -1;
+  const moveInGroup = (offset: number) => {
+    const target = panelGroup?.items[panelGroupIndex + offset];
+    if (target) setPanelId(target.id);
+  };
+
+  // Keep the open request's tile in view while stepping through the queue.
+  useEffect(() => {
+    if (!panelId) return;
+    document
+      .querySelector<HTMLElement>(`[data-request-id="${panelId}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [panelId]);
   const moveAfterDecision = (id: string) => {
     const index = ordered.findIndex((item) => item.id === id);
     const next = ordered[index + 1] ?? ordered[index - 1] ?? null;
@@ -312,6 +326,7 @@ export function ReviewQueue() {
                     return (
                       <div
                         key={item.id}
+                        data-request-id={item.id}
                         role='button'
                         tabIndex={0}
                         onClick={() => setPanelId(item.id)}
@@ -343,6 +358,7 @@ export function ReviewQueue() {
                   return (
                     <div
                       key={item.id}
+                      data-request-id={item.id}
                       role='button'
                       tabIndex={0}
                       onClick={() => setPanelId(item.id)}
@@ -435,6 +451,10 @@ export function ReviewQueue() {
           item={panelItem}
           position={panelIndex + 1}
           total={ordered.length}
+          groupPosition={panelGroupIndex + 1}
+          groupTotal={panelGroup?.items.length ?? 1}
+          onPreviousInGroup={() => moveInGroup(-1)}
+          onNextInGroup={() => moveInGroup(1)}
           onPrevious={() => setPanelId(ordered[(panelIndex - 1 + ordered.length) % ordered.length].id)}
           onNext={() => setPanelId(ordered[(panelIndex + 1) % ordered.length].id)}
           onClose={() => setPanelId(null)}
