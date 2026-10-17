@@ -1,5 +1,10 @@
+import { and, eq } from 'drizzle-orm';
+import { after } from 'next/server';
 import sharp from 'sharp';
+import { db } from '@/db';
 import { redis } from '@/db/redis';
+import { flagColors } from '@/db/schema';
+import { type ColorFamily, PALETTE_NAME_FAMILY } from '@/lib/flag-search-terms';
 
 export type PaletteColor = {
   hex: string;
@@ -18,6 +23,8 @@ const MIN_SHARE = 0.006;
 /** A small colour this close to the line between two bigger ones is an anti-aliased edge between them. */
 const BLEND_DISTANCE = 12;
 const MAX_COLORS = 6;
+/** A colour has to cover this much of the flag before the flag counts as, say, "red" in search. */
+const FAMILY_MIN_SHARE = 0.04;
 
 type Lab = [number, number, number];
 
@@ -181,24 +188,95 @@ export async function extractPalette(image: Buffer): Promise<PaletteColor[]> {
     .slice(0, MAX_COLORS);
 }
 
+/** Downloads a flag image and reads its palette; empty when the image can't be read. */
+export async function readImagePalette(imageUrl: string): Promise<PaletteColor[]> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(imageUrl, {
+        // Wikimedia rejects requests without a descriptive user agent.
+        headers: { 'User-Agent': 'Vexilo/1.0 (https://vexilo.org)' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (response.ok) return await extractPalette(Buffer.from(await response.arrayBuffer()));
+      // Back off when rate limited (Wikimedia) or the host hiccups; other failures are final.
+      if (response.status !== 429 && response.status < 500) return [];
+      const retryAfter = Number(response.headers.get('retry-after'));
+      await new Promise((resolve) => setTimeout(resolve, (retryAfter || 2 ** attempt) * 1000));
+    } catch (error) {
+      console.error(`[flag-palette] Could not read ${imageUrl}:`, error);
+      return [];
+    }
+  }
+  return [];
+}
+
+/** Broad colour families that cover enough of the flag to count when searching ("a red flag"). */
+export function paletteFamilies(palette: PaletteColor[]): ColorFamily[] {
+  const families = new Set<ColorFamily>();
+  for (const color of palette) {
+    const family = PALETTE_NAME_FAMILY[color.name];
+    if (family && color.share >= FAMILY_MIN_SHARE) families.add(family);
+  }
+  return [...families];
+}
+
+/** Reads the palette for an image and stores it on the flag, replacing what was there. */
+export async function storeFlagColors(flagId: string, imageUrl: string): Promise<PaletteColor[]> {
+  const palette = await readImagePalette(imageUrl);
+  const values = { image: imageUrl, colors: palette, families: paletteFamilies(palette), updatedAt: new Date() };
+  await db
+    .insert(flagColors)
+    .values({ flagId, ...values })
+    .onConflictDoUpdate({ target: flagColors.flagId, set: values });
+  return palette;
+}
+
+/**
+ * Saves a flag's colours once the current request has responded, so approving or editing a
+ * flag isn't slowed down by downloading its image. Outside a request (scripts) it runs now.
+ */
+export function saveFlagColorsLater(flagId: string, imageUrl: string) {
+  const task = () =>
+    storeFlagColors(flagId, imageUrl).then(
+      () => undefined,
+      (error) => console.error(`[flag-palette] Could not save colours for ${flagId}:`, error),
+    );
+  try {
+    after(task);
+  } catch {
+    void task();
+  }
+}
+
+/** Points stored colours at a new URL for the same picture (e.g. a self-hosted copy) without re-reading it. */
+export async function moveFlagColors(flagId: string, fromUrl: string, toUrl: string) {
+  await db
+    .update(flagColors)
+    .set({ image: toUrl })
+    .where(and(eq(flagColors.flagId, flagId), eq(flagColors.image, fromUrl)))
+    .catch((error) => console.error(`[flag-palette] Could not move colours for ${flagId}:`, error));
+}
+
+/** The flag's stored colours, read from its image the first time (or after the image changes). */
+export async function getFlagColors(flag: { id: string; image: string }): Promise<PaletteColor[]> {
+  try {
+    const [row] = await db.select().from(flagColors).where(eq(flagColors.flagId, flag.id)).limit(1);
+    if (row && row.image === flag.image) return row.colors;
+    return await storeFlagColors(flag.id, flag.image);
+  } catch (error) {
+    // The colours table may not exist yet (migration not applied); fall back to the cache.
+    console.error('[flag-palette] Could not use stored colours:', error);
+    return getFlagPalette(flag.image);
+  }
+}
+
 /** Cached palette for a flag image URL; empty when the image can't be read. */
 export async function getFlagPalette(imageUrl: string): Promise<PaletteColor[]> {
   const key = CACHE_PREFIX + imageUrl;
   const cached = await redis.get<PaletteColor[]>(key).catch(() => null);
   if (cached) return cached;
 
-  let palette: PaletteColor[] = [];
-  try {
-    const response = await fetch(imageUrl, {
-      // Wikimedia rejects requests without a descriptive user agent.
-      headers: { 'User-Agent': 'Vexilo/1.0 (https://vexilo.org)' },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (response.ok) palette = await extractPalette(Buffer.from(await response.arrayBuffer()));
-  } catch (error) {
-    console.error(`[flag-palette] Could not read ${imageUrl}:`, error);
-  }
-
+  const palette = await readImagePalette(imageUrl);
   await redis
     .set(key, palette, { ex: palette.length > 0 ? CACHE_SECONDS : FAILURE_CACHE_SECONDS })
     .catch(() => null);

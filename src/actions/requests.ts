@@ -8,6 +8,8 @@ import { and, count, eq, inArray, max, ne, sql } from 'drizzle-orm';
 import { base64ImageToS3URI, deleteFileFromUrl } from './s3';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { redis } from '@/db/redis';
+import { relatedFlagsCacheKey } from '@/lib/cache-keys';
+import { saveFlagColorsLater } from '@/lib/flag-palette';
 import { upsertFlagMetadataMirror } from './flag-ai-metadata';
 import { findExistingFlags } from './batch-flags';
 
@@ -274,6 +276,7 @@ async function publishNewFlagRequest(flagRequest: FlagRequestRow) {
     })
     .returning({ id: flags.id })
     .then((res) => res[0]);
+  saveFlagColorsLater(flag.id, flagRequest.flag.flagImage);
 
   await upsertFlagMetadataMirror({
     flagId: flag.id,
@@ -365,6 +368,7 @@ async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
       updatedAt: new Date(),
     })
     .where(eq(flags.id, flagRequest.flagId ?? ''));
+  if (nextImage !== flag.image) saveFlagColorsLater(flag.id, nextImage);
 
   await upsertFlagMetadataMirror({
     flagId: flag.id,
@@ -393,7 +397,7 @@ async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
   await redis.del('leaderboard');
   await redis.del('tags');
   await redis.del(`flag-${flagRequest.flagId}`);
-  await redis.del(`recommendations-${flagRequest.flagId}`);
+  await redis.del(`recommendations-${flagRequest.flagId}`, relatedFlagsCacheKey(flagRequest.flagId ?? ''));
 
   return true;
 }

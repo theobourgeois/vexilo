@@ -1,19 +1,36 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Suspense } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import Logo from '@/components/Logo';
-import { HeaderSearch } from '@/components/header-search';
+import { FlagOfTheDayPill } from '@/components/flag-of-the-day-pill';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { PostFlagButton } from '@/components/post-flag-button';
 import { AuthHeader } from '@/components/auth-header';
 import { HamburgerMenu } from '@/components/hamburger-menu';
 import { cn } from '@/lib/utils';
-import { NAV_LINKS } from '@/lib/nav';
+import { FOCUS_SEARCH_KEY, NAV_LINKS } from '@/lib/nav';
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Search lives on the browse page; "/" or ⌘K from anywhere else goes there with the box focused.
+  useEffect(() => {
+    if (pathname === '/') return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable;
+      if ((event.key === 'k' && (event.metaKey || event.ctrlKey)) || (event.key === '/' && !typing)) {
+        event.preventDefault();
+        sessionStorage.setItem(FOCUS_SEARCH_KEY, '1');
+        router.push('/');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pathname, router]);
 
   return (
     <header className='sticky top-0 z-40 border-b border-line bg-background/80 backdrop-blur-xl backdrop-saturate-150'>
@@ -36,9 +53,7 @@ export function SiteHeader() {
             );
           })}
         </nav>
-        <Suspense fallback={<div className='ml-auto h-[38px] max-w-[440px] flex-1' />}>
-          <HeaderSearch className='ml-auto max-w-[440px] flex-1' />
-        </Suspense>
+        <FlagOfTheDayPill className='ml-auto' />
         <div className='hidden items-center gap-2 md:flex'>
           <ThemeToggle />
           <PostFlagButton />
