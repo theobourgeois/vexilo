@@ -49,6 +49,7 @@ export const Eye = bold(Ph.Eye, 'Eye');
 export const FileText = bold(Ph.FileText, 'FileText');
 export const Fire = bold(Ph.Fire, 'Fire');
 export const Flag = bold(Ph.Flag, 'Flag');
+export const ImageBroken = bold(Ph.ImageBroken, 'ImageBroken');
 export const FlagBanner = bold(Ph.FlagBanner, 'FlagBanner');
 export const FolderOpen = bold(Ph.FolderOpen, 'FolderOpen');
 export const Gamepad2 = bold(Ph.GameController, 'Gamepad2');
