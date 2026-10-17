@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getUserData } from '@/actions/users';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { X, Flag, LucideIcon } from 'lucide-react';
+import { X, Flag, Icon } from '@/components/icons';
 
 // ============================================
 // Generic Alert Banner Component
@@ -17,7 +17,7 @@ export type AlertBannerConfig = {
   /** Unique key for localStorage to track dismissal */
   id: string;
   /** Icon to display in the alert */
-  icon?: LucideIcon;
+  icon?: Icon;
   /** Main message content - can be string or ReactNode for custom formatting */
   message: ReactNode;
   /** Call-to-action button text */
@@ -101,34 +101,19 @@ export function AlertBanner({ config, isLoading = false }: AlertBannerProps) {
   }
 
   return (
-    <Alert className='relative' variant={variant}>
-      {Icon && <Icon className='h-4 w-4' />}
-      <AlertDescription className='flex items-center justify-between gap-4 pr-8'>
-        <span>
-          {message}
-          {actionText && (onAction || href) && (
-            <>
-              {' '}
-              <Button
-                variant='default'
-                className='py-0 px-2 h-auto font-semibold underline ml-1 cursor-pointer'
-                onClick={handleAction}
-              >
-                {actionText}
-              </Button>
-            </>
-          )}
-        </span>
+    <Alert className='flex items-center gap-3 py-2.5 pl-4 pr-2.5' variant={variant}>
+      {Icon && <Icon className='size-4 shrink-0 text-main' />}
+      <AlertDescription className='min-w-0 flex-1 text-[13.5px] text-subtle [&_strong]:font-semibold [&_strong]:text-foreground'>
+        {message}
       </AlertDescription>
+      {actionText && (onAction || href) && (
+        <Button variant='neutral' size='sm' onClick={handleAction} className='shrink-0'>
+          {actionText}
+        </Button>
+      )}
       {dismissible && (
-        <Button
-          variant='default'
-          size='sm'
-          className='absolute top-2 right-2 h-6 w-6 p-0 hover:bg-white/20 cursor-pointer'
-          onClick={handleDismiss}
-          aria-label='Dismiss'
-        >
-          <X className='h-4 w-4' />
+        <Button variant='ghost' size='icon-sm' className='shrink-0' onClick={handleDismiss} aria-label='Dismiss'>
+          <X />
         </Button>
       )}
     </Alert>
@@ -146,7 +131,7 @@ type AlertBannerContainerProps = {
 
 export function AlertBannerContainer({
   alerts,
-  className = 'max-w-7xl mx-auto px-4 pt-4',
+  className = 'mx-auto max-w-[1312px] px-4 pt-4 md:px-8',
 }: AlertBannerContainerProps) {
   return (
     <div className={`${className} space-y-2`}>
@@ -200,17 +185,16 @@ export function ProfileFlagAlert() {
     icon: Flag,
     message: (
       <>
-        <strong>Show off your favorite flag!</strong> Add a flag badge to your
-        profile picture.
+        <strong>Pick a profile flag.</strong> It shows next to your name across Vexilo.
       </>
     ),
-    actionText: session?.user ? 'Go to Settings' : 'Sign in to get started',
+    actionText: session?.user ? 'Choose flag' : 'Sign in',
     onAction: handleAction,
     shouldShow,
   };
 
   return (
-    <div className='max-w-7xl mx-auto px-4 pt-4'>
+    <div className='pt-6 empty:hidden'>
       <AlertBanner config={config} isLoading={isLoading} />
     </div>
   );

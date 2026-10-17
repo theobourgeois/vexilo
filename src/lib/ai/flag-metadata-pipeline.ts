@@ -6,14 +6,15 @@ import {
   flags,
 } from '@/db/schema';
 import { openai } from '@ai-sdk/openai';
-import { Output, generateText } from 'ai';
+import { type InferToolOutput, Output, generateText } from 'ai';
 import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import { tavily } from '@tavily/core';
 import { z } from 'zod';
 
 const DEFAULT_MODEL = process.env.FLAG_AI_MODEL || 'gpt-5';
-const PIPELINE_VERSION = 'v1-single-pass';
+const PIPELINE_VERSION = 'v2-openai-web-search';
+const MAX_WEB_SEARCH_CALLS = 2;
+const WEB_SEARCH_USD_PER_CALL = 0.01;
 
 type FlagRecord = {
   id: string;
@@ -75,6 +76,10 @@ type OpenAiUserContentPart =
       type: 'image';
       image: URL | Uint8Array;
     };
+
+type WebSearchOutput = InferToolOutput<
+  ReturnType<typeof openai.tools.webSearch>
+>;
 
 type ModelPricing = {
   inputUsdPerMillion: number;
@@ -229,6 +234,14 @@ function formatUsd(value: number): string {
 function getModelPricing(model: string): ModelPricing | null {
   const normalizedModel = model.trim().toLowerCase();
 
+  if (normalizedModel === 'gpt-6-luna') {
+    return {
+      inputUsdPerMillion: 0.1,
+      cachedInputUsdPerMillion: 0.01,
+      outputUsdPerMillion: 0.5,
+    };
+  }
+
   if (normalizedModel === 'gpt-5.4') {
     return {
       inputUsdPerMillion: 2.5,
@@ -264,7 +277,11 @@ function getModelPricing(model: string): ModelPricing | null {
   return null;
 }
 
-function buildUsageLog(usage: UsageSnapshot, model: string) {
+export function buildUsageLog(
+  usage: UsageSnapshot,
+  model: string,
+  webSearchCalls = 0,
+) {
   const inputTokens = usage.inputTokens ?? 0;
   const outputTokens = usage.outputTokens ?? 0;
   const totalTokens = usage.totalTokens ?? inputTokens + outputTokens;
@@ -283,7 +300,8 @@ function buildUsageLog(usage: UsageSnapshot, model: string) {
       (nonCachedInputTokens / 1_000_000) * pricing.inputUsdPerMillion +
       (cachedInputTokens / 1_000_000) *
         (pricing.cachedInputUsdPerMillion ?? pricing.inputUsdPerMillion) +
-      (outputTokens / 1_000_000) * pricing.outputUsdPerMillion;
+      (outputTokens / 1_000_000) * pricing.outputUsdPerMillion +
+      webSearchCalls * WEB_SEARCH_USD_PER_CALL;
   }
 
   return {
@@ -293,6 +311,7 @@ function buildUsageLog(usage: UsageSnapshot, model: string) {
     nonCachedInputTokens,
     cachedInputTokens,
     cacheWriteTokens,
+    webSearchCalls,
     ...(typeof textOutputTokens === 'number' ? { textOutputTokens } : {}),
     ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
     ...(typeof estimatedCostUsd === 'number'
@@ -696,17 +715,17 @@ async function buildOpenAiUserContent(
   return content;
 }
 
-function buildStructuredPrompt(flag: FlagRecord, researchMemo: string): string {
+function buildStructuredPrompt(flag: FlagRecord): string {
   return [
     'You are generating high-precision AI metadata for a vexillology website.',
     'Use the provided image as the primary visual source of truth.',
-    'Use the grounded research memo below only for supported historical or contextual facts.',
+    `Use web search to research this flag's history, origin, and symbolism. Use what you find only for supported historical or contextual facts.`,
     'Do not invent facts. If uncertain, prefer an empty string or empty array.',
     'Keep user-facing tags broad and useful; keep meta tags dense and visually descriptive for embeddings.',
     'The structuredData object is the primary search representation. Be consistent and prefer the controlled vocabulary exactly.',
     'Use snake_case for regionTags, periodTags, and styleTags.',
     'Write user-facing prose as direct factual copy, not as commentary about your sources or process.',
-    'Do not mention the research memo, provided materials, source bundle, or use phrases like "according to", "the memo states", or "the research says".',
+    'Do not mention web searches, sources, provided materials, or use phrases like "according to" or "the research says".',
     '',
     `Flag name: ${flag.name}`,
     `Flag index: ${flag.index}`,
@@ -714,9 +733,6 @@ function buildStructuredPrompt(flag: FlagRecord, researchMemo: string): string {
     `Existing tags: ${flag.tags.join(', ') || '(none)'}`,
     `Existing source URLs: ${flag.sources.join(', ') || '(none)'}`,
     `Reference link: ${flag.link}`,
-    '',
-    'Grounded research memo:',
-    researchMemo || '(none)',
     '',
     'Important distinctions:',
     '- descriptionDraft: short, polished, public-facing draft',
@@ -738,67 +754,8 @@ function buildStructuredPrompt(flag: FlagRecord, researchMemo: string): string {
   ].join('\n');
 }
 
-function buildResearchQuery(flag: FlagRecord): string {
-  const keywords = [
-    'flag',
-    flag.name,
-    'design',
-    'symbolism',
-    'history',
-    'vexillology',
-    ...flag.tags.slice(0, 5),
-  ]
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  const dedupedKeywords = Array.from(new Set(keywords));
-  const query = dedupedKeywords.join(' ').slice(0, 300).trim();
-
-  return query || `flag ${flag.name}`;
-}
-
-function buildResearchMemoFromTavily(response: {
-  answer?: string;
-  results: Array<{
-    title: string;
-    url: string;
-    content: string;
-    rawContent?: string;
-  }>;
-}): string {
-  const sections: string[] = [];
-
-  if (response.answer?.trim()) {
-    sections.push(`Summary:\n${response.answer.trim()}`);
-  }
-
-  for (const [index, result] of response.results.entries()) {
-    const body = (result.rawContent || result.content || '')
-      .trim()
-      .slice(0, 1800);
-    sections.push(
-      [
-        `Source ${index + 1}: ${result.title}`,
-        `URL: ${result.url}`,
-        body ? `Content:\n${body}` : '',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-    );
-  }
-
-  return sections.join('\n\n').trim();
-}
-
-async function researchFlagWithTavily(
-  flag: FlagRecord,
-  logger?: PipelineLogFn,
-): Promise<{
-  researchMemo: string;
-  researchSources: FlagAiResearchSource[];
-  rawResponse: unknown;
-}> {
-  const baseSources: FlagAiResearchSource[] = [
+function buildManualResearchSources(flag: FlagRecord): FlagAiResearchSource[] {
+  return [
     {
       type: 'manual',
       url: flag.link,
@@ -812,71 +769,6 @@ async function researchFlagWithTavily(
       }),
     ),
   ];
-
-  const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) {
-    emitLog(
-      logger,
-      'warn',
-      'TAVILY_API_KEY is missing, skipping external web research',
-    );
-    return {
-      researchMemo: '',
-      researchSources: dedupeResearchSources(baseSources),
-      rawResponse: null,
-    };
-  }
-
-  const client = tavily({ apiKey });
-  const query = buildResearchQuery(flag);
-
-  emitLog(logger, 'info', 'Searching Tavily for flag research', {
-    query,
-    maxResults: 5,
-    searchDepth: 'advanced',
-  });
-
-  const response = await client.search(query, {
-    searchDepth: 'advanced',
-    topic: 'general',
-    maxResults: 5,
-    includeAnswer: 'advanced',
-    includeRawContent: 'text',
-    chunksPerSource: 3,
-  });
-
-  const webSources = response.results.map(
-    (result): FlagAiResearchSource => ({
-      type: 'web',
-      title: result.title,
-      url: result.url,
-      provider: 'tavily',
-      notes: `Tavily search score: ${result.score}`,
-    }),
-  );
-
-  const researchSources = dedupeResearchSources([
-    {
-      type: 'llm',
-      provider: 'tavily',
-      notes: 'External research retrieved through Tavily search.',
-    },
-    ...baseSources,
-    ...webSources,
-  ]);
-
-  const researchMemo = buildResearchMemoFromTavily(response);
-
-  emitLog(logger, 'info', 'Received Tavily research results', {
-    answerPreview: response.answer?.slice(0, 400) || '',
-    resultCount: response.results.length,
-  });
-
-  return {
-    researchMemo,
-    researchSources,
-    rawResponse: response,
-  };
 }
 
 async function generateViaOpenAi(
@@ -888,11 +780,7 @@ async function generateViaOpenAi(
     throw new Error('Missing OPENAI_API_KEY.');
   }
 
-  const tavilyResearch = await researchFlagWithTavily(flag, logger);
-  const structuredPrompt = buildStructuredPrompt(
-    flag,
-    tavilyResearch.researchMemo,
-  );
+  const structuredPrompt = buildStructuredPrompt(flag);
   const userContent = await buildOpenAiUserContent(
     structuredPrompt,
     flag.image,
@@ -902,27 +790,54 @@ async function generateViaOpenAi(
   emitLog(logger, 'info', 'Sending structured output request to OpenAI', {
     model,
     provider: 'openai',
-    researchSourcesCount: tavilyResearch.researchSources.length,
+    maxWebSearchCalls: MAX_WEB_SEARCH_CALLS,
     promptPreview: structuredPrompt.slice(0, 500),
   });
 
-  const { output, usage } = await generateText({
-    model: openai('gpt-5.4'),
+  const { output, usage, toolCalls, toolResults } = await generateText({
+    model: openai(model),
     messages: [
       {
         role: 'user',
         content: userContent,
       },
     ],
+    tools: {
+      web_search: openai.tools.webSearch({ searchContextSize: 'low' }),
+    },
+    providerOptions: {
+      openai: { maxToolCalls: MAX_WEB_SEARCH_CALLS },
+    },
     output: Output.object({
       schema: flagMetadataObjectSchema,
     }),
   });
 
+  const webSearchCalls = toolCalls.filter(
+    (call) => call.toolName === 'web_search',
+  ).length;
+  const webSources = toolResults.flatMap((result): FlagAiResearchSource[] => {
+    if (result.toolName !== 'web_search') {
+      return [];
+    }
+
+    const { sources = [] } = result.output as WebSearchOutput;
+    return sources.flatMap((source) =>
+      source.type === 'url'
+        ? [{ type: 'web', url: source.url, provider: 'openai_web_search' }]
+        : [],
+    );
+  });
+
+  emitLog(logger, 'info', 'Received OpenAI web search results', {
+    webSearchCalls,
+    sourceCount: webSources.length,
+  });
+
   const structuredData = normalizeStructuredData(output.structuredData);
   const searchTokens = buildSearchTokens(structuredData);
   const embeddingText = buildEmbeddingText(structuredData, searchTokens);
-  const requestUsage = buildUsageLog(usage, 'gpt-5.4');
+  const requestUsage = buildUsageLog(usage, model, webSearchCalls);
 
   const result = {
     flag,
@@ -943,14 +858,15 @@ async function generateViaOpenAi(
           type: 'llm',
           provider: 'openai',
           model,
-          notes: 'Structured metadata generated with the AI SDK.',
+          notes: 'Structured metadata generated with the AI SDK using OpenAI web search.',
         },
-        ...tavilyResearch.researchSources,
+        ...buildManualResearchSources(flag),
+        ...webSources,
       ]),
       structuredData,
     },
     rawResponse: {
-      research: tavilyResearch.rawResponse,
+      research: { webSearchCalls, sources: webSources },
       structured: output,
     },
   };

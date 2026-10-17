@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canada — Vexilo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link rel="stylesheet" href="v2.css" />
+<style>
+  .crumbs { padding: 22px 0 16px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  .crumbs a:hover { color: var(--text); }
+  .crumbs i { font-size: 12px; }
+  .crumbs .cur { color: var(--text); font-weight: 500; }
+  .crumbs .nav-keys { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  .top { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+  .viewer { overflow: hidden; }
+  .viewer .stage-panel { height: 440px; }
+  .viewer .mast { position: absolute; left: 72px; top: 56px; bottom: 0; }
+  .viewer .bar { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 18px; border-top: 1px solid var(--line); }
+  .viewer .bar .mono { font-size: 12px; color: var(--muted); }
+  .viewer .bar .sp { flex: 1; }
+  .view-toggle { position: absolute; top: 14px; right: 14px; }
+
+  .info { padding: 26px 26px 24px; display: flex; flex-direction: column; }
+  .info .added { margin-top: auto; }
+  .info .tags { margin-bottom: 18px; }
+  .info .eyebrow { display: flex; align-items: center; gap: 10px; }
+  .info h1 { margin: 10px 0 0; font-size: 40px; line-height: 1.05; font-weight: 650; letter-spacing: -0.045em; }
+  .info .alt { color: var(--muted); margin-top: 6px; }
+  .info p { margin: 16px 0 0; color: var(--text-2); font-size: 15px; line-height: 1.6; }
+  .info .actions { display: flex; gap: 8px; margin-top: 20px; }
+  .info .actions .sp { flex: 1; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .added { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-2); }
+  .added .avatar { width: 26px; height: 26px; font-size: 10px; }
+  .added b { color: var(--text); font-weight: 600; }
+  .added .sp { flex: 1; }
+
+  .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+  .panel { padding: 20px 22px; }
+  .panel h2 { margin: 0 0 14px; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; display: flex; justify-content: space-between; align-items: center; }
+  .spec { display: grid; grid-template-columns: auto 1fr; row-gap: 0; }
+  .spec dt, .spec dd { margin: 0; padding: 9px 0; border-bottom: 1px dashed var(--line-2); font-size: 13px; }
+  .spec dt { color: var(--muted); padding-right: 16px; }
+  .spec dd { text-align: right; font-weight: 500; }
+  .spec dd a { border-bottom: 1px solid var(--line-2); }
+  .spec dt:nth-last-of-type(1), .spec dd:nth-last-of-type(1) { border-bottom: 0; }
+
+  .swatches { display: grid; gap: 10px; }
+  .sw { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; background: var(--well); box-shadow: var(--shadow-well); }
+  .sw .chipc { width: 40px; height: 40px; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.3); }
+  .sw b { font-weight: 600; font-size: 13px; display: block; }
+  .sw .mono { font-size: 11.5px; color: var(--muted); }
+  .sw button { margin-left: auto; }
+
+  .trait { padding: 10px 0; border-bottom: 1px dashed var(--line-2); }
+  .trait:last-child { border-bottom: 0; }
+  .trait .t { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+  .trait .t span:first-child { color: var(--muted); width: 64px; flex: none; }
+  .trait .t b { font-weight: 600; }
+  .trait .t .mono { margin-left: auto; font-size: 12px; color: var(--text-2); }
+  .meter { height: 4px; border-radius: 4px; margin: 8px 0 0 72px; background: var(--well); box-shadow: var(--shadow-well); overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+
+  .related { margin-top: 40px; }
+  .related .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .related .card .stage { height: 150px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="crumbs">
+    <a href="home.html">Browse</a><i class="ph-bold ph-caret-right"></i>
+    <a href="#">national</a><i class="ph-bold ph-caret-right"></i>
+    <span class="cur">Canada</span>
+    <div class="nav-keys">
+      <span class="mono" style="font-size:12px">#2073</span>
+      <button class="btn btn--sm btn--icon"><i class="ph-bold ph-arrow-left"></i></button>
+      <button class="btn btn--sm btn--icon"><i class="ph-bold ph-arrow-right"></i></button>
+      <span class="mono" style="font-size:12px">#2075</span>
+    </div>
+  </div>
+
+  <section class="top">
+    <div class="tile viewer">
+      <div class="stage-panel">
+        <div class="view-toggle seg">
+          <button class="on"><i class="ph-bold ph-flag"></i>Hoisted</button>
+          <button><i class="ph-bold ph-rectangle"></i>Flat</button>
+        </div>
+        <div class="mast" id="mast"></div>
+      </div>
+      <div class="bar">
+        <span class="mono">1 : 2 · SVG · 2400 × 1200</span>
+        <span class="sp"></span>
+        <button class="btn btn--sm"><i class="ph-bold ph-download-simple"></i>SVG</button>
+        <button class="btn btn--sm"><i class="ph-bold ph-download-simple"></i>PNG</button>
+        <button class="btn btn--sm btn--icon" title="Copy link"><i class="ph-bold ph-link-simple"></i></button>
+      </div>
+    </div>
+
+    <div class="tile info">
+      <div class="eyebrow"><span class="label">#2074 · National flag</span></div>
+      <h1>Canada</h1>
+      <div class="alt">The Maple Leaf · l'Unifolié</div>
+      <p id="desc"></p>
+      <div class="actions">
+        <button class="btn btn--primary"><i class="ph-fill ph-heart"></i>Favorited<span class="mono" style="opacity:.8">31</span></button>
+        <button class="btn"><i class="ph-bold ph-pencil-simple"></i>Suggest edit</button>
+        <span class="sp"></span>
+        <button class="btn btn--icon" title="Set as profile flag"><i class="ph-bold ph-user-circle"></i></button>
+        <button class="btn btn--icon" title="Share"><i class="ph-bold ph-share-network"></i></button>
+        <button class="btn btn--icon" title="Report"><i class="ph-bold ph-flag-banner"></i></button>
+      </div>
+      <div class="tags" id="tags"></div>
+      <div class="added">
+        <span class="avatar" style="background:#C2410C">MK</span>
+        <span>Added by <b>mira.k</b> · edited by 3 others</span>
+        <span class="sp"></span>
+        <a class="btn btn--sm btn--ghost" href="#"><i class="ph-bold ph-clock-counter-clockwise"></i>History</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="row3">
+    <div class="tile panel">
+      <h2>Details</h2>
+      <dl class="spec" id="spec"></dl>
+    </div>
+    <div class="tile panel">
+      <h2>Colours <span class="mono muted" style="font-weight:400;font-size:12px">2</span></h2>
+      <div class="swatches" id="sw"></div>
+    </div>
+    <div class="tile panel">
+      <h2>Traits <span class="mono muted" style="font-weight:400;font-size:12px">share of all flags</span></h2>
+      <div id="traits"></div>
+    </div>
+  </section>
+
+  <section class="related">
+    <div class="section-head"><h2>Related flags</h2><a class="btn btn--sm btn--ghost" href="#">See all<i class="ph-bold ph-arrow-right"></i></a></div>
+    <div class="grid" id="related"></div>
+  </section>
+</main>
+
+<script src="../shared/flags.js"></script>
+<script src="v2.js"></script>
+<script>
+  V.mount('flag');
+  const D = DETAIL;
+  document.getElementById('mast').innerHTML = `<div class="pole"></div>${V.cloth(D.code, D.ratio, D.name, { h: 260, size: 'lg', live: true })}`;
+  document.getElementById('desc').textContent = D.description;
+  document.getElementById('tags').innerHTML = D.tags.map(t => `<a class="tag" href="#">${t}</a>`).join('');
+  document.getElementById('spec').innerHTML = D.facts.map(([k, v]) =>
+    `<dt>${k}</dt><dd>${k === 'Source' ? `<a href="#">${v} <i class="ph-bold ph-arrow-up-right" style="font-size:11px"></i></a>` : v}</dd>`).join('') +
+    `<dt>Catalogue</dt><dd class="mono">#2074</dd>`;
+  document.getElementById('sw').innerHTML = D.colors.map(c => {
+    const rgb = [1, 3, 5].map(i => parseInt(c.hex.slice(i, i + 2), 16)).join(' ');
+    return `<div class="sw"><span class="chipc" style="background:${c.hex}"></span><div><b>${c.name}</b><span class="mono">${c.hex} · rgb ${rgb}</span></div>
+      <button class="btn btn--sm btn--icon" title="Copy"><i class="ph-bold ph-copy"></i></button></div>`;
+  }).join('');
+  document.getElementById('traits').innerHTML = D.traits.map(([k, v, p]) => {
+    const n = parseFloat(p.replace('<', '')) || 0.6;
+    return `<div class="trait"><div class="t"><span>${k}</span><b>${v}</b><span class="mono">${p}</span></div><div class="meter"><i style="width:${Math.max(n, 2)}%"></i></div></div>`;
+  }).join('');
+  const RATIO = { us: 1.9, pe: 1.5, lb: 1.5, ng: 2 };
+  const SUB = { us: '#0012 · stripes', pe: '#0231 · vertical triband', lb: '#0907 · centered emblem', ng: '#0188 · vertical triband', at: '#0057 · horizontal triband' };
+  document.getElementById('related').innerHTML = D.related.concat([{ name: 'Austria', code: 'at' }]).map(r => {
+    const ratio = RATIO[r.code] || 1.5;
+    return `<article class="tile card"><div class="stage">${V.cloth(r.code, ratio, r.name, { h: V.fitH(ratio, 150 * 96, 190, 118), size: 'md' })}</div>
+      <div class="meta"><div><div class="name">${r.name}</div><div class="sub">${SUB[r.code]}</div></div></div></article>`;
+  }).join('');
+</script>
+</body>
+</html>

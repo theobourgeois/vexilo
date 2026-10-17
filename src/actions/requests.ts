@@ -3,12 +3,13 @@
 import { db } from '@/db';
 import { flagRequests, flags, leaderboard, users, flagTags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
-import { Flag } from '@/lib/types';
-import { and, count, eq, max, sql } from 'drizzle-orm';
+import { Flag, RelatedFlag } from '@/lib/types';
+import { and, count, eq, inArray, max, ne, sql } from 'drizzle-orm';
 import { base64ImageToS3URI, deleteFileFromUrl } from './s3';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { redis } from '@/db/redis';
 import { upsertFlagMetadataMirror } from './flag-ai-metadata';
+import { findExistingFlags } from './batch-flags';
 
 // Helper function to update tag counts when tags are added or removed
 async function updateTagCounts(oldTags: string[], newTags: string[]) {
@@ -118,6 +119,7 @@ export async function getPendingFlagRequests(page: number, limit: number) {
       deleted: flagRequests.deleted,
       userMessage: flagRequests.userMessage,
       userName: users.name,
+      userIsTrusted: users.isTrusted,
     })
     .from(flagRequests)
     .leftJoin(users, eq(flagRequests.userId, users.id))
@@ -140,6 +142,46 @@ export async function getPendingFlagRequests(page: number, limit: number) {
   };
 }
 
+/**
+ * Deletes a stored image unless a flag still uses it. Requests can point at any
+ * CloudFront URL (including another flag's image), so never delete blindly.
+ */
+async function deleteImageIfUnused(
+  imageUrl: string,
+  options: { uploadsOnly?: boolean; ignoreFlagId?: string } = {},
+) {
+  if (!imageUrl.startsWith(`${CLOUD_FRONT_URL}/`)) return;
+  if (options.uploadsOnly && !imageUrl.startsWith(`${CLOUD_FRONT_URL}/images/`)) return;
+
+  const [inUse] = await db
+    .select({ id: flags.id })
+    .from(flags)
+    .where(
+      and(
+        eq(flags.image, imageUrl),
+        options.ignoreFlagId ? ne(flags.id, options.ignoreFlagId) : undefined,
+      ),
+    )
+    .limit(1);
+  if (inUse) return;
+
+  await deleteFileFromUrl(imageUrl);
+}
+
+async function declineRequest(flagRequest: typeof flagRequests.$inferSelect) {
+  // Only new flags own their image; only clean up images uploaded for the request.
+  if (!flagRequest.flagId) {
+    await deleteImageIfUnused(flagRequest.flag.flagImage, { uploadsOnly: true });
+  }
+
+  await db
+    .update(flagRequests)
+    .set({
+      deleted: true,
+    })
+    .where(eq(flagRequests.id, flagRequest.id));
+}
+
 export async function declineFlagRequest(flagRequestId: string) {
   const session = await getServerAuthSession();
   if (!session?.user?.isAdmin) {
@@ -157,21 +199,7 @@ export async function declineFlagRequest(flagRequestId: string) {
     return false;
   }
 
-  // only delete the flag image if it's a new flag
-  if (!flagRequest.flagId) {
-    const flagImage = flagRequest.flag.flagImage;
-    if (flagImage.includes(CLOUD_FRONT_URL)) {
-      await deleteFileFromUrl(flagImage);
-    }
-  }
-
-  await db
-    .update(flagRequests)
-    .set({
-      deleted: true,
-    })
-    .where(eq(flagRequests.id, flagRequestId));
-
+  await declineRequest(flagRequest);
   return true;
 }
 
@@ -214,23 +242,19 @@ async function updateLeaderboard(userId: string) {
   }
 }
 
-export async function approveFlagRequest(flagRequestId: string) {
-  const session = await getServerAuthSession();
-  if (!session?.user?.isAdmin) {
-    return null;
-  }
+type FlagRequestRow = typeof flagRequests.$inferSelect;
 
-  const flagRequest = await db
+async function getFlagRequest(flagRequestId: string) {
+  return db
     .select()
     .from(flagRequests)
     .where(eq(flagRequests.id, flagRequestId))
     .limit(1)
     .then((res) => res[0]);
+}
 
-  if (!flagRequest) {
-    return false;
-  }
-
+/** Creates the flag for a new-flag request and marks the request approved. */
+async function publishNewFlagRequest(flagRequest: FlagRequestRow) {
   const index = await db
     .select({ maxIndex: max(flags.index) })
     .from(flags)
@@ -271,31 +295,16 @@ export async function approveFlagRequest(flagRequestId: string) {
       approved: true,
       flagId: flag.id,
     })
-    .where(eq(flagRequests.id, flagRequestId));
+    .where(eq(flagRequests.id, flagRequest.id));
 
   await redis.del('leaderboard');
   await redis.del('tags');
 
-  return true;
+  return flag.id;
 }
 
-export async function approveFlagEditRequest(flagRequestId: string) {
-  const session = await getServerAuthSession();
-  if (!session?.user?.isAdmin) {
-    return null;
-  }
-
-  const flagRequest = await db
-    .select()
-    .from(flagRequests)
-    .where(eq(flagRequests.id, flagRequestId))
-    .limit(1)
-    .then((res) => res[0]);
-
-  if (!flagRequest) {
-    return false;
-  }
-
+/** Applies an edit request to its flag and marks the request approved. */
+async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
   const flag = await db
     .select()
     .from(flags)
@@ -310,11 +319,10 @@ export async function approveFlagEditRequest(flagRequestId: string) {
   const isImageChanged =
     flagRequest.flag.flagImage !== flagRequest.oldFlag?.flagImage;
 
-  if (
-    isImageChanged &&
-    flagRequest.oldFlag?.flagImage?.includes(CLOUD_FRONT_URL)
-  ) {
-    await deleteFileFromUrl(flagRequest.oldFlag?.flagImage ?? '');
+  if (isImageChanged && flagRequest.oldFlag?.flagImage) {
+    await deleteImageIfUnused(flagRequest.oldFlag.flagImage, {
+      ignoreFlagId: flag.id,
+    });
   }
 
   // Check if tags have changed
@@ -380,7 +388,7 @@ export async function approveFlagEditRequest(flagRequestId: string) {
       approved: true,
       isEdit: true,
     })
-    .where(eq(flagRequests.id, flagRequestId));
+    .where(eq(flagRequests.id, flagRequest.id));
 
   await redis.del('leaderboard');
   await redis.del('tags');
@@ -388,6 +396,82 @@ export async function approveFlagEditRequest(flagRequestId: string) {
   await redis.del(`recommendations-${flagRequest.flagId}`);
 
   return true;
+}
+
+export async function approveFlagRequest(flagRequestId: string) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const flagRequest = await getFlagRequest(flagRequestId);
+  if (!flagRequest) {
+    return false;
+  }
+
+  await publishNewFlagRequest(flagRequest);
+  return true;
+}
+
+export async function approveFlagEditRequest(flagRequestId: string) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const flagRequest = await getFlagRequest(flagRequestId);
+  if (!flagRequest) {
+    return false;
+  }
+
+  return publishFlagEditRequest(flagRequest);
+}
+
+/**
+ * Publishes a request immediately for trusted creators. Failures leave the
+ * request pending for a moderator instead of failing the submission.
+ */
+async function autoApproveFlagRequest(flagRequest: FlagRequestRow) {
+  try {
+    if (flagRequest.flagId) {
+      return await publishFlagEditRequest(flagRequest);
+    }
+    await publishNewFlagRequest(flagRequest);
+    return true;
+  } catch (error) {
+    console.error(`Auto-approving flag request ${flagRequest.id} failed`, error);
+    return false;
+  }
+}
+
+/** Approves every pending request from a user (e.g. right after trusting them). */
+export async function approvePendingFlagRequestsForUser(userId: string) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const pending = await db
+    .select()
+    .from(flagRequests)
+    .where(
+      and(
+        eq(flagRequests.userId, userId),
+        eq(flagRequests.approved, false),
+        eq(flagRequests.deleted, false),
+      ),
+    )
+    .orderBy(flagRequests.createdAt);
+
+  let approved = 0;
+  // Sequential on purpose: new flags take the next free index one at a time.
+  for (const flagRequest of pending) {
+    if (await autoApproveFlagRequest(flagRequest)) {
+      approved += 1;
+    }
+  }
+
+  return { approved, total: pending.length };
 }
 
 const MAX_FLAG_REQUESTS = 100;
@@ -429,7 +513,7 @@ export async function createFlagRequest(
       ),
     );
 
-  if (numFlagRequests[0].count >= MAX_FLAG_REQUESTS) {
+  if (!user.isTrusted && numFlagRequests[0].count >= MAX_FLAG_REQUESTS) {
     return {
       success: false,
       message: `You have reached the maximum number of flag requests. Please wait for your request to be approved or contact an admin.`,
@@ -467,20 +551,462 @@ export async function createFlagRequest(
       : null;
   }
 
-  await db.insert(flagRequests).values({
-    userId: session.user.id,
-    flagId: flagId ?? null,
-    oldFlag: oldFlag ?? null,
-    userMessage: userMessage ?? '',
-    flag: {
-      ...flag,
-      index: -1,
-      flagImage: imageUrl,
-    },
-  });
+  const [flagRequest] = await db
+    .insert(flagRequests)
+    .values({
+      userId: session.user.id,
+      flagId: flagId ?? null,
+      oldFlag: oldFlag ?? null,
+      userMessage: userMessage ?? '',
+      flag: {
+        ...flag,
+        index: -1,
+        flagImage: imageUrl,
+      },
+    })
+    .returning();
+
+  const autoApproved = user.isTrusted
+    ? await autoApproveFlagRequest(flagRequest)
+    : false;
 
   return {
     success: true,
-    message: 'Flag request created successfully.',
+    autoApproved,
+    message: autoApproved
+      ? 'Flag published.'
+      : 'Flag request created successfully.',
   };
+}
+
+async function countPendingFlagRequests(userId: string) {
+  const [result] = await db
+    .select({ count: count() })
+    .from(flagRequests)
+    .where(
+      and(eq(flagRequests.userId, userId), eq(flagRequests.approved, false)),
+    );
+  return result.count;
+}
+
+export async function getRemainingFlagRequestSlots() {
+  const session = await getServerAuthSession();
+  if (!session?.user) {
+    return { remaining: 0, max: MAX_FLAG_REQUESTS, isTrusted: false };
+  }
+
+  const [user, pending] = await Promise.all([
+    db
+      .select({ isTrusted: users.isTrusted })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1)
+      .then((res) => res[0]),
+    countPendingFlagRequests(session.user.id),
+  ]);
+  const isTrusted = user?.isTrusted ?? false;
+
+  return {
+    // Trusted creators aren't limited; their requests never stay pending.
+    remaining: Math.max(MAX_FLAG_REQUESTS - pending, 0),
+    max: MAX_FLAG_REQUESTS,
+    isTrusted,
+  };
+}
+
+export type BatchFlagRequestInput = {
+  flagName: string;
+  flagImage: string;
+  sources: string[];
+  tags: string[];
+  description: string;
+  relatedFlags: RelatedFlag[];
+  userMessage: string;
+};
+
+export async function createFlagRequests(batch: BatchFlagRequestInput[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user) {
+    return {
+      success: false as const,
+      message: 'You must be logged in to create a flag request.',
+    };
+  }
+
+  const user = await db
+    .select({
+      id: users.id,
+      userNumber: users.userNumber,
+      isTrusted: users.isTrusted,
+    })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1)
+    .then((res) => res[0]);
+
+  if (!user) {
+    return {
+      success: false as const,
+      message: 'User not found in database. Please try logging in again.',
+    };
+  }
+
+  if (batch.length === 0) {
+    return { success: false as const, message: 'Add at least one flag.' };
+  }
+
+  const invalid = batch.find(
+    (flag) =>
+      !flag.flagName.trim() ||
+      !/^https?:\/\//.test(flag.flagImage) ||
+      flag.sources.length === 0,
+  );
+  if (invalid) {
+    return {
+      success: false as const,
+      message: `"${invalid.flagName || 'Untitled flag'}" needs a name, an uploaded image and a source.`,
+    };
+  }
+
+  const pending = await countPendingFlagRequests(session.user.id);
+  const remaining = MAX_FLAG_REQUESTS - pending;
+  if (!user.isTrusted && batch.length > remaining) {
+    return {
+      success: false as const,
+      message:
+        remaining > 0
+          ? `You can only have ${MAX_FLAG_REQUESTS} flags waiting for review. You can submit ${remaining} more right now.`
+          : `You have reached the maximum number of flag requests. Please wait for your requests to be approved or contact an admin.`,
+    };
+  }
+
+  const inserted = await db.insert(flagRequests).values(
+    batch.map((flag) => ({
+      userId: session.user.id,
+      flagId: null,
+      oldFlag: null,
+      userMessage: flag.userMessage.trim(),
+      flag: {
+        flagName: flag.flagName.trim(),
+        flagImage: flag.flagImage,
+        link: '',
+        sources: flag.sources,
+        tags: flag.tags,
+        description: flag.description.trim(),
+        relatedFlags: flag.relatedFlags,
+        index: -1,
+      },
+    })),
+  ).returning();
+
+  // Sequential on purpose: new flags take the next free index one at a time.
+  const autoApprovedIds: string[] = [];
+  if (user.isTrusted) {
+    for (const flagRequest of inserted) {
+      if (await autoApproveFlagRequest(flagRequest)) {
+        autoApprovedIds.push(flagRequest.id);
+      }
+    }
+  }
+
+  return {
+    success: true as const,
+    created: batch.length,
+    // Index-aligned with the submitted batch.
+    published: inserted.map((flagRequest) =>
+      autoApprovedIds.includes(flagRequest.id),
+    ),
+    userNumber: user.userNumber,
+  };
+}
+
+export type ReviewQueueItem = {
+  id: string;
+  flagId: string | null;
+  isEdit: boolean;
+  flag: Omit<Flag, 'id'>;
+  oldFlag: Omit<Flag, 'id'> | null;
+  userMessage: string;
+  createdAt: Date;
+  duplicateOf: string | null;
+  user: {
+    id: string;
+    name: string | null;
+    image: string | null;
+    userNumber: string | null;
+    isTrusted: boolean;
+    approvedCount: number;
+    declinedCount: number;
+  };
+};
+
+const REVIEW_QUEUE_LIMIT = 500;
+
+export async function getReviewQueue(): Promise<{
+  items: ReviewQueueItem[];
+  total: number;
+} | null> {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const pendingWhere = and(
+    eq(flagRequests.approved, false),
+    eq(flagRequests.deleted, false),
+  );
+
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({
+        id: flagRequests.id,
+        flagId: flagRequests.flagId,
+        flag: flagRequests.flag,
+        oldFlag: flagRequests.oldFlag,
+        userMessage: flagRequests.userMessage,
+        createdAt: flagRequests.createdAt,
+        userId: flagRequests.userId,
+        userName: users.name,
+        userImage: users.image,
+        userNumber: users.userNumber,
+        userIsTrusted: users.isTrusted,
+      })
+      .from(flagRequests)
+      .leftJoin(users, eq(flagRequests.userId, users.id))
+      .where(pendingWhere)
+      .orderBy(flagRequests.createdAt)
+      .limit(REVIEW_QUEUE_LIMIT),
+    db.select({ total: count() }).from(flagRequests).where(pendingWhere),
+  ]);
+
+  const userIds = Array.from(new Set(rows.map((row) => row.userId)));
+  const history =
+    userIds.length > 0
+      ? await db
+          .select({
+            userId: flagRequests.userId,
+            approved: sql<number>`count(*) filter (where ${flagRequests.approved})`,
+            declined: sql<number>`count(*) filter (where ${flagRequests.deleted})`,
+          })
+          .from(flagRequests)
+          .where(inArray(flagRequests.userId, userIds))
+          .groupBy(flagRequests.userId)
+      : [];
+  const historyByUser = new Map(history.map((entry) => [entry.userId, entry]));
+
+  const duplicates = await findExistingFlags(
+    rows
+      .filter((row) => !row.flagId)
+      .map((row) => ({
+        key: row.id,
+        name: row.flag.flagName,
+        sources: row.flag.sources ?? [],
+      })),
+  );
+  const duplicateById = new Map(
+    duplicates
+      .filter((match) => match.status === 'live')
+      .map((match) => [match.key, match.name]),
+  );
+
+  return {
+    total,
+    items: rows.map((row) => {
+      const userHistory = historyByUser.get(row.userId);
+      return {
+        id: row.id,
+        flagId: row.flagId,
+        isEdit: row.flagId !== null,
+        flag: row.flag,
+        oldFlag: row.oldFlag,
+        userMessage: row.userMessage,
+        createdAt: row.createdAt,
+        duplicateOf: duplicateById.get(row.id) ?? null,
+        user: {
+          id: row.userId,
+          name: row.userName,
+          image: row.userImage,
+          userNumber: row.userNumber,
+          isTrusted: row.userIsTrusted ?? false,
+          approvedCount: Number(userHistory?.approved ?? 0),
+          declinedCount: Number(userHistory?.declined ?? 0),
+        },
+      };
+    }),
+  };
+}
+
+async function getPendingRequestsByIds(ids: string[]) {
+  if (ids.length === 0) {
+    return [];
+  }
+  return db
+    .select()
+    .from(flagRequests)
+    .where(
+      and(
+        inArray(flagRequests.id, ids),
+        eq(flagRequests.approved, false),
+        eq(flagRequests.deleted, false),
+      ),
+    )
+    .orderBy(flagRequests.createdAt);
+}
+
+export async function approveFlagRequests(ids: string[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const approved: string[] = [];
+  const failed: Array<{ id: string; message: string }> = [];
+  // Sequential on purpose: new flags take the next free index one at a time.
+  for (const flagRequest of await getPendingRequestsByIds(ids)) {
+    try {
+      if (flagRequest.flagId) {
+        if (!(await publishFlagEditRequest(flagRequest))) {
+          throw new Error('The flag being edited no longer exists.');
+        }
+      } else {
+        await publishNewFlagRequest(flagRequest);
+      }
+      approved.push(flagRequest.id);
+    } catch (error) {
+      console.error(`Approving flag request ${flagRequest.id} failed`, error);
+      failed.push({
+        id: flagRequest.id,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  return { approved, failed };
+}
+
+export async function declineFlagRequests(ids: string[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const declined: string[] = [];
+  for (const flagRequest of await getPendingRequestsByIds(ids)) {
+    await declineRequest(flagRequest);
+    declined.push(flagRequest.id);
+  }
+
+  return { declined };
+}
+
+/** Lets an admin tweak a pending request (typo, tags...) before approving it. */
+export async function updatePendingFlagRequest(
+  id: string,
+  patch: Partial<
+    Pick<Flag, 'flagName' | 'description' | 'tags' | 'sources'>
+  >,
+) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const [flagRequest] = await getPendingRequestsByIds([id]);
+  if (!flagRequest) {
+    return false;
+  }
+
+  await db
+    .update(flagRequests)
+    .set({
+      flag: { ...flagRequest.flag, ...patch },
+      updatedAt: new Date(),
+    })
+    .where(eq(flagRequests.id, id));
+
+  return true;
+}
+
+export async function addTagsToFlagRequests(ids: string[], tags: string[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return null;
+  }
+
+  const cleanTags = tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
+  for (const flagRequest of await getPendingRequestsByIds(ids)) {
+    await db
+      .update(flagRequests)
+      .set({
+        flag: {
+          ...flagRequest.flag,
+          tags: Array.from(new Set([...flagRequest.flag.tags, ...cleanTags])),
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(flagRequests.id, flagRequest.id));
+  }
+
+  return true;
+}
+
+export type AiFlagDraftSubmission = {
+  flagName: string;
+  flagImage: string;
+  sources: string[];
+  tags: string[];
+  description: string;
+  imageOrigin: 'commons' | 'drawn';
+};
+
+/**
+ * Adds AI-generated drafts to the review queue. Unlike createFlagRequests these are
+ * never auto-approved, even for trusted admins, so every generated flag gets a look.
+ * Drawn fictional flags may have no sources.
+ */
+export async function submitAiFlagDrafts(drafts: AiFlagDraftSubmission[]) {
+  const session = await getServerAuthSession();
+  if (!session?.user?.isAdmin) {
+    return { success: false as const, message: 'Only admins can add generated flags.' };
+  }
+  if (drafts.length === 0) {
+    return { success: false as const, message: 'Select at least one draft.' };
+  }
+
+  const invalid = drafts.find(
+    (draft) =>
+      !draft.flagName.trim() ||
+      !draft.flagImage.startsWith(`${CLOUD_FRONT_URL}/`) ||
+      (draft.imageOrigin === 'commons' && draft.sources.length === 0),
+  );
+  if (invalid) {
+    return {
+      success: false as const,
+      message: `"${invalid.flagName || 'Untitled flag'}" needs a name, an image and a source.`,
+    };
+  }
+
+  await db.insert(flagRequests).values(
+    drafts.map((draft) => ({
+      userId: session.user.id,
+      flagId: null,
+      oldFlag: null,
+      userMessage:
+        draft.imageOrigin === 'drawn'
+          ? 'Created with AI. The image was drawn by AI, so check it closely.'
+          : 'Created with AI. Image from Wikimedia Commons.',
+      flag: {
+        flagName: draft.flagName.trim(),
+        flagImage: draft.flagImage,
+        link: '',
+        sources: draft.sources.filter((source) => /^https?:\/\//.test(source)),
+        tags: draft.tags,
+        description: draft.description.trim(),
+        relatedFlags: [],
+        index: -1,
+      },
+    })),
+  );
+
+  return { success: true as const, created: drafts.length };
 }

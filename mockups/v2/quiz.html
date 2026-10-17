@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quiz — Vexilo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link rel="stylesheet" href="v2.css" />
+<style>
+  .q-wrap { max-width: 920px; margin: 0 auto; }
+  .q-top { padding: 28px 0 16px; display: flex; align-items: center; gap: 12px; }
+  .stats { margin-left: auto; display: flex; gap: 8px; }
+  .stat {
+    display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px;
+    border-radius: 11px; background: var(--well); box-shadow: var(--shadow-well);
+    font-size: 13px; color: var(--text-2);
+  }
+  .stat b { font: 600 13px/1 var(--mono); color: var(--text); }
+  .stat i { font-size: 15px; }
+  .stat.hot i { color: var(--accent); }
+
+  .q { overflow: hidden; }
+  .q .stage-panel { height: 380px; }
+  .q .mast { position: absolute; left: 50%; top: 52px; bottom: 0; transform: translateX(-62%); }
+  .q .count { position: absolute; top: 16px; left: 18px; }
+  .q .history { position: absolute; top: 18px; right: 18px; display: flex; gap: 5px; }
+  .q .history i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+  .q .history i.x { background: var(--bad); }
+  .q .history i.e { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line-2); }
+  .q .body { padding: 22px 24px 24px; }
+  .q h1 { margin: 0 0 16px; font-size: 18px; font-weight: 600; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+  .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ans {
+    height: 56px; padding: 0 14px 0 12px; border-radius: 13px;
+    display: flex; align-items: center; gap: 12px; text-align: left;
+    font-size: 15px; font-weight: 550;
+    background: var(--raised-bg); box-shadow: var(--shadow-key);
+    transition: transform .12s;
+  }
+  .ans:hover { transform: translateY(-1px); }
+  .ans .kbd { flex: none; }
+  .ans .r { margin-left: auto; font-size: 18px; }
+  .ans.good { background: var(--good-soft); box-shadow: inset 0 0 0 1.5px var(--good); color: var(--text); }
+  .ans.good .r { color: var(--good); }
+  .ans.good .kbd { background: var(--good); color: #fff; box-shadow: none; }
+  .ans.dim { opacity: .45; }
+  .q .foot { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .q .foot .fact { flex: 1; color: var(--text-2); font-size: 13.5px; }
+  .q .foot .fact b { color: var(--text); font-weight: 600; }
+  .btn .kbd { margin-left: 2px; background: rgba(255,255,255,.2); color: #fff; box-shadow: none; }
+
+  .alt { margin-top: 40px; }
+  .alt .section-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .pick .card .stage { height: 150px; }
+  .pick .card .meta { justify-content: center; padding-bottom: 12px; }
+  .pick .card.bad { box-shadow: inset 0 0 0 1.5px var(--bad), var(--shadow-tile); }
+  .pick .card.bad .tagr { color: var(--bad); }
+  .tagr { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1 var(--mono); color: var(--muted); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="q-wrap">
+    <div class="q-top">
+      <div class="seg">
+        <button class="on"><i class="ph-bold ph-flag"></i>Name the flag</button>
+        <button><i class="ph-bold ph-squares-four"></i>Find the flag</button>
+        <button><i class="ph-bold ph-timer"></i>Timed</button>
+      </div>
+      <button class="btn btn--ghost btn--sm"><i class="ph-bold ph-sliders-horizontal"></i>National only</button>
+      <div class="stats">
+        <span class="stat hot"><i class="ph-fill ph-fire"></i>Streak <b>7</b></span>
+        <span class="stat"><i class="ph-bold ph-target"></i>Score <b>23/27</b></span>
+        <span class="stat"><i class="ph-bold ph-trophy"></i>Best <b>31</b></span>
+      </div>
+    </div>
+
+    <section class="tile q">
+      <div class="stage-panel">
+        <span class="count label">Question 28</span>
+        <div class="history" title="Last 10 answers"><i></i><i></i><i class="x"></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="e"></i></div>
+        <div class="mast" id="mast"></div>
+      </div>
+      <div class="body">
+        <h1>Which flag is this?</h1>
+        <div class="answers">
+          <button class="ans dim"><span class="kbd">1</span>Tuvalu</button>
+          <button class="ans good"><span class="kbd">2</span>Kiribati<i class="r ph-bold ph-check-circle"></i></button>
+          <button class="ans dim"><span class="kbd">3</span>Marshall Islands</button>
+          <button class="ans dim"><span class="kbd">4</span>Nauru</button>
+        </div>
+        <div class="foot">
+          <div class="fact"><b>Correct.</b> The frigatebird over a rising sun was adopted in 1979, at independence.</div>
+          <a class="btn btn--ghost btn--sm" href="flag.html">View flag<i class="ph-bold ph-arrow-up-right"></i></a>
+          <button class="btn btn--primary">Next flag<span class="kbd">↵</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="alt">
+      <div class="section-head">
+        <div><h2>Find the flag</h2><p>The reverse mode: pick the right flag out of four.</p></div>
+      </div>
+      <div class="tile" style="padding:20px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <span style="font-size:16px;font-weight:600;letter-spacing:-0.02em">Which one is <span style="color:var(--accent)">Sri Lanka</span>?</span>
+        </div>
+        <div class="pick" id="pick"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="../shared/flags.js"></script>
+<script src="v2.js"></script>
+<script>
+  V.mount('quiz');
+  document.getElementById('mast').innerHTML = `<div class="pole"></div>${V.cloth('ki', 2, 'Kiribati', { h: 200, size: 'lg', live: true })}`;
+  const opts = [['lk', 2, 'A', 'good'], ['bt', 1.5, 'B', 'bad'], ['in', 1.5, 'C', ''], ['mz', 1.5, 'D', '']];
+  document.getElementById('pick').innerHTML = opts.map(([c, r, k, s]) => `
+    <article class="tile card ${s === 'bad' ? 'bad' : ''} ${c === 'in' ? 'is-hover' : ''}">
+      <div class="stage">${V.cloth(c, r, '', { h: V.fitH(r, 160 * 104, 160, 112), size: 'md' })}</div>
+      <div class="meta"><span class="tagr">${s === 'bad' ? '<i class="ph-bold ph-x-circle"></i>Bhutan' : `<span class="kbd">${k}</span>`}</span></div>
+    </article>`).join('');
+</script>
+</body>
+</html>

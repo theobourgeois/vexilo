@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vexilo — Museum of Flags · 05 Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<script src="./shared/flags.js"></script>
+<style>
+/* ------------------------------------------------------------------
+   VEXILO — Direction 05 "Gallery"
+   Flags as artefacts on a wall. Frame + mat + placard; spot-lit at night.
+   Spacing scale: 4 8 12 16 24 32 48 64 96 128
+   Type: Cormorant (display) · Inter (UI) · IBM Plex Mono (catalogue)
+   Icons: Phosphor LIGHT only (fill for active favourite)
+------------------------------------------------------------------- */
+:root{
+  --serif:"Cormorant", "Cormorant Garamond", Georgia, serif;
+  --sans:"Inter", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+
+  /* Day — gallery wall */
+  --wall:#EFEDE8;
+  --wall-feature:#E7E3DB;
+  --desk:rgba(255,255,255,.38);
+  --mat:#F8F6F2;
+  --mat-bevel:#FFFFFF;
+  --bevel-shade:rgba(60,45,30,.10);
+  --frame:#241C17;
+  --frame-hair:rgba(0,0,0,0);
+  --frame-inner:inset 0 1px 3px rgba(40,28,18,.10), inset 0 0 0 1px rgba(40,28,18,.04);
+  --ink:#1A1A1A;
+  --ink-2:#4A453E;
+  --muted:#7C766C;
+  --rule:rgba(26,26,26,.11);
+  --rule-2:rgba(26,26,26,.22);
+  --accent:#7A1F2B;
+  --accent-hover:#621722;
+  --accent-ink:#FFFFFF;
+  --accent-soft:rgba(122,31,43,.07);
+  --placard:#FFFFFF;
+  --placard-edge:rgba(26,26,26,.07);
+  --placard-shadow:1px 2px 0 rgba(40,30,20,.04), 3px 8px 14px -8px rgba(40,30,20,.30);
+  --chip-paper:#FFFFFF;
+  --halo:rgba(255,255,255,.50);
+  --pool:rgba(255,250,238,.95);
+  --pool-2:rgba(255,246,226,.0);
+  --beam:rgba(255,252,244,.85);
+  --stage-pool:rgba(255,255,255,.70);
+  --lamp:#2A231E;
+  --lamp-rim:#2A231E;
+  --lamp-glow:0 0 0 rgba(0,0,0,0);
+  --flag-edge:rgba(0,0,0,.10);
+  --glass:.0;
+  --toplight:rgba(255,255,255,0);
+  --shadow-frame:2px 4px 5px -1px rgba(48,34,22,.20), 10px 20px 30px -10px rgba(48,34,22,.36);
+  --shadow-frame-hover:3px 6px 8px -2px rgba(48,34,22,.20), 18px 34px 46px -14px rgba(48,34,22,.42);
+  --shadow-frame-lg:4px 8px 10px -2px rgba(48,34,22,.20), 22px 44px 64px -18px rgba(48,34,22,.45);
+  --wash:radial-gradient(120% 55% at 50% -8%, rgba(255,255,255,.65), rgba(255,255,255,0) 62%);
+  --vignette:radial-gradient(140% 100% at 50% 40%, rgba(0,0,0,0) 60%, rgba(70,55,35,.06) 100%);
+  --sel:rgba(122,31,43,.18);
+}
+html.dark{
+  /* Night — the museum after hours */
+  --wall:#121110;
+  --wall-feature:#0D0C0B;
+  --desk:rgba(0,0,0,.28);
+  --mat:#1D1B18;
+  --mat-bevel:#2E2A23;
+  --bevel-shade:rgba(0,0,0,.55);
+  --frame:#0A0908;
+  --frame-hair:#B8975A;
+  --frame-inner:inset 0 0 0 1px rgba(184,151,90,.28), inset 0 2px 6px rgba(0,0,0,.5);
+  --ink:#E9E4DA;
+  --ink-2:#BDB5A7;
+  --muted:#8A8276;
+  --rule:rgba(233,228,218,.09);
+  --rule-2:rgba(233,228,218,.18);
+  --accent:#C9A86A;
+  --accent-hover:#D9BC82;
+  --accent-ink:#141210;
+  --accent-soft:rgba(201,168,106,.09);
+  --placard:#1A1815;
+  --placard-edge:rgba(233,228,218,.07);
+  --placard-shadow:1px 2px 0 rgba(0,0,0,.4), 4px 10px 18px -8px rgba(0,0,0,.8);
+  --chip-paper:#201E1A;
+  --halo:#2A2620;
+  --pool:rgba(255,214,150,.22);
+  --pool-2:rgba(255,214,150,.0);
+  --beam:rgba(255,222,168,.13);
+  --stage-pool:rgba(74,62,44,.62);
+  --lamp:#24201B;
+  --lamp-rim:#B8975A;
+  --lamp-glow:0 8px 22px 4px rgba(255,214,150,.30);
+  --flag-edge:rgba(255,255,255,.05);
+  --glass:1;
+  --toplight:rgba(255,232,190,.10);
+  --shadow-frame:3px 6px 8px -2px rgba(0,0,0,.65), 14px 26px 38px -8px rgba(0,0,0,.85);
+  --shadow-frame-hover:4px 8px 10px -2px rgba(0,0,0,.7), 22px 40px 56px -12px rgba(0,0,0,.9);
+  --shadow-frame-lg:6px 12px 14px -4px rgba(0,0,0,.7), 30px 56px 80px -16px rgba(0,0,0,.95);
+  --wash:radial-gradient(110% 50% at 50% -6%, rgba(46,40,32,.55), rgba(18,17,16,0) 60%);
+  --vignette:radial-gradient(130% 100% at 50% 35%, rgba(0,0,0,0) 45%, rgba(0,0,0,.55) 100%);
+  --sel:rgba(201,168,106,.25);
+}
+
+*{box-sizing:border-box}
+html{-webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility}
+body{
+  margin:0; min-width:1240px;
+  font:400 14px/1.55 var(--sans); color:var(--ink);
+  background-color:var(--wall);
+  background-image:
+    var(--vignette),
+    var(--wash),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .46 0 0 0 0 .4 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .4 0 0 0 0 .33 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+  background-attachment:fixed, scroll, scroll, scroll;
+  transition:background-color .5s ease, color .5s ease;
+}
+::selection{background:var(--sel)}
+a{color:inherit; text-decoration:none}
+button{font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer}
+img{display:block}
+.wrap{max-width:1280px; margin:0 auto; padding:0 48px}
+.wrap.wrap-pad{max-width:1376px}
+
+/* ---------- shared type ---------- */
+.eyebrow{
+  font:600 10.5px/1 var(--sans); letter-spacing:.24em; text-transform:uppercase; color:var(--accent);
+  display:inline-flex; align-items:center; gap:12px;
+}
+.eyebrow::before{content:""; width:28px; height:1px; background:currentColor; opacity:.7}
+.eyebrow.bare::before{display:none}
+.mono{font-family:var(--mono)}
+.caps{font:500 10.5px/1.2 var(--sans); letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
+
+/* ---------- buttons ---------- */
+.btn{
+  height:38px; padding:0 16px; border-radius:2px;
+  display:inline-flex; align-items:center; gap:8px;
+  font:500 13px/1 var(--sans); letter-spacing:.02em; white-space:nowrap;
+  transition:background-color .2s, border-color .2s, color .2s, transform .2s;
+}
+.btn i{font-size:16px}
+.btn-primary{background:var(--accent); color:var(--accent-ink)}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-ghost{box-shadow:inset 0 0 0 1px var(--rule-2); color:var(--ink)}
+.btn-ghost:hover{box-shadow:inset 0 0 0 1px var(--ink)}
+.btn-text{padding:0 4px; color:var(--ink-2)}
+.btn-text:hover{color:var(--ink)}
+.btn-text:hover span{text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:1px}
+.icon-btn{
+  height:36px; padding:0 12px 0 10px; border-radius:999px; display:inline-flex; align-items:center; gap:8px;
+  box-shadow:inset 0 0 0 1px var(--rule-2); font:500 12px/1 var(--sans); color:var(--ink-2); letter-spacing:.02em;
+  transition:box-shadow .2s, color .2s;
+}
+.icon-btn i{font-size:16px}
+.icon-btn:hover{box-shadow:inset 0 0 0 1px var(--ink); color:var(--ink)}
+
+/* ---------- header ---------- */
+.top{border-bottom:1px solid var(--rule)}
+.top-in{height:76px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:32px}
+.brand{display:inline-flex; align-items:center; gap:14px; justify-self:start}
+.brand-glyph{width:22px; height:18px; border:1.5px solid var(--ink); padding:3px; box-shadow:1px 2px 0 var(--rule)}
+html.dark .brand-glyph{border-color:var(--frame-hair)}
+.brand-glyph span{display:block; height:100%; background:var(--accent)}
+.brand-text{display:flex; flex-direction:column; gap:5px}
+.brand-word{font:600 23px/0.8 var(--serif); letter-spacing:.36em; margin-right:-.36em; padding-top:2px}
+.brand-sub{font:500 9px/1 var(--sans); letter-spacing:.32em; text-transform:uppercase; color:var(--muted)}
+.nav{display:flex; gap:36px}
+.nav a{
+  font:500 11px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--ink-2);
+  padding:8px 0; position:relative; transition:color .2s;
+}
+.nav a::after{content:""; position:absolute; left:0; right:0; bottom:0; height:1px; background:var(--accent); transform:scaleX(0); transition:transform .3s ease}
+.nav a:hover{color:var(--ink)}
+.nav a:hover::after,.nav a.on::after{transform:scaleX(1)}
+.nav a.on{color:var(--ink)}
+.actions{display:flex; align-items:center; gap:10px; justify-self:end}
+.theme-toggle .t-night,.theme-toggle .t-day{display:inline-flex; align-items:center; gap:8px}
+.theme-toggle .t-day{display:none}
+html.dark .theme-toggle .t-day{display:inline-flex}
+html.dark .theme-toggle .t-night{display:none}
+
+/* ---------- frames (the signature) ---------- */
+.frame{
+  position:relative; display:inline-block;
+  background:var(--mat);
+  border:3px solid var(--frame);
+  padding:var(--mt,24px) var(--ms,24px) var(--mb,30px);   /* bottom-weighted mat */
+  box-shadow:0 0 0 1px var(--frame-hair), var(--frame-inner), var(--shadow-frame);
+  transition:transform .6s cubic-bezier(.2,.7,.2,1), box-shadow .6s cubic-bezier(.2,.7,.2,1), background-color .5s;
+}
+html.dark .frame{border-width:2px}
+.frame::before{ /* top light falling on the mat (night only) */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(to bottom, var(--toplight), rgba(0,0,0,0) 45%);
+}
+.frame::after{ /* glazing sheen */
+  content:""; position:absolute; inset:0; pointer-events:none; opacity:var(--glass);
+  background:linear-gradient(118deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,.015) 34%, rgba(255,255,255,0) 34.2%);
+}
+.flag{
+  position:relative; display:block;
+  width:var(--fw); aspect-ratio:var(--r);
+  box-shadow:0 0 0 2px var(--mat-bevel), -1px -1px 0 2px var(--bevel-shade);  /* bevel-cut window */
+}
+.flag img{width:100%; height:100%; object-fit:contain}
+.flag::after{content:""; position:absolute; inset:0; box-shadow:inset 0 0 0 1px var(--flag-edge); pointer-events:none}
+.flag.is-shaped::after{display:none}   /* Nepal: no rectangular edge on a non-rectangular flag */
+
+/* ---------- hero ---------- */
+.hero{display:grid; grid-template-columns:1.3fr 1fr; gap:56px; align-items:center; padding-top:8px; padding-bottom:40px}
+.stage{position:relative; height:640px; display:flex; align-items:center; justify-content:center}
+.track{position:absolute; top:0; left:12%; right:12%; height:1px; background:var(--rule-2)}
+.lamp{position:absolute; top:0; left:50%; transform:translateX(-50%); width:22px; height:46px; display:flex; flex-direction:column; align-items:center}
+.lamp::before{content:""; width:1px; height:12px; background:var(--lamp)}
+.lamp::after{
+  content:""; width:22px; height:32px; border-radius:3px 3px 9px 9px;
+  background:linear-gradient(90deg, var(--lamp), color-mix(in srgb, var(--lamp) 70%, #fff 30%) 45%, var(--lamp));
+  border-bottom:2px solid var(--lamp-rim); box-shadow:var(--lamp-glow);
+}
+.beam-wrap{position:absolute; top:44px; left:50%; transform:translateX(-50%); width:780px; height:600px; filter:blur(16px); pointer-events:none}
+.beam{width:100%; height:100%; clip-path:polygon(48.6% 0, 51.4% 0, 92% 100%, 8% 100%);
+  background:linear-gradient(to bottom, var(--beam), color-mix(in srgb, var(--beam) 35%, transparent) 55%, rgba(0,0,0,0) 92%)}
+.stage-pool{position:absolute; inset:40px -40px -20px; pointer-events:none;
+  background:radial-gradient(ellipse 50% 46% at 50% 54%, var(--stage-pool), rgba(0,0,0,0) 72%)}
+.stage .frame{margin-top:56px; box-shadow:0 0 0 1px var(--frame-hair), var(--frame-inner), var(--shadow-frame-lg)}
+.stage .frame:hover{transform:translateY(-3px)}
+.stage-label{
+  position:absolute; bottom:22px; left:50%; transform:translateX(-50%);
+  font:400 11px/1 var(--mono); color:var(--muted); letter-spacing:.06em; white-space:nowrap
+}
+
+.walltext{padding:24px 0 24px 8px}
+.wt-head{display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:28px}
+.wt-date{font:400 11px/1 var(--mono); letter-spacing:.08em; color:var(--muted); text-transform:uppercase}
+.wt-title{font:500 128px/.84 var(--serif); letter-spacing:-.035em; margin:0 0 0 -6px}
+.wt-sub{font:italic 400 30px/1.15 var(--serif); color:var(--ink-2); margin:18px 0 0; letter-spacing:-.005em}
+.wt-blurb{font:400 21px/1.5 var(--serif); color:var(--ink); margin:28px 0 0; max-width:30em; text-wrap:pretty}
+.wt-blurb::first-letter{font-weight:600}
+.wt-meta{display:grid; grid-template-columns:repeat(3, auto); justify-content:start; gap:0 40px; margin:32px 0 0; padding:20px 0 0; border-top:1px solid var(--rule)}
+.wt-meta dt{font:500 10px/1 var(--sans); letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
+.wt-meta dd{margin:9px 0 0; font:400 14px/1 var(--mono); color:var(--ink)}
+.wt-actions{display:flex; gap:10px; margin-top:32px; align-items:center}
+.wt-next{margin-top:28px; font:400 12px/1.4 var(--sans); color:var(--muted); display:flex; align-items:center; gap:8px}
+.wt-next b{font:italic 500 16px/1 var(--serif); color:var(--ink-2)}
+
+/* ---------- visitor desk ---------- */
+.desk{border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); background:var(--desk)}
+.desk-row{display:grid; grid-template-columns:200px 1fr auto; gap:48px; align-items:center; padding:28px 0 24px}
+.desk-label{display:flex; flex-direction:column; gap:10px}
+.desk-label small{font:400 12px/1.3 var(--sans); color:var(--muted)}
+.search{display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--rule-2); padding:4px 0 10px; transition:border-color .3s}
+.search:focus-within,.search:hover{border-color:var(--ink)}
+.search i{font-size:22px; color:var(--muted)}
+.search input{
+  flex:1; border:0; outline:0; background:transparent; color:var(--ink);
+  font:400 28px/1.1 var(--serif); letter-spacing:-.01em; padding:0;
+}
+.search input::placeholder{color:var(--muted); font-style:italic; opacity:.9}
+.search kbd{font:400 11px/1 var(--mono); color:var(--muted); padding:5px 7px; border-radius:2px; box-shadow:inset 0 0 0 1px var(--rule-2)}
+.desk-link{display:inline-flex; align-items:center; gap:8px; font:500 12px/1 var(--sans); color:var(--ink-2); letter-spacing:.02em}
+.desk-link:hover{color:var(--accent)}
+.rooms{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(10, 1fr); border-top:1px solid var(--rule)}
+.rooms li + li{border-left:1px solid var(--rule)}
+.rooms a{display:flex; flex-direction:column; gap:6px; padding:16px 14px 18px; transition:background-color .25s}
+.rooms a:hover{background:var(--accent-soft)}
+.r-no{font:500 9.5px/1 var(--sans); letter-spacing:.22em; text-transform:uppercase; color:var(--accent)}
+.r-name{font:600 19px/1.05 var(--serif); letter-spacing:-.005em; white-space:nowrap; transition:color .2s}
+.rooms a:hover .r-name{color:var(--accent)}
+.r-count{font:400 11px/1 var(--mono); color:var(--muted)}
+.patrons{display:flex; align-items:center; gap:24px; padding:14px 0; border-top:1px solid var(--rule); font-size:12px; color:var(--muted)}
+.patrons ol{list-style:none; margin:0; padding:0; display:flex; gap:28px}
+.patrons li{display:flex; align-items:baseline; gap:8px}
+.patrons li b{font:italic 500 16px/1 var(--serif); color:var(--ink)}
+.patrons li span{font:400 11px/1 var(--mono)}
+.patrons .desk-link{margin-left:auto}
+
+/* ---------- room / salon wall ---------- */
+.room{padding:96px 0 48px}
+.room-head{display:flex; align-items:flex-end; justify-content:space-between; gap:32px; padding-bottom:28px; border-bottom:1px solid var(--rule); margin-bottom:64px}
+.room-title{margin:14px 0 0; font:500 54px/1 var(--serif); letter-spacing:-.025em}
+.room-title .rn{font-style:italic; color:var(--accent)}
+.room-title .dash{color:var(--muted); font-weight:400; margin:0 .12em}
+.room-desc{margin:12px 0 0; font:400 14px/1.5 var(--sans); color:var(--muted); max-width:46ch}
+.hang-by{display:flex; align-items:center; gap:24px}
+.hang-by .caps{margin-right:-4px}
+.sort{display:flex; gap:20px}
+.sort button{font:italic 500 19px/1 var(--serif); color:var(--muted); padding:4px 0; border-bottom:1px solid transparent; transition:color .2s, border-color .2s}
+.sort button:hover{color:var(--ink)}
+.sort button.on{color:var(--ink); border-color:var(--accent)}
+.count{font:400 11px/1 var(--mono); color:var(--muted); padding-left:24px; border-left:1px solid var(--rule)}
+
+.salon{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); column-gap:40px; row-gap:80px}
+.work{position:relative}
+.hang{position:relative; height:236px; display:flex; align-items:center; justify-content:center} /* shared eye-line */
+.halo{position:absolute; inset:-34px -14px; pointer-events:none; background:radial-gradient(closest-side, var(--halo), rgba(0,0,0,0)); transition:opacity .6s}
+.pool{
+  position:absolute; inset:-72px -24px -8px; pointer-events:none; opacity:0; transition:opacity .6s ease;
+  background:
+    radial-gradient(ellipse 34% 30% at 50% 0%, var(--pool), var(--pool-2) 100%),
+    radial-gradient(ellipse 52% 78% at 50% 8%, var(--pool), var(--pool-2) 72%);
+}
+.work .frame{z-index:1}
+.work:hover .pool,.work.is-hover .pool{opacity:1}
+.work:hover .frame,.work.is-hover .frame{transform:translateY(-4px); box-shadow:0 0 0 1px var(--frame-hair), var(--frame-inner), var(--shadow-frame-hover)}
+
+.placard{
+  position:relative; width:min(236px,100%); margin:22px auto 0; padding:13px 15px 10px;
+  background:var(--placard); border-radius:1px;
+  box-shadow:0 0 0 1px var(--placard-edge), var(--placard-shadow);
+  transition:background-color .5s, box-shadow .3s;
+}
+.p-name{margin:0; font:600 23px/1.02 var(--serif); letter-spacing:-.012em}
+.p-name a:hover{color:var(--accent)}
+.p-cat{margin-top:7px; font:400 11px/1.2 var(--mono); color:var(--ink-2); letter-spacing:.01em}
+.p-med{margin-top:3px; font:italic 400 15px/1.3 var(--serif); color:var(--muted)}
+.p-foot{display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:9px; border-top:1px solid var(--rule)}
+.p-favs{display:inline-flex; align-items:center; gap:6px; font:400 11px/1 var(--mono); color:var(--muted)}
+.p-favs i{font-size:14px}
+.collect{
+  display:inline-flex; align-items:center; gap:6px; font:600 10px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase;
+  color:var(--accent); opacity:0; transform:translateX(-4px); transition:opacity .35s, transform .35s;
+}
+.collect i{font-size:14px}
+.work:hover .collect,.work.is-hover .collect{opacity:1; transform:none}
+.collect:hover span{text-decoration:underline; text-underline-offset:3px}
+.work.is-collected .collect{opacity:1; transform:none}
+.work.is-collected .p-favs{color:var(--accent)}
+
+.room-foot{display:flex; justify-content:center; padding-top:80px}
+.empty{grid-column:1/-1; text-align:center; padding:64px 0; font:italic 400 22px/1.4 var(--serif); color:var(--muted)}
+
+/* ---------- divider ---------- */
+.divider{display:flex; align-items:center; gap:24px; padding:72px 0 0}
+.divider::before,.divider::after{content:""; flex:1; height:1px; background:var(--rule-2)}
+.divider span{font:500 10.5px/1 var(--sans); letter-spacing:.26em; text-transform:uppercase; color:var(--muted); display:inline-flex; gap:10px; align-items:center}
+.divider i{font-size:15px}
+
+/* ---------- detail page ---------- */
+.detail{padding:48px 0 96px}
+.crumbs{display:flex; align-items:center; gap:10px; font:400 12px/1 var(--sans); color:var(--muted); margin-bottom:28px}
+.crumbs a:hover{color:var(--ink)}
+.crumbs i{font-size:12px}
+.crumbs b{font-weight:500; color:var(--ink)}
+.detail-grid{display:grid; grid-template-columns:1.45fr 1fr; gap:48px; align-items:start}
+.feature-wall{
+  position:relative; height:600px; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--wall-feature);
+  box-shadow:inset 0 0 0 1px var(--rule), inset 0 40px 80px -40px rgba(0,0,0,.10), inset 0 -60px 90px -50px rgba(0,0,0,.12);
+}
+html.dark .feature-wall{box-shadow:inset 0 0 0 1px var(--rule), inset 0 0 160px 30px rgba(0,0,0,.65)}
+.feature-wall .stage-pool{inset:0; background:radial-gradient(ellipse 52% 48% at 50% 54%, var(--stage-pool), rgba(0,0,0,0) 74%)}
+.feature-wall .beam-wrap{top:44px; width:900px; height:560px}
+.feature-wall .frame{margin-top:44px; box-shadow:0 0 0 1px var(--frame-hair), var(--frame-inner), var(--shadow-frame-lg)}
+.wall-note{position:absolute; left:24px; right:24px; bottom:20px; display:flex; justify-content:space-between; font:400 10.5px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+
+.also{margin-top:40px}
+.also-head{display:flex; align-items:baseline; justify-content:space-between; padding-bottom:16px; border-bottom:1px solid var(--rule); margin-bottom:32px}
+.also-head h3{margin:0; font:500 28px/1 var(--serif); letter-spacing:-.015em}
+.also-row{display:grid; grid-template-columns:repeat(4,1fr); gap:24px}
+.mini{display:flex; flex-direction:column; align-items:center; gap:16px}
+.mini .hang{height:118px; width:100%}
+.mini .halo{inset:-10px -4px}
+.mini .frame{border-width:2px; box-shadow:0 0 0 1px var(--frame-hair), var(--frame-inner), 2px 4px 4px -1px rgba(0,0,0,.18), 8px 14px 20px -8px rgba(0,0,0,.35)}
+.mini:hover .frame{transform:translateY(-3px)}
+.mini:hover .pool{opacity:1}
+.mini .pool{inset:-30px -10px -4px}
+.mini-name{display:block; font:600 18px/1 var(--serif); text-align:center}
+.mini-cap{display:block; font:400 10.5px/1 var(--mono); color:var(--muted); margin-top:6px; text-align:center; text-transform:uppercase; letter-spacing:.06em}
+
+.long-placard{
+  background:var(--placard); padding:40px 40px 36px; border-radius:1px;
+  box-shadow:0 0 0 1px var(--placard-edge), var(--placard-shadow);
+}
+.lp-title{margin:16px 0 0; font:500 76px/.9 var(--serif); letter-spacing:-.03em}
+.lp-alt{margin:12px 0 0; font:italic 400 22px/1.2 var(--serif); color:var(--ink-2)}
+.lp-cat{margin-top:16px; display:flex; gap:16px; font:400 12px/1 var(--mono); color:var(--muted)}
+.lp-cat span + span{padding-left:16px; border-left:1px solid var(--rule-2)}
+.lp-desc{margin:24px 0 0; font:400 20px/1.5 var(--serif); color:var(--ink); text-wrap:pretty}
+.lp-actions{display:flex; gap:8px; margin-top:24px; align-items:center}
+.lp-actions .btn-primary .n{font:400 12px/1 var(--mono); opacity:.8; padding-left:10px; margin-left:2px; border-left:1px solid color-mix(in srgb, var(--accent-ink) 35%, transparent)}
+.lp-sec{margin-top:32px; padding-top:20px; border-top:1px solid var(--rule)}
+.lp-sec h4{margin:0 0 16px; font:600 10.5px/1 var(--sans); letter-spacing:.24em; text-transform:uppercase; color:var(--muted)}
+.prov{margin:0; display:grid; grid-template-columns:auto 1fr; row-gap:11px}
+.prov div{display:contents}
+.prov dt{font:400 14px/1.3 var(--sans); color:var(--ink-2); display:flex; align-items:baseline; gap:8px; padding-right:8px}
+.prov dt::after{content:""; flex:1; min-width:24px; border-bottom:1px dotted var(--rule-2); transform:translateY(-3px)}
+.prov dd{margin:0; font:500 17px/1.3 var(--serif); text-align:right}
+.prov dd.m{font:400 12.5px/1.6 var(--mono)}
+.prov dd a{display:inline-flex; align-items:center; gap:4px; border-bottom:1px solid var(--rule-2)}
+.prov dd a:hover{color:var(--accent); border-color:var(--accent)}
+.chips{display:flex; gap:14px}
+.chip{width:120px; background:var(--chip-paper); border-radius:2px; padding:6px 6px 0; box-shadow:0 0 0 1px var(--rule), 1px 3px 8px -4px rgba(0,0,0,.25); transition:transform .3s}
+.chip:hover{transform:translateY(-2px) rotate(-1deg)}
+.chip-c{height:72px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.chip-l{padding:9px 2px 10px; display:flex; flex-direction:column; gap:5px}
+.chip-l b{font:600 17px/1 var(--serif)}
+.chip-l span{font:400 10.5px/1 var(--mono); color:var(--muted); letter-spacing:.04em}
+.traits{display:flex; flex-direction:column}
+.trait{display:grid; grid-template-columns:90px 1fr auto; gap:16px; align-items:center; padding:11px 0}
+.trait + .trait{border-top:1px solid var(--rule)}
+.trait .k{font:500 10px/1 var(--sans); letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
+.trait .v{font:600 18px/1.1 var(--serif)}
+.trait .v small{display:block; margin-top:4px; font:400 12px/1.3 var(--sans); color:var(--muted)}
+.rar{display:flex; flex-direction:column; align-items:flex-end; gap:6px}
+.meter{width:96px; height:2px; background:var(--rule); position:relative}
+.meter span{position:absolute; left:0; top:0; bottom:0; background:var(--accent); min-width:2px}
+.rar em{font:normal 400 11px/1 var(--mono); color:var(--ink-2)}
+.rare{font:600 9px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:var(--accent); padding:4px 6px; box-shadow:inset 0 0 0 1px var(--accent); border-radius:1px}
+.terms{display:flex; flex-wrap:wrap; gap:6px}
+.terms a{font:400 12px/1 var(--sans); color:var(--ink-2); padding:7px 10px; border-radius:1px; box-shadow:inset 0 0 0 1px var(--rule-2); transition:color .2s, box-shadow .2s}
+.terms a:hover{color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent)}
+
+/* ---------- footer ---------- */
+.foot{border-top:1px solid var(--rule)}
+.foot-in{display:flex; align-items:center; justify-content:space-between; gap:24px; padding:28px 0 36px; font-size:12px; color:var(--muted)}
+.foot-brand{font:600 15px/1 var(--serif); letter-spacing:.3em; color:var(--ink)}
+.foot-brand span{font:italic 400 15px/1 var(--serif); letter-spacing:0; color:var(--muted); margin-left:8px}
+.foot nav{display:flex; gap:24px}
+.foot nav a:hover{color:var(--ink)}
+
+@media (max-width:1360px){
+  .wt-title{font-size:112px}
+  .rooms a{padding:14px 10px 16px}
+  .r-name{font-size:17px}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#" aria-label="Vexilo — Museum of Flags">
+      <span class="brand-glyph" aria-hidden="true"><span></span></span>
+      <span class="brand-text">
+        <span class="brand-word">VEXILO</span>
+        <span class="brand-sub">Museum of Flags</span>
+      </span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="#room" class="on">Browse</a>
+      <a href="#">Quiz</a>
+      <a href="#">Leaderboard</a>
+      <a href="#">Donate</a>
+    </nav>
+    <div class="actions">
+      <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle night mode">
+        <span class="t-night"><i class="ph-light ph-moon"></i>After hours</span>
+        <span class="t-day"><i class="ph-light ph-sun"></i>Daylight</span>
+      </button>
+      <a class="btn btn-text" href="#"><i class="ph-light ph-google-logo"></i><span>Sign in</span></a>
+      <a class="btn btn-primary" href="#"><i class="ph-light ph-plus"></i>Post flag</a>
+    </div>
+  </div>
+</header>
+
+<!-- ============ HERO — Exhibition of the day ============ -->
+<section class="wrap hero" aria-label="Exhibition of the day">
+  <div class="stage">
+    <div class="track"></div>
+    <div class="lamp" aria-hidden="true"></div>
+    <div class="beam-wrap" aria-hidden="true"><div class="beam"></div></div>
+    <div class="stage-pool" aria-hidden="true"></div>
+    <a href="#flag" id="heroFrame"></a>
+    <div class="stage-label" id="heroLabel"></div>
+  </div>
+
+  <div class="walltext">
+    <div class="wt-head">
+      <span class="eyebrow">Exhibition of the day</span>
+      <span class="wt-date">16 Oct 2026</span>
+    </div>
+    <h1 class="wt-title" id="fotdName"></h1>
+    <p class="wt-sub">Druk Yul — the Thunder Dragon</p>
+    <p class="wt-blurb" id="fotdBlurb"></p>
+    <dl class="wt-meta" id="fotdMeta"></dl>
+    <div class="wt-actions">
+      <a class="btn btn-primary" href="#flag">Enter the exhibition<i class="ph-light ph-arrow-right"></i></a>
+      <button class="btn btn-ghost"><i class="ph-light ph-heart"></i>Collect</button>
+      <button class="btn btn-text"><i class="ph-light ph-share-network"></i><span>Share</span></button>
+    </div>
+    <div class="wt-next"><i class="ph-light ph-calendar-blank"></i>Tomorrow in the hall: <b>Kiribati</b></div>
+  </div>
+</section>
+
+<!-- ============ VISITOR DESK ============ -->
+<section class="desk" aria-label="Search the collection">
+  <div class="wrap">
+    <div class="desk-row">
+      <div class="desk-label">
+        <span class="eyebrow bare">Visitor desk</span>
+        <small>Open daily · admission free</small>
+      </div>
+      <label class="search">
+        <i class="ph-light ph-magnifying-glass"></i>
+        <input id="q" type="search" placeholder="Search 15,284 flags…" autocomplete="off">
+        <kbd>/</kbd>
+      </label>
+      <a class="desk-link" href="#">Advanced search<i class="ph-light ph-arrow-right"></i></a>
+    </div>
+    <ol class="rooms" id="rooms"></ol>
+    <div class="patrons">
+      <span class="caps">Patrons this month</span>
+      <ol>
+        <li><b>Marta Vidal</b><span>214 entries</span></li>
+        <li><b>Kenji Ota</b><span>187</span></li>
+        <li><b>A. Lindqvist</b><span>162</span></li>
+        <li><b>Ruth Okafor</b><span>140</span></li>
+      </ol>
+      <a class="desk-link" href="#">The register<i class="ph-light ph-arrow-right"></i></a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ROOM I — salon wall ============ -->
+<section class="wrap room" id="room" aria-label="Popular this week">
+  <div class="room-head">
+    <div>
+      <span class="eyebrow">Now on view</span>
+      <h2 class="room-title"><span class="rn">Room I</span><span class="dash">—</span>Popular this week</h2>
+      <p class="room-desc">The sixteen works most collected by visitors over the last seven days, hung salon-style on a shared eye-line.</p>
+    </div>
+    <div class="hang-by">
+      <span class="caps">Hang by</span>
+      <div class="sort" id="sort" role="tablist">
+        <button class="on" data-sort="popular">Popular</button>
+        <button data-sort="newest">Newest</button>
+        <button data-sort="az">A–Z</button>
+      </div>
+      <span class="count" id="count"></span>
+    </div>
+  </div>
+  <div class="salon" id="salon"></div>
+  <div class="room-foot">
+    <a class="btn btn-ghost" href="#">Continue to Room II<i class="ph-light ph-arrow-right"></i></a>
+  </div>
+</section>
+
+<!-- ============ FLAG PAGE (preview) ============ -->
+<div class="wrap">
+  <div class="divider"><span><i class="ph-light ph-frame-corners"></i>Flag page — preview</span></div>
+</div>
+
+<section class="wrap detail" id="flag" aria-label="Flag page">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a href="#">Collection</a><i class="ph-light ph-caret-right"></i>
+    <a href="#">Room I — National</a><i class="ph-light ph-caret-right"></i>
+    <b id="crumbName"></b>
+  </nav>
+
+  <div class="detail-grid">
+    <div>
+      <div class="feature-wall">
+        <div class="track"></div>
+        <div class="lamp" aria-hidden="true"></div>
+        <div class="beam-wrap" aria-hidden="true"><div class="beam"></div></div>
+        <div class="stage-pool" aria-hidden="true"></div>
+        <div id="detailFrame"></div>
+        <div class="wall-note"><span>Gallery II · North wall</span><span id="wallNote"></span></div>
+      </div>
+
+      <div class="also">
+        <div class="also-head">
+          <h3>Also in this room</h3>
+          <a class="desk-link" href="#">View all of Room I<i class="ph-light ph-arrow-right"></i></a>
+        </div>
+        <div class="also-row" id="related"></div>
+      </div>
+    </div>
+
+    <aside class="long-placard" id="placard"></aside>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="foot">
+  <div class="wrap foot-in">
+    <span class="foot-brand">VEXILO<span>Museum of Flags</span></span>
+    <span class="mono" style="font-size:11px">15,284 works in the collection · admission always free</span>
+    <nav><a href="#">About</a><a href="#">API</a><a href="#">Terms</a><a href="#">© 2026</a></nav>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const { FLAGS, FLAG_IMG, FOTD, DETAIL, TAGS } = window;
+  const $ = (s) => document.querySelector(s);
+  const nf = new Intl.NumberFormat('en-US');
+  const pad = (n) => String(n).padStart(4, '0');
+  const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+  const RATIO = { 1: '1:1', 1.5: '2:3', 2: '1:2', 1.667: '3:5', 1.43: '7:10', 2.545: '11:28', 1.9: '10:19' };
+  const ratioLabel = (r) => r < 1 ? 'double pennon' : (RATIO[r] || `1:${r}`);
+  const MEDIUM = ['Wool bunting', 'Printed cotton', 'Silk, appliqué', 'Nylon', 'Linen', 'Sewn polyester'];
+  const medium = (f) => MEDIUM[f.index % MEDIUM.length];
+  const ROOM_NAMES = { national: 'National', 'us-state': 'U.S. States', municipality: 'Municipal', military: 'Military', historical: 'Historical', tricolor: 'Tricolours', proposal: 'Proposals', fictional: 'Fiction', heraldic: 'Heraldic', stars: 'Stars' };
+
+  /* Frame builder — flag sized at its true ratio, mat bottom-weighted, nothing cropped. */
+  function frame(f, fw, mat = [24, 24, 30], extra = '') {
+    const shaped = (f.tags || []).includes('non-rectangular') || f.ratio < 1;
+    return `<span class="frame ${extra}" style="--mt:${mat[0]}px;--ms:${mat[1]}px;--mb:${mat[2]}px">
+      <span class="flag ${shaped ? 'is-shaped' : ''}" style="--r:${f.ratio};--fw:${fw}">
+        <img src="${FLAG_IMG(f.code)}" alt="Flag of ${f.name}" loading="lazy">
+      </span></span>`;
+  }
+
+  /* Salon sizing: equalise visual area so a 1:2 and a 0.82 feel equally weighted. */
+  function salonWidth(r, area = 20500, maxW = 200, maxH = 164) {
+    let w = Math.sqrt(area * r), h = w / r;
+    if (w > maxW) { w = maxW; h = w / r; }
+    if (h > maxH) { h = maxH; w = h * r; }
+    return Math.round(w) + 'px';
+  }
+
+  /* ---------- hero ---------- */
+  $('#heroFrame').outerHTML = `<a href="#flag" aria-label="${FOTD.name}">${frame({ ...FOTD, tags: [] }, 'clamp(400px, 32vw, 480px)', [42, 42, 54])}</a>`;
+  $('#heroLabel').textContent = `Nº ${pad(FOTD.index)} — ${FOTD.name}, ${FOTD.year}`;
+  $('#fotdName').textContent = FOTD.name;
+  $('#fotdBlurb').textContent = FOTD.blurb;
+  $('#fotdMeta').innerHTML = [
+    ['Catalogue', `Nº ${pad(FOTD.index)}`], ['Adopted', FOTD.year], ['Proportion', ratioLabel(FOTD.ratio)],
+  ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+
+  /* ---------- rooms ---------- */
+  $('#rooms').innerHTML = TAGS.map(([t, n], i) => `
+    <li><a href="#"><span class="r-no">Room ${ROMAN[i]}</span><span class="r-name">${ROOM_NAMES[t] || t}</span><span class="r-count">${nf.format(n)}</span></a></li>`).join('');
+
+  /* ---------- salon wall ---------- */
+  const collected = new Set(['ch']);
+  const PINNED_HOVER = 'np'; // static-screenshot hover state
+  let sortKey = 'popular', query = '';
+
+  function work(f) {
+    const isC = collected.has(f.code);
+    return `<article class="work ${f.code === PINNED_HOVER ? 'is-hover' : ''} ${isC ? 'is-collected' : ''}" data-code="${f.code}">
+      <a class="hang" href="#flag" aria-label="${f.name}">
+        <span class="halo"></span><span class="pool"></span>
+        ${frame(f, salonWidth(f.ratio))}
+      </a>
+      <div class="placard">
+        <h3 class="p-name"><a href="#flag">${f.name}</a></h3>
+        <div class="p-cat">Nº ${pad(f.index)} · ${f.year}</div>
+        <div class="p-med">${medium(f)} · ${ratioLabel(f.ratio)}</div>
+        <div class="p-foot">
+          <span class="p-favs"><i class="${isC ? 'ph-fill' : 'ph-light'} ph-heart"></i>${f.favs + (isC ? 1 : 0)}</span>
+          <button class="collect" data-collect="${f.code}">
+            <i class="${isC ? 'ph-fill' : 'ph-light'} ph-heart"></i><span>${isC ? 'Collected' : 'Collect'}</span>
+          </button>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  function renderSalon() {
+    const list = FLAGS
+      .filter((f) => !query || f.name.toLowerCase().includes(query) || f.tags.some((t) => t.includes(query)))
+      .slice()
+      .sort((a, b) => sortKey === 'newest' ? b.year - a.year : sortKey === 'az' ? a.name.localeCompare(b.name) : b.favs - a.favs);
+    $('#salon').innerHTML = list.length ? list.map(work).join('') : `<p class="empty">No works in this room match “${query}”.</p>`;
+    $('#count').textContent = `${list.length} works on view`;
+  }
+  renderSalon();
+
+  $('#sort').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    sortKey = b.dataset.sort;
+    document.querySelectorAll('#sort button').forEach((x) => x.classList.toggle('on', x === b));
+    renderSalon();
+  });
+  $('#q').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); renderSalon(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== $('#q')) { e.preventDefault(); $('#q').focus(); }
+  });
+  $('#salon').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-collect]'); if (!b) return;
+    const c = b.dataset.collect;
+    collected.has(c) ? collected.delete(c) : collected.add(c);
+    renderSalon();
+  });
+
+  /* ---------- detail ---------- */
+  const D = DETAIL;
+  $('#crumbName').textContent = D.name;
+  $('#wallNote').textContent = `Nº ${pad(D.index)} · ${D.year}`;
+  $('#detailFrame').outerHTML = frame({ ...D, tags: [] }, 'clamp(440px, 35vw, 520px)', [44, 44, 56]);
+
+  const relRatio = { us: 1.9, pe: 1.5, lb: 1.5, ng: 2 };
+  $('#related').innerHTML = D.related.map((r) => {
+    const f = { ...r, ratio: relRatio[r.code] || 1.5, tags: [] };
+    return `<a class="mini" href="#">
+      <span class="hang"><span class="halo"></span><span class="pool"></span>${frame(f, Math.round(Math.min(108, 64 * f.ratio)) + 'px', [12, 12, 15])}</span>
+      <span><span class="mini-name">${r.name}</span><span class="mini-cap">${r.code} · ${ratioLabel(f.ratio)}</span></span>
+    </a>`;
+  }).join('');
+
+  const LABEL = { Designer: 'Designed by' };
+  const pct = (s) => s.startsWith('<') ? 0.6 : parseFloat(s);
+  const rarityText = (s) => s.startsWith('<') ? `Found in fewer than ${s.slice(1)} of the collection` : `Found in ${s} of the collection`;
+
+  $('#placard').innerHTML = `
+    <span class="eyebrow">Room I — National flags</span>
+    <h2 class="lp-title">${D.name}</h2>
+    <p class="lp-alt">The Maple Leaf · l’Unifolié</p>
+    <div class="lp-cat"><span>Nº ${pad(D.index)}</span><span>${D.year}</span><span>${D.favs} collectors</span></div>
+    <p class="lp-desc">${D.description}</p>
+    <div class="lp-actions">
+      <button class="btn btn-primary"><i class="ph-light ph-heart"></i>Collect<span class="n">${D.favs}</span></button>
+      <button class="btn btn-ghost"><i class="ph-light ph-pencil-simple"></i>Edit</button>
+      <button class="btn btn-text"><i class="ph-light ph-flag"></i><span>Report</span></button>
+    </div>
+
+    <div class="lp-sec">
+      <h4>Provenance</h4>
+      <dl class="prov">
+        ${D.facts.map(([k, v]) => {
+          const isSrc = k === 'Source';
+          return `<div><dt>${LABEL[k] || k}</dt><dd class="${isSrc || k === 'Proportion' ? 'm' : ''}">${isSrc ? `<a href="#">${v}<i class="ph-light ph-arrow-up-right"></i></a>` : v}</dd></div>`;
+        }).join('')}
+      </dl>
+    </div>
+
+    <div class="lp-sec">
+      <h4>Palette</h4>
+      <div class="chips">
+        ${D.colors.map((c, i) => `<div class="chip"><div class="chip-c" style="background:${c.hex}"></div>
+          <div class="chip-l"><b>${c.name}</b><span>${c.hex} · VX-${D.index}-${i + 1}</span></div></div>`).join('')}
+      </div>
+    </div>
+
+    <div class="lp-sec">
+      <h4>Distinguishing features</h4>
+      <div class="traits">
+        ${D.traits.map(([k, v, r]) => `<div class="trait">
+          <span class="k">${k}</span>
+          <span class="v">${v}<small>${rarityText(r)}</small></span>
+          <span class="rar">${pct(r) <= 3 ? '<span class="rare">Rare</span>' : `<em>${r}</em>`}<span class="meter"><span style="width:${Math.max(pct(r), 1)}%"></span></span></span>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="lp-sec">
+      <h4>Catalogue terms</h4>
+      <div class="terms">${D.tags.map((t) => `<a href="#">${t}</a>`).join('')}</div>
+    </div>`;
+
+  /* ---------- theme ---------- */
+  $('#themeToggle').addEventListener('click', () => document.documentElement.classList.toggle('dark'));
+})();
+</script>
+</body>
+</html>

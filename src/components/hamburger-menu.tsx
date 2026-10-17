@@ -1,63 +1,75 @@
 'use client';
 
-import { Menu, Gamepad2, Heart, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from './ui/button';
-import { Drawer, DrawerContent, DrawerTrigger } from './ui/drawer';
-import { AuthHeader } from './auth-header';
-import Logo from './Logo';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Coffee, Menu, Plus } from '@/components/icons';
+import { Button } from './ui/button';
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from './ui/drawer';
+import { AuthHeader } from './auth-header';
+import { ThemeToggle } from './theme-toggle';
+import Logo from './Logo';
+import { NAV_LINKS } from '@/lib/nav';
+import { cn } from '@/lib/utils';
 
 export function HamburgerMenu() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <Drawer direction='right' open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
-        <Button variant='neutral' size='icon' className='md:hidden'>
-          <Menu className='h-6 w-6' />
+        <Button variant='neutral' size='icon' className='shrink-0 md:hidden' aria-label='Open menu'>
+          <Menu />
         </Button>
       </DrawerTrigger>
-      <DrawerContent className='data-[vaul-drawer-direction=right]:w-[86vw] data-[vaul-drawer-direction=right]:max-w-[320px] p-0'>
-        <div className='flex min-h-dvh flex-col px-4 pb-4 pt-6'>
-          <div className='flex items-start justify-between gap-3 border-b border-border/60 pb-5'>
-            <Logo
-              showText
-              textClassName='hidden [@media(min-width:300px)]:flex'
-            />
-            <div className='shrink-0 pt-1'>
+      <DrawerContent className='p-0 data-[vaul-drawer-direction=right]:w-[86vw] data-[vaul-drawer-direction=right]:max-w-[320px]'>
+        <DrawerTitle className='sr-only'>Menu</DrawerTitle>
+        <div className='flex min-h-dvh flex-col px-4 pb-4 pt-5'>
+          <div className='flex items-center justify-between gap-3 border-b border-line pb-4'>
+            <Logo />
+            <div className='flex items-center gap-2'>
+              <ThemeToggle />
               <AuthHeader />
             </div>
           </div>
 
-          <nav className='space-y-1 py-3'>
-            <Link
-              href='/quiz'
-              onClick={() => setOpen(false)}
-              className='flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground'
-            >
-              <Gamepad2 className='h-4 w-4' />
-              Quiz
-            </Link>
+          <nav className='space-y-0.5 py-3'>
+            {NAV_LINKS.map(({ href, label }) => {
+              const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    'flex items-center rounded-[10px] px-3 py-2.5 text-[15px] font-medium text-subtle transition-colors hover:bg-foreground/[0.06] hover:text-foreground',
+                    active && 'bg-foreground/[0.07] text-foreground',
+                  )}
+                >
+                  {label}
+                </Link>
+              );
+            })}
             <a
               href='https://buymeacoffee.com/theobourgeois'
               target='_blank'
               rel='noopener noreferrer'
               onClick={() => setOpen(false)}
-              className='flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground'
+              className='flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[15px] font-medium text-subtle transition-colors hover:bg-foreground/[0.06] hover:text-foreground'
             >
-              <Heart className='h-4 w-4 fill-red-500 text-red-500' />
+              <Coffee className='size-4' />
               Donate
             </a>
           </nav>
 
-          <div className='mt-auto border-t border-border/60 pt-4'>
-            <Link href='/post-flag' onClick={() => setOpen(false)} className='block'>
-              <Button size='lg' className='w-full justify-center'>
-                <Plus className='h-4 w-4' />
-                Post Flag
-              </Button>
-            </Link>
+          <div className='mt-auto border-t border-line pt-4'>
+            <Button asChild size='lg' className='w-full'>
+              <Link href='/post-flag' onClick={() => setOpen(false)}>
+                <Plus />
+                Post flag
+              </Link>
+            </Button>
           </div>
         </div>
       </DrawerContent>

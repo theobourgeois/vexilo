@@ -1,14 +1,14 @@
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import Link from "next/link";
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Plus } from '@/components/icons';
 
 export function PostFlagButton() {
-    return (
-        <Link href="/post-flag" className="">
-            <Button className="">
-                <Plus className="w-4 h-4" />
-                Post Flag
-            </Button>
-        </Link>
-    );
+  return (
+    <Button asChild>
+      <Link href='/post-flag'>
+        <Plus />
+        Post flag
+      </Link>
+    </Button>
+  );
 }

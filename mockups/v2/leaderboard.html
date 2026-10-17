@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Leaderboard — Vexilo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link rel="stylesheet" href="v2.css" />
+<style>
+  .lb { max-width: 1040px; margin: 0 auto; }
+  .lb-top { padding: 28px 0 18px; display: flex; align-items: center; gap: 16px; }
+  .lb-top h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.03em; }
+  .lb-top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .lb-top .seg { margin-left: auto; }
+
+  .podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .pod { overflow: hidden; cursor: pointer; transition: transform .25s cubic-bezier(.2,.7,.3,1), box-shadow .25s; }
+  .pod:hover, .pod.is-hover { transform: translateY(-3px); box-shadow: var(--shadow-tile-hover); }
+  .pod:hover .cw > i, .pod.is-hover .cw > i { animation-play-state: running; }
+  .pod .stage-panel { height: 190px; border-bottom: 1px solid var(--line); }
+  .pod .mast { position: absolute; left: 44px; top: 34px; bottom: 0; }
+  .pod .rank { position: absolute; top: 14px; right: 14px; }
+  .medal {
+    display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+    font: 600 13px/1 var(--mono); color: #3B2A00;
+    background: radial-gradient(circle at 35% 30%, #FFF4C2, #F2C94C 55%, #C8971A);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 0 0 1px rgba(120, 85, 0, .35), 0 2px 4px rgba(0,0,0,.15);
+  }
+  .medal.s2 { color: #2E3135; background: radial-gradient(circle at 35% 30%, #FFFFFF, #CDD1D6 55%, #9AA0A7); box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 0 0 1px rgba(60,65,70,.3), 0 2px 4px rgba(0,0,0,.15); }
+  .medal.s3 { color: #3A1E08; background: radial-gradient(circle at 35% 30%, #FFE0C2, #D9935A 55%, #A9622A); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1px rgba(110,55,15,.35), 0 2px 4px rgba(0,0,0,.15); }
+  .pod .who { display: flex; align-items: center; gap: 12px; padding: 16px 18px 18px; }
+  .pod .who .avatar { width: 40px; height: 40px; font-size: 14px; }
+  .pod .who b { display: block; font-size: 15px; font-weight: 600; letter-spacing: -0.015em; }
+  .pod .who .mono { font-size: 12px; color: var(--muted); }
+  .pod .who .big { margin-left: auto; text-align: right; }
+  .pod .who .big b { font: 600 20px/1 var(--mono); letter-spacing: -0.02em; }
+
+  .table { margin-top: 16px; padding: 6px; }
+  .tr { display: grid; grid-template-columns: 52px 1fr 120px 150px 110px; align-items: center; gap: 12px; height: 60px; padding: 0 14px; border-radius: 12px; }
+  .tr + .tr { box-shadow: 0 -1px 0 var(--line); }
+  .tr.head { height: 38px; box-shadow: none; }
+  .tr.me { background: var(--accent-soft); box-shadow: inset 0 0 0 1px rgba(255, 90, 31, .25); }
+  .tr.me + .tr { box-shadow: none; }
+  .tr .rk { font: 500 13px/1 var(--mono); color: var(--muted); }
+  .tr .u { display: flex; align-items: center; gap: 12px; font-weight: 550; }
+  .tr .u .you { font: 500 10px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); padding: 4px 6px; border-radius: 6px; background: var(--accent-soft); }
+  .tr .pf { display: flex; align-items: center; }
+  .tr .num { font: 500 13px/1 var(--mono); text-align: right; }
+  .tr .up { font: 500 12px/1 var(--mono); color: var(--good); text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+  .bar { height: 6px; border-radius: 6px; background: var(--well); box-shadow: var(--shadow-well); overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 6px; background: var(--text-2); opacity: .55; }
+  .tr.me .bar i { background: var(--accent); opacity: 1; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="lb">
+    <div class="lb-top">
+      <div><h1>Leaderboard</h1><p>Ranked by approved flags and edits.</p></div>
+      <div class="seg"><button>This week</button><button class="on">This month</button><button>All time</button></div>
+    </div>
+    <div class="podium" id="podium"></div>
+    <div class="tile table" id="table"></div>
+  </div>
+</main>
+
+<script src="../shared/flags.js"></script>
+<script src="v2.js"></script>
+<script>
+  V.mount('leaderboard');
+  const U = V.USERS;
+  document.getElementById('podium').innerHTML = U.slice(0, 3).map((u, i) => `
+    <article class="tile pod ${i === 0 ? 'is-hover' : ''}">
+      <div class="stage-panel">
+        <span class="rank medal ${i ? 's' + (i + 1) : ''}">${i + 1}</span>
+        <div class="mast"><div class="pole"></div>${V.cloth(u.flag, u.ratio, '', { h: V.fitH(u.ratio, 160 * 100, 220, 112), size: 'md' })}</div>
+      </div>
+      <div class="who">
+        <span class="avatar" style="background:${u.color}">${u.initials}</span>
+        <div><b>${u.name}</b><span class="mono">since ${u.joined}</span></div>
+        <div class="big"><b>${u.month}</b><div class="mono">this month</div></div>
+      </div>
+    </article>`).join('');
+
+  const max = U[3].month;
+  document.getElementById('table').innerHTML =
+    `<div class="tr head label"><span>#</span><span>Contributor</span><span>Profile flag</span><span>This month</span><span style="text-align:right">All time</span></div>` +
+    U.slice(3).map((u, i) => `
+      <div class="tr ${u.name === 'tom.b' ? 'me' : ''}">
+        <span class="rk">${String(i + 4).padStart(2, '0')}</span>
+        <span class="u"><span class="avatar" style="background:${u.color}">${u.initials}</span>${u.name}${u.name === 'tom.b' ? '<span class="you">You</span>' : ''}</span>
+        <span class="pf">${V.cloth(u.flag, u.ratio, '', { h: 24, size: 'sm' })}</span>
+        <span style="display:flex;align-items:center;gap:10px"><span class="bar" style="flex:1"><i style="width:${(u.month / max) * 100}%"></i></span><span class="num" style="width:22px">${u.month}</span></span>
+        <span class="num">${u.count.toLocaleString()}</span>
+      </div>`).join('');
+</script>
+</body>
+</html>

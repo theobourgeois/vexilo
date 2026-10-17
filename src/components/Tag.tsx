@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import React from 'react';
 
@@ -11,6 +10,8 @@ interface TagProps {
   count?: number;
   onClick?: () => void;
   isActive?: boolean;
+  /** `chip` is the raised filter style used on browse; `outline` is the quiet pill used on flag pages. */
+  variant?: 'chip' | 'outline';
 }
 
 export default function Tag({
@@ -19,6 +20,7 @@ export default function Tag({
   count,
   onClick,
   isActive: isActiveProp,
+  variant = 'outline',
 }: TagProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -30,39 +32,51 @@ export default function Tag({
       return;
     }
     e.preventDefault();
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(window.location.pathname === '/' ? searchParams : undefined);
     params.set('tag', text);
+    params.delete('page');
     if (window.location.pathname !== '/') {
       router.push(`/?${params.toString()}`);
-      // After navigation, scroll to search-header
-      setTimeout(() => {
-        const searchHeader = document.getElementById('search-header');
-        if (searchHeader) {
-          searchHeader.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 500);
     } else {
-      router.replace(`${window.location.pathname}?${params.toString()}`, {
-        scroll: false,
-      });
+      router.replace(`/?${params.toString()}`, { scroll: false });
     }
   };
+
+  if (variant === 'chip') {
+    return (
+      <button
+        type='button'
+        onClick={handleClick}
+        aria-pressed={isActive}
+        className={cn(
+          'inline-flex h-8 shrink-0 cursor-pointer items-center gap-[7px] whitespace-nowrap rounded-full px-3 text-[13px] font-medium transition-[color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          isActive ? 'bg-foreground text-background' : 'vx-key text-subtle hover:text-foreground',
+          className,
+        )}
+      >
+        {text}
+        {count !== undefined && (
+          <span className={cn('tabular-nums text-[11px]', isActive ? 'opacity-60' : 'text-muted-foreground')}>
+            {count.toLocaleString()}
+          </span>
+        )}
+      </button>
+    );
+  }
 
   return (
     <button
       type='button'
       onClick={handleClick}
-      className={cn('focus:outline-none group', className)}
       aria-label={`Filter by tag ${text}`}
+      className={cn(
+        'inline-flex h-[26px] cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-medium shadow-[inset_0_0_0_1px_var(--border)] transition-[color,box-shadow] hover:text-foreground hover:shadow-[inset_0_0_0_1px_var(--muted-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        isActive ? 'text-foreground shadow-[inset_0_0_0_1px_var(--foreground)]' : 'text-subtle',
+        className,
+      )}
     >
-      <Badge
-        variant={isActive ? 'default' : 'neutral'}
-        className={cn(
-          'cursor-pointer group-hover:bg-main hover:brightness-105 group-hover:text-main-foreground group-focus:bg-main group-focus:text-main-foreground border border-border px-3 py-1 rounded-full text-xs font-medium shadow-sm',
-        )}
-      >
-        #{text} {count ? `(${count})` : ''}
-      </Badge>
+      {text}
+      {count !== undefined && <span className='tabular-nums text-[11px] text-muted-foreground'>{count}</span>}
     </button>
   );
 }

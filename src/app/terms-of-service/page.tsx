@@ -1,180 +1,117 @@
 "use client";
 
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, FileText, Users, Flag } from "lucide-react";
-import { useRouter } from "next/navigation";
-
-export default function TermsOfServicePage() {
-    const router = useRouter();
-
-    const handleBackToHome = () => {
-        router.push("/");
-    };
-
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <div className="max-w-4xl mx-auto px-4 py-12">
-            <div className="space-y-6">
-                <div className="text-center">
-                    <h1 className="text-3xl font-bold tracking-tight">
-                        Terms of Service
-                    </h1>
-                    <p className="text-muted-foreground mt-2">
-                        Last updated: {new Date().toLocaleDateString()}
-                    </p>
-                </div>
+        <section className="border-t border-line pt-7">
+            <h2 className="text-[17px] font-semibold tracking-[-0.02em]">{title}</h2>
+            <div className="mt-3 space-y-5">{children}</div>
+        </section>
+    );
+}
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <FileText className="h-6 w-6 text-blue-600" />
-                            </div>
-                            <CardTitle>Acceptance of Terms</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground">
-                            By accessing and using Vexilo, you accept and agree to be bound by the terms and provision of this agreement. 
-                            If you do not agree to abide by the above, please do not use this service.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                                <Users className="h-6 w-6 text-green-600" />
-                            </div>
-                            <CardTitle>User Accounts and Privacy</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <h4 className="font-semibold mb-2">Account Information</h4>
-                            <p className="text-sm text-muted-foreground">
-                                You are responsible for maintaining the confidentiality of your account information and for all activities that occur under your account.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-2">Public Display Consent</h4>
-                            <p className="text-sm text-muted-foreground">
-                                By using Vexilo, you agree that your username and profile picture may be displayed publicly on our leaderboards, 
-                                community features, and other public areas of the platform. This includes but is not limited to:
-                            </p>
-                            <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-                                <li>• Community leaderboards showing top contributors</li>
-                                <li>• Public flag submissions with attribution</li>
-                                <li>• Community engagement features</li>
-                                <li>• Platform promotional materials (with appropriate context)</li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-2">Privacy Controls</h4>
-                            <p className="text-sm text-muted-foreground">
-                                You can manage your privacy settings in your account settings page, including options to update your display name 
-                                and control your visibility in public features.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-purple-100 rounded-lg">
-                                <Flag className="h-6 w-6 text-purple-600" />
-                            </div>
-                            <CardTitle>Content Guidelines</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <h4 className="font-semibold mb-2">User-Generated Content</h4>
-                            <p className="text-sm text-muted-foreground">
-                                You retain ownership of content you submit to Vexilo, but you grant us a license to use, display, and distribute 
-                                your content in connection with the service.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-2">Prohibited Content</h4>
-                            <p className="text-sm text-muted-foreground">
-                                You agree not to submit content that is illegal, harmful, threatening, abusive, defamatory, or violates any 
-                                third-party rights. We reserve the right to remove content that violates these terms.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-2">Copyright and Attribution</h4>
-                            <p className="text-sm text-muted-foreground">
-                                You must have the right to share any flag images you submit. Proper attribution must be provided for all content 
-                                that is not your original work.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-orange-100 rounded-lg">
-                                <Shield className="h-6 w-6 text-orange-600" />
-                            </div>
-                            <CardTitle>Service Limitations</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <h4 className="font-semibold mb-2">Service Availability</h4>
-                            <p className="text-sm text-muted-foreground">
-                                We strive to maintain service availability but cannot guarantee uninterrupted access. We may modify, suspend, 
-                                or discontinue the service at any time.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-2">Limitation of Liability</h4>
-                            <p className="text-sm text-muted-foreground">
-                                Vexilo is provided &quot;as is&quot; without warranties. We are not liable for any damages arising from your use of the service.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold mb-2">Termination</h4>
-                            <p className="text-sm text-muted-foreground">
-                                We may terminate or suspend your account at any time for violations of these terms. You may also terminate 
-                                your account at any time through your settings.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Changes to Terms</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground">
-                            We may update these terms from time to time. We will notify users of significant changes via email or through 
-                            the platform. Continued use of the service after changes constitutes acceptance of the new terms.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <div className="flex justify-center pt-6">
-                    <Button
-                        variant="neutral"
-                        onClick={handleBackToHome}
-                        className="flex items-center gap-2"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to Home
-                    </Button>
-                </div>
-            </div>
+function Sub({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <h3 className="text-[15px] font-semibold">{title}</h3>
+            <div className="mt-1.5 space-y-3">{children}</div>
         </div>
     );
-} 
+}
+
+export default function TermsOfServicePage() {
+    return (
+        <article className="mx-auto max-w-[760px] px-4 pb-20 pt-7 text-[15px] leading-[1.7] text-subtle md:px-8">
+            <header className="pb-8">
+                <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.03em] text-foreground">
+                    Terms of Service
+                </h1>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                    Last updated <span className="tabular-nums">{new Date().toLocaleDateString()}</span>
+                </p>
+            </header>
+
+            <div className="space-y-9 [&_h2]:text-foreground [&_h3]:text-foreground [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-5 [&_ul]:marker:text-muted-foreground">
+                <Section title="Acceptance of terms">
+                    <p>
+                        By accessing and using Vexilo, you accept and agree to be bound by the terms and provision of this agreement.
+                        If you do not agree to abide by the above, please do not use this service.
+                    </p>
+                </Section>
+
+                <Section title="User accounts and privacy">
+                    <Sub title="Account information">
+                        <p>
+                            You are responsible for maintaining the confidentiality of your account information and for all activities that occur under your account.
+                        </p>
+                    </Sub>
+                    <Sub title="Public display consent">
+                        <p>
+                            By using Vexilo, you agree that your username and profile picture may be displayed publicly on our leaderboards,
+                            community features, and other public areas of the platform. This includes but is not limited to:
+                        </p>
+                        <ul>
+                            <li>Community leaderboards showing top contributors</li>
+                            <li>Public flag submissions with attribution</li>
+                            <li>Community engagement features</li>
+                            <li>Platform promotional materials (with appropriate context)</li>
+                        </ul>
+                    </Sub>
+                    <Sub title="Privacy controls">
+                        <p>
+                            You can manage your privacy settings in your account settings page, including options to update your display name
+                            and control your visibility in public features.
+                        </p>
+                    </Sub>
+                </Section>
+
+                <Section title="Content guidelines">
+                    <Sub title="User-generated content">
+                        <p>
+                            You retain ownership of content you submit to Vexilo, but you grant us a license to use, display, and distribute
+                            your content in connection with the service.
+                        </p>
+                    </Sub>
+                    <Sub title="Prohibited content">
+                        <p>
+                            You agree not to submit content that is illegal, harmful, threatening, abusive, defamatory, or violates any
+                            third-party rights. We reserve the right to remove content that violates these terms.
+                        </p>
+                    </Sub>
+                    <Sub title="Copyright and attribution">
+                        <p>
+                            You must have the right to share any flag images you submit. Proper attribution must be provided for all content
+                            that is not your original work.
+                        </p>
+                    </Sub>
+                </Section>
+
+                <Section title="Service limitations">
+                    <Sub title="Service availability">
+                        <p>
+                            We strive to maintain service availability but cannot guarantee uninterrupted access. We may modify, suspend,
+                            or discontinue the service at any time.
+                        </p>
+                    </Sub>
+                    <Sub title="Limitation of liability">
+                        <p>
+                            Vexilo is provided &quot;as is&quot; without warranties. We are not liable for any damages arising from your use of the service.
+                        </p>
+                    </Sub>
+                    <Sub title="Termination">
+                        <p>
+                            We may terminate or suspend your account at any time for violations of these terms. You may also terminate
+                            your account at any time through your settings.
+                        </p>
+                    </Sub>
+                </Section>
+
+                <Section title="Changes to terms">
+                    <p>
+                        We may update these terms from time to time. We will notify users of significant changes via email or through
+                        the platform. Continued use of the service after changes constitutes acceptance of the new terms.
+                    </p>
+                </Section>
+            </div>
+        </article>
+    );
+}

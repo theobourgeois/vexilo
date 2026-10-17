@@ -1,21 +1,16 @@
 import type { Metadata } from 'next';
-import { DM_Sans } from 'next/font/google';
+import { Poppins } from 'next/font/google';
 import './globals.css';
 import Providers from '@/components/providers';
-import Logo from '@/components/Logo';
-import { AuthHeader } from '@/components/auth-header';
 import { Toaster } from '@/components/ui/sonner';
-import { PostFlagButton } from '@/components/post-flag-button';
-import { HamburgerMenu } from '@/components/hamburger-menu';
+import { SiteHeader } from '@/components/site-header';
 import { Footer } from '@/components/footer';
 import { Analytics } from '@vercel/analytics/next';
-import { Heart, Gamepad2 } from 'lucide-react';
-import Link from 'next/link';
 
-const dmSans = DM_Sans({
-  variable: '--font-dm-sans',
+const poppins = Poppins({
+  variable: '--font-poppins',
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  weight: ['400', '500', '600', '700'],
 });
 
 export const keywords = [
@@ -108,45 +103,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en'>
-      <body className={`${dmSans.variable} antialiased bg-[image:var(--background-image-noise),radial-gradient(ellipse_at_top,oklch(96%_0.01_255),oklch(92%_0.02_255))] dark:bg-[image:var(--background-image-noise),radial-gradient(ellipse_at_top,oklch(22%_0.01_255),oklch(15%_0.01_255))] bg-[size:256px,auto]`}>
+    <html lang='en' suppressHydrationWarning>
+      <body className={`${poppins.variable} antialiased`}>
         <Toaster />
         <Analytics />
         <Providers>
-          {/* Logo Header */}
-          <header className='max-w-7xl mx-auto px-4 flex flex-col items-start justify-start py-4'>
-            <div className='w-full flex justify-between items-start'>
-              <div>
-                <Logo />
-              </div>
-              <div className='flex items-center gap-2'>
-                <div className='hidden md:flex items-center gap-4'>
-                  <Link
-                    href='/quiz'
-                    className='flex items-center gap-1.5 text-sm font-bold text-foreground/60 hover:text-foreground transition-colors'
-                  >
-                    <Gamepad2 className='w-4 h-4' />
-                    Quiz
-                  </Link>
-                  <a
-                    href='https://buymeacoffee.com/theobourgeois'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='flex items-center gap-1.5 text-sm font-bold text-foreground/60 hover:text-foreground transition-colors'
-                  >
-                    <Heart className='w-4 h-4 fill-red-500 text-red-500 drop-shadow-sm' />
-                    Donate
-                  </a>
-                  <PostFlagButton />
-                  <AuthHeader />
-                </div>
-                <HamburgerMenu />
-              </div>
-            </div>
-          </header>
-          <div className='w-full min-h-screen'>
-            {children}
-          </div>
+          <SiteHeader />
+          <main className='min-h-[calc(100dvh-4rem)]'>{children}</main>
           <Footer />
         </Providers>
       </body>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { Trophy, ArrowRight } from "lucide-react";
+import { Trophy, ArrowRight } from '@/components/icons';
 import Link from "next/link";
 import { getRankStyle } from "@/lib/get-rank-style";
 import Image from "next/image";
