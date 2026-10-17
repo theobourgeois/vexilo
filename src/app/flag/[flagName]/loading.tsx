@@ -28,7 +28,7 @@ export default function FlagLoading() {
         <div className={`h-3.5 w-24 ${bar}`} />
       </div>
 
-      <div className='grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]'>
+      <div className='grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-10'>
         <div className='vx-tile flex flex-col overflow-hidden'>
           <div className='bg-stage relative h-[340px] sm:h-[440px]'>
             <div className='absolute right-3.5 top-3.5 h-9 w-[168px] animate-pulse rounded-full bg-foreground/[0.06]' />
@@ -43,7 +43,7 @@ export default function FlagLoading() {
           </div>
         </div>
 
-        <section className='vx-tile flex flex-col p-6 sm:p-[26px]'>
+        <section className='flex flex-col lg:pt-1'>
           <div className={`h-3 w-28 ${bar}`} />
           <div className={`mt-3.5 h-9 w-3/4 sm:h-10 ${bar}`} />
           <div className='mt-5 space-y-2.5'>
@@ -64,7 +64,7 @@ export default function FlagLoading() {
         </section>
       </div>
 
-      <div className='mt-4 grid items-start gap-4 md:grid-cols-2 lg:grid-cols-3'>
+      <div className='mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
         <PanelSkeleton rows={4} />
         <PanelSkeleton rows={3} />
         <PanelSkeleton rows={5} />
