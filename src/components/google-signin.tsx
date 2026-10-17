@@ -1,21 +1,18 @@
-"use client";
+'use client';
 
-import { signIn } from "next-auth/react";
-import { Button } from "./ui/button";
-import { FcGoogle } from "react-icons/fc";
+import { signIn } from 'next-auth/react';
+import { Button } from './ui/button';
+import { GoogleLogo } from '@/components/icons';
 
 export function GoogleSignin() {
-    const handleSignIn = async () => {
-        await signIn("google", { callbackUrl: "/" });
-    };
+  const handleSignIn = async () => {
+    await signIn('google', { callbackUrl: '/' });
+  };
 
-    return (
-        <Button
-            className="inline-flex gap-1 bg-white"
-            onClick={handleSignIn}
-            variant="default"
-        >
-            Sign in with Google <FcGoogle size="20" />
-        </Button>
-    );
+  return (
+    <Button variant='neutral' onClick={handleSignIn}>
+      <GoogleLogo />
+      Sign in with Google
+    </Button>
+  );
 }

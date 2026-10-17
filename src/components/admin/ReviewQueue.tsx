@@ -8,15 +8,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   CheckCheck,
   Check,
-  Copy,
   Inbox,
   Loader2,
-  ScanEye,
   ShieldCheck,
   Tag,
-  TriangleAlert,
   X,
-} from 'lucide-react';
+} from '@/components/icons';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -44,7 +41,7 @@ const FILTERS: Array<{ value: ReviewFilter; label: string }> = [
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className='text-[11px] font-bold px-1.5 py-px rounded-md border border-border bg-secondary-background text-foreground/70 shadow-[0_2px_0_var(--border)]'>
+    <kbd className='inline-flex min-w-5 justify-center rounded-[6px] px-1.5 py-px tabular-nums text-[10.5px] font-medium leading-4 vx-key text-subtle'>
       {children}
     </kbd>
   );
@@ -56,7 +53,7 @@ function Avatar({ user }: { user: ReviewQueueItem['user'] }) {
     return <img src={user.image} alt='' referrerPolicy='no-referrer' className='size-9 rounded-full shrink-0' />;
   }
   return (
-    <div className='size-9 rounded-full bg-main/70 text-white font-bold flex items-center justify-center shrink-0'>
+    <div className='size-9 rounded-full bg-main-soft text-main font-semibold flex items-center justify-center shrink-0'>
       {(user.name || '?').charAt(0).toUpperCase()}
     </div>
   );
@@ -69,7 +66,7 @@ function FlagThumb({ src, alt, className }: { src: string; alt: string; classNam
       alt={alt}
       width={160}
       height={100}
-      className={cn('w-auto object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.18)]', className)}
+      className={cn('w-auto object-contain drop-shadow-[0_0_0.6px_rgb(0_0_0/0.45)]', className)}
     />
   );
 }
@@ -196,51 +193,50 @@ export function ReviewQueue() {
     <div className='pb-36'>
       <div className='flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-5'>
         <div>
-          <h1 className='text-3xl font-bold tracking-tight'>Review queue</h1>
-          <p className='text-foreground/60 mt-1'>
+          <h1 className='text-[22px] font-semibold tracking-[-0.03em]'>Review queue</h1>
+          <p className='mt-0.5 text-[13px] text-muted-foreground'>
             {total} waiting
             {items.length > 0 && ` · oldest ${timeAgo(items[0].createdAt)}`}
             {total > items.length && ` · showing the oldest ${items.length}`}
           </p>
         </div>
         <Button variant='neutral' onClick={() => setIsFocusOpen(true)} disabled={ordered.length === 0}>
-          <ScanEye />
-          Focus mode <Kbd>F</Kbd>
+          Focus mode
         </Button>
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 mb-6 text-sm font-semibold'>
+      <div className='flex flex-wrap items-center gap-2 mb-6 text-[13px] font-medium'>
         {FILTERS.map(({ value, label }) => (
           <button
             key={value}
             type='button'
             onClick={() => setFilter(value)}
             className={cn(
-              'px-3 py-1.5 rounded-full border transition-colors cursor-pointer flex items-center gap-1.5',
+              'h-8 px-3 rounded-full transition-colors cursor-pointer flex items-center gap-1.5',
               filter === value
-                ? 'bg-foreground text-background border-foreground'
-                : value === 'attention' && counts.attention > 0
-                  ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800'
-                  : 'bg-secondary-background border-border hover:border-foreground/30',
+                ? 'bg-foreground text-background'
+                : 'vx-key text-subtle hover:text-foreground',
             )}
           >
-            {value === 'attention' && <TriangleAlert className='size-3.5' />}
-            {label} {counts[value]}
+            {label}{' '}
+            <span className={cn('tabular-nums text-xs', value === 'attention' && counts.attention > 0 && filter !== value ? 'text-warn' : 'opacity-70')}>
+              {counts[value]}
+            </span>
           </button>
         ))}
       </div>
 
       {isLoading && (
         <div className='flex justify-center py-20'>
-          <Loader2 className='size-8 animate-spin text-foreground/40' />
+          <Loader2 className='size-8 animate-spin text-muted-foreground' />
         </div>
       )}
 
       {!isLoading && groups.length === 0 && (
         <Card className='py-16 items-center text-center gap-2'>
-          <Inbox className='size-10 text-foreground/30' />
-          <p className='text-lg font-bold'>All caught up</p>
-          <p className='text-sm text-foreground/60'>
+          <Inbox className='size-10 text-muted-foreground' />
+          <p className='text-[17px] font-semibold tracking-[-0.02em]'>All caught up</p>
+          <p className='text-[13px] text-muted-foreground'>
             {filter === 'all' ? 'Nothing waiting for review.' : 'Nothing matches this filter.'}
           </p>
         </Card>
@@ -270,15 +266,15 @@ export function ReviewQueue() {
                 />
                 <Avatar user={group.user} />
                 <div className='flex-1 min-w-0'>
-                  <p className='font-bold truncate'>
-                    {group.user.name || 'Anonymous'} <span className='text-foreground/60 font-medium'>{summary}</span>
+                  <p className='font-semibold truncate'>
+                    {group.user.name || 'Anonymous'} <span className='text-subtle font-normal'>{summary}</span>
                   </p>
-                  <p className='text-xs text-foreground/60'>
+                  <p className='text-xs text-muted-foreground'>
                     {timeAgo(group.createdAt)} · {group.user.approvedCount} approved before, {group.user.declinedCount} declined
                   </p>
                 </div>
                 {group.user.isTrusted ? (
-                  <span className='text-xs font-bold text-main flex items-center gap-1'>
+                  <span className='text-xs font-semibold text-main flex items-center gap-1'>
                     <ShieldCheck className='size-4' />
                     Trusted
                   </span>
@@ -303,7 +299,7 @@ export function ReviewQueue() {
                 </Button>
               </div>
               {flaggedCount > 0 && approvable.length > 0 && (
-                <p className='-mt-2 mb-3 text-xs text-amber-700 dark:text-amber-400 font-semibold'>
+                <p className='-mt-2 mb-3 text-[13px] text-warn'>
                   {flaggedCount} need{flaggedCount === 1 ? 's' : ''} a look and won&apos;t be included.
                 </p>
               )}
@@ -321,20 +317,20 @@ export function ReviewQueue() {
                         onClick={() => setPanelId(item.id)}
                         onKeyDown={(event) => event.key === 'Enter' && setPanelId(item.id)}
                         className={cn(
-                          'col-span-2 sm:col-span-3 md:col-span-2 xl:col-span-3 rounded-xl p-3 flex items-center gap-3 cursor-pointer transition-shadow bg-secondary-background',
-                          isSelected ? 'ring-2 ring-main bg-main/10' : 'ring-1 ring-border hover:ring-foreground/30',
+                          'col-span-2 sm:col-span-3 md:col-span-2 xl:col-span-3 rounded-[14px] p-3 flex items-center gap-3 cursor-pointer transition-shadow',
+                          isSelected ? 'ring-2 ring-main bg-main-soft' : 'bg-secondary-background ring-1 ring-border hover:ring-foreground/25',
                           panelId === item.id && 'ring-2 ring-main',
                         )}
                       >
                         <SelectBox label={`Select ${item.flag.flagName}`} checked={isSelected} onToggle={(event) => toggle(item.id, event.shiftKey)} />
-                        <div className='size-14 rounded-lg bg-foreground/5 flex items-center justify-center shrink-0'>
+                        <div className='size-14 rounded-[10px] bg-stage flex items-center justify-center shrink-0'>
                           <FlagThumb src={item.flag.flagImage} alt={item.flag.flagName} className='max-h-8 max-w-[80%]' />
                         </div>
                         <div className='min-w-0'>
                           <p className='text-sm font-semibold truncate'>{item.flag.flagName}</p>
                           <div className='flex flex-wrap gap-1 mt-1'>
                             {describeEditChanges(item).map((change) => (
-                              <span key={change} className='text-[10px] font-bold uppercase tracking-wide rounded bg-main/10 text-main px-1.5 py-0.5'>
+                              <span key={change} className='tabular-nums text-xs font-medium rounded-[5px] bg-main-soft text-main px-1.5 py-0.5'>
                                 {change}
                               </span>
                             ))}
@@ -352,31 +348,26 @@ export function ReviewQueue() {
                       onClick={() => setPanelId(item.id)}
                       onKeyDown={(event) => event.key === 'Enter' && setPanelId(item.id)}
                       className={cn(
-                        'rounded-xl p-2 cursor-pointer transition-shadow',
+                        'rounded-[14px] p-2 cursor-pointer transition-shadow',
                         isSelected
-                          ? 'bg-main/10 ring-2 ring-main'
+                          ? 'bg-main-soft ring-2 ring-main'
                           : warning
-                            ? 'bg-secondary-background ring-1 ring-amber-300 dark:ring-amber-700'
-                            : 'bg-secondary-background ring-1 ring-border hover:ring-foreground/30',
+                            ? 'bg-secondary-background ring-1 ring-warn/50'
+                            : 'bg-secondary-background ring-1 ring-border hover:ring-foreground/25',
                         panelId === item.id && 'ring-2 ring-main',
                       )}
                     >
-                      <div className='relative h-20 rounded-lg bg-foreground/5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.08)] flex items-center justify-center'>
-                        <FlagThumb src={item.flag.flagImage} alt={item.flag.flagName} className='max-h-12 max-w-[80%]' />
+                      <div className='relative h-24 rounded-[10px] bg-stage flex items-center justify-center'>
+                        <FlagThumb src={item.flag.flagImage} alt={item.flag.flagName} className='max-h-14 max-w-[78%]' />
                         <SelectBox
                           label={`Select ${item.flag.flagName}`}
                           checked={isSelected}
                           onToggle={(event) => toggle(item.id, event.shiftKey)}
                           className='absolute top-1.5 left-1.5'
                         />
-                        {warning && (
-                          <div className='absolute bottom-1.5 inset-x-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/80 dark:border-amber-800 dark:text-amber-200 text-[10px] font-bold px-1.5 py-0.5 flex items-center gap-1 truncate'>
-                            <Copy className='size-3 shrink-0' />
-                            <span className='truncate'>{warning}</span>
-                          </div>
-                        )}
                       </div>
-                      <p className='text-xs font-semibold mt-1.5 truncate px-0.5'>{item.flag.flagName}</p>
+                      <p className='text-[13px] font-medium mt-2 truncate px-0.5'>{item.flag.flagName}</p>
+                      {warning && <p className='text-xs text-warn truncate px-0.5'>{warning}</p>}
                     </div>
                   );
                 })}
@@ -393,9 +384,9 @@ export function ReviewQueue() {
             <div className='flex-1 min-w-0 text-sm'>
               <p className='truncate'>
                 <b>{selectedIds.length} selected</b>
-                {selectedUsers.size === 1 && <span className='text-foreground/60'> · from {[...selectedUsers][0]}</span>}
+                {selectedUsers.size === 1 && <span className='text-muted-foreground'> · from {[...selectedUsers][0]}</span>}
               </p>
-              <p className='hidden sm:flex text-xs text-foreground/60 items-center gap-1.5 mt-0.5'>
+              <p className='hidden sm:flex text-xs text-muted-foreground items-center gap-1.5 mt-0.5'>
                 <Kbd>A</Kbd> approve <Kbd>D</Kbd> decline <Kbd>⇧</Kbd>+click range <Kbd>Esc</Kbd> clear
               </p>
             </div>
@@ -405,7 +396,7 @@ export function ReviewQueue() {
                 Add tags
               </Button>
               {tagDraft !== null && (
-                <div className='absolute bottom-12 left-0 w-72 rounded-2xl border border-border bg-secondary-background p-3 shadow-xl'>
+                <div className='absolute bottom-12 left-0 w-72 rounded-[14px] bg-popover p-3 shadow-pop'>
                   <input
                     autoFocus
                     value={tagDraft}
@@ -415,10 +406,10 @@ export function ReviewQueue() {
                       if (event.key === 'Escape') setTagDraft(null);
                     }}
                     placeholder='castile, historical'
-                    className='w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-main'
+                    className='w-full h-9 rounded-[9px] bg-well shadow-well px-3 text-sm placeholder:text-muted-foreground outline-none focus:shadow-[var(--sh-well),0_0_0_2px_var(--main)]'
                   />
                   <div className='flex items-center justify-between mt-2'>
-                    <span className='text-xs text-foreground/60'>Comma-separated</span>
+                    <span className='text-xs text-muted-foreground'>Comma-separated</span>
                     <Button size='sm' onClick={applyTags} disabled={isTagging || !tagDraft.trim()}>
                       {isTagging && <Loader2 className='animate-spin' />}
                       Add
@@ -427,7 +418,7 @@ export function ReviewQueue() {
                 </div>
               )}
             </div>
-            <Button variant='neutral' size='sm' onClick={() => runBulk('decline', selectedIds)} className='text-red-600'>
+            <Button variant='neutral' size='sm' onClick={() => runBulk('decline', selectedIds)} className='text-bad'>
               <X />
               Decline
             </Button>

@@ -1,7 +1,6 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink } from '@/components/icons';
 import { extractDomain, getFaviconUrl } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -18,28 +17,24 @@ export default function SourceBadge({ source }: SourceBadgeProps) {
       href={source}
       target='_blank'
       rel='noopener noreferrer'
-      className='inline-block'
+      title={source}
+      className='vx-key inline-flex h-7 max-w-full items-center gap-2 rounded-full px-2.5 text-[12.5px] font-medium text-subtle transition-[transform,color] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
     >
-      <Badge
-        variant='neutral'
-        className='flex items-center gap-2 px-3 py-1 hover:bg-secondary cursor-pointer transition-colors'
-      >
-        {faviconUrl && (
-          <Image
-            src={faviconUrl}
-            alt={`${domain} favicon`}
-            width={16}
-            height={16}
-            className='rounded-sm'
-            onError={(e) => {
-              // Hide the image if favicon fails to load
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-        )}
-        <span className='text-sm'>{domain}</span>
-        <ExternalLink className='w-3 h-3' />
-      </Badge>
+      {faviconUrl && (
+        <Image
+          src={faviconUrl}
+          alt=''
+          width={14}
+          height={14}
+          className='shrink-0 rounded-[3px]'
+          onError={(e) => {
+            // Hide the image if favicon fails to load
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      )}
+      <span className='truncate'>{domain}</span>
+      <ExternalLink className='size-3 shrink-0 text-muted-foreground' />
     </a>
   );
 }

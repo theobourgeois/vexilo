@@ -3,11 +3,10 @@ import { Input } from "./ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { getFlags } from "@/actions/flags";
 import { useDebounce } from "use-debounce";
-import Image from "next/image";
-import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Search, X, Check } from "lucide-react";
+import FlagImage from './FlagImage';
+import { RemovablePill } from "./TagInput";
+import { Search, Check, Loader2 } from '@/components/icons';
+import { cn } from "@/lib/utils";
 import { RelatedFlag } from "@/lib/types";
 
 type FlagLinkSearchInputProps = {
@@ -74,95 +73,70 @@ export default function RelatedFlagInput({
 
 	return (
 		<div className="space-y-1.5" ref={dropdownRef}>
-			{/* Search Input */}
 			<div className="relative">
-				<div className="relative">
-					<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-					<Input
-						placeholder="Search for a flag..."
-						onChange={(e) => setSearch(e.target.value)}
-						value={search}
-						className="pl-10 pr-4"
-						onFocus={() => setIsDropdownOpen(true)}
-					/>
-				</div>
+				<Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+				<Input
+					placeholder="Search for a flag..."
+					onChange={(e) => setSearch(e.target.value)}
+					value={search}
+					className="pl-10"
+					onFocus={() => setIsDropdownOpen(true)}
+				/>
 
-				{/* Search Results Dropdown */}
 				{search && isDropdownOpen && (
-					<Card className="absolute top-full left-0 right-0 z-50 mt-2 max-h-60 overflow-y-auto shadow-lg border-2">
-						<CardContent className="p-2">
-							{isLoading ? (
-								<div className="flex items-center justify-center py-4">
-									<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-								</div>
-							) : recommendations && recommendations.length > 0 ? (
-								<div className="space-y-0">
-									{recommendations.map((flag) => {
-										const isSelected = isFlagSelected(flag.id);
-										return (
-											<div
-												key={flag.id}
-												className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary-background transition-colors cursor-pointer"
-												onClick={() => handleSelect(flag)}
-											>
-												<div className="flex-shrink-0 w-4 h-4 border-2 border-border rounded flex items-center justify-center bg-background">
-													{isSelected && (
-														<Check className="h-3 w-3 text-primary" />
-													)}
-												</div>
-												<div className="relative w-8 h-6 rounded overflow-hidden border border-border flex-shrink-0">
-													<Image
-														src={flag.image}
-														alt={flag.name}
-														fill
-														className="object-cover"
-													/>
-												</div>
-												<span className="font-medium text-sm">{flag.name}</span>
-											</div>
-										);
-									})}
-								</div>
-							) : (
-								<div className="text-center py-4 text-muted-foreground text-sm">
-									No flags found
-								</div>
-							)}
-						</CardContent>
-					</Card>
+					<div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-64 overflow-y-auto rounded-[14px] bg-popover p-1.5 shadow-pop">
+						{isLoading ? (
+							<div className="flex items-center justify-center py-4 text-muted-foreground">
+								<Loader2 className="size-4 animate-spin" />
+							</div>
+						) : recommendations && recommendations.length > 0 ? (
+							recommendations.map((flag) => {
+								const isSelected = isFlagSelected(flag.id);
+								return (
+									<button
+										key={flag.id}
+										type="button"
+										aria-pressed={isSelected}
+										className="flex w-full cursor-pointer items-center gap-3 rounded-[9px] px-2.5 py-1.5 text-left text-[13px] transition-colors hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.06] focus-visible:outline-none"
+										onClick={() => handleSelect(flag)}
+									>
+										<span
+											className={cn(
+												"grid size-4 shrink-0 place-items-center rounded-[5px]",
+												isSelected ? "bg-main text-main-foreground" : "vx-well",
+											)}
+										>
+											{isSelected && <Check className="size-3" />}
+										</span>
+										<span className="flex w-9 shrink-0 justify-center">
+											<FlagImage src={flag.image} alt={flag.name} maxHeight={20} fixed />
+										</span>
+										<span className="truncate font-medium">{flag.name}</span>
+									</button>
+								);
+							})
+						) : (
+							<div className="py-4 text-center text-[13px] text-muted-foreground">
+								No flags found
+							</div>
+						)}
+					</div>
 				)}
 			</div>
 
-			{/* Selected Links */}
 			{relatedFlags.length > 0 && (
-				<div className="space-y-2">
-					<div className="flex flex-wrap gap-1">
-						{relatedFlags.map((link) => (
-							<Badge
-								key={link.id}
-								variant="neutral"
-								className="flex items-center gap-2 px-3 py-1.5"
-							>
-								<div className="relative w-4 h-3 rounded overflow-hidden border border-border">
-									<Image
-										src={link.image}
-										alt={link.name}
-										fill
-										className="object-cover"
-									/>
-								</div>
-								<span className="text-xs font-medium">{link.name}</span>
-								<Button
-									variant="noShadow"
-									size="icon"
-									className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
-									onClick={() => handleRemoveLink(link.id)}
-								>
-									<X className="h-3 w-3" />
-								</Button>
-							</Badge>
-						))}
-					</div>
+				<div className="flex flex-wrap gap-1.5 pt-1">
+					{relatedFlags.map((link) => (
+						<RemovablePill
+							key={link.id}
+							onRemove={() => handleRemoveLink(link.id)}
+							removeLabel={`Remove ${link.name}`}
+							className="pl-1.5"
+						>
+							<FlagImage src={link.image} alt="" maxHeight={14} fixed />
+							<span className="truncate">{link.name}</span>
+						</RemovablePill>
+					))}
 				</div>
 			)}
 		</div>

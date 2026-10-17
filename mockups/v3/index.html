@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-accent="crimson" data-font="poppins">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vexilo v3 — cleaner pass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="../shared/flags.js"></script>
+<style>
+/* ───────── Tokens ───────── */
+:root {
+  --bg: #f3f2ef;
+  --surface: #ffffff;
+  --stage: #ecebe7;
+  --fg: #1b1c1f;
+  --subtle: #56575c;
+  --muted: #8b8a86;
+  --line: rgb(27 28 31 / 0.09);
+  --line-strong: rgb(27 28 31 / 0.16);
+  --hover: rgb(27 28 31 / 0.04);
+  --flag-edge: rgb(27 28 31 / 0.45);
+  --warn: #a8551a;
+  --bad: #c0362c;
+  --good: #1f7a4d;
+}
+[data-theme="dark"] {
+  --bg: #131416;
+  --surface: #1b1c1f;
+  --stage: #222327;
+  --fg: #ecebe7;
+  --subtle: #b0afab;
+  --muted: #76777c;
+  --line: rgb(255 255 255 / 0.07);
+  --line-strong: rgb(255 255 255 / 0.14);
+  --hover: rgb(255 255 255 / 0.04);
+  --flag-edge: rgb(0 0 0 / 0.7);
+  --warn: #e0a066;
+  --bad: #ef7266;
+  --good: #5cc48d;
+}
+
+/* Accent options */
+[data-accent="crimson"] { --accent: #b8232f; --accent-ink: #fff; }
+[data-accent="navy"]    { --accent: #203f8f; --accent-ink: #fff; }
+[data-accent="forest"]  { --accent: #1d6b48; --accent-ink: #fff; }
+[data-accent="ochre"]   { --accent: #b07214; --accent-ink: #fff; }
+[data-accent="ink"]     { --accent: #1b1c1f; --accent-ink: #fff; }
+[data-theme="dark"][data-accent="crimson"] { --accent: #e0464f; --accent-ink: #fff; }
+[data-theme="dark"][data-accent="navy"]    { --accent: #8aa6f5; --accent-ink: #0d1530; }
+[data-theme="dark"][data-accent="forest"]  { --accent: #5cc48d; --accent-ink: #0a1f14; }
+[data-theme="dark"][data-accent="ochre"]   { --accent: #e3a53e; --accent-ink: #1f1404; }
+[data-theme="dark"][data-accent="ink"]     { --accent: #ecebe7; --accent-ink: #131416; }
+:root { --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* Font options */
+[data-font="poppins"]    { --font: "Poppins", system-ui, sans-serif; --track: 0em; --track-h: -0.02em; --body: 13.5px; }
+[data-font="instrument"] { --font: "Instrument Sans", system-ui, sans-serif; --track: 0em; --track-h: -0.025em; --body: 14px; }
+[data-font="bricolage"]  { --font: "Bricolage Grotesque", system-ui, sans-serif; --track: 0em; --track-h: -0.03em; --body: 14px; }
+[data-font="figtree"]    { --font: "Figtree", system-ui, sans-serif; --track: 0em; --track-h: -0.02em; --body: 14px; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: var(--body);
+  line-height: 1.55;
+  letter-spacing: var(--track);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  transition: background .2s, color .2s;
+}
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: var(--track-h); line-height: 1.15; }
+p { margin: 0; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ───────── Mockup chrome (not product) ───────── */
+.picker {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
+  padding: 12px 32px;
+  background: #0e0f11; color: #d8d7d3;
+  font: 13px/1.4 system-ui, sans-serif; letter-spacing: 0;
+}
+.picker b { color: #fff; font-weight: 600; margin-right: 6px; }
+.picker .grp { display: flex; align-items: center; gap: 6px; }
+.picker .lbl { color: #8b8a86; margin-right: 4px; }
+.picker button {
+  border: 1px solid #2c2d31; background: #18191c; color: #d8d7d3;
+  border-radius: 8px; padding: 5px 10px; font: inherit;
+}
+.picker button[aria-pressed="true"] { background: #f3f2ef; color: #111; border-color: #f3f2ef; }
+.picker .sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; vertical-align: -1px; margin-right: 6px; }
+
+.notes {
+  max-width: 1280px; margin: 28px auto 0; padding: 0 32px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+}
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+.note h3 { font-size: 15px; margin-bottom: 8px; }
+.note ul { margin: 0; padding-left: 18px; color: var(--subtle); }
+.note li { margin: 3px 0; }
+
+.screen-label {
+  max-width: 1280px; margin: 56px auto 12px; padding: 0 32px;
+  display: flex; align-items: baseline; gap: 12px;
+}
+.screen-label h2 { font-size: 20px; }
+.screen-label span { color: var(--muted); }
+.frame {
+  max-width: 1280px; margin: 0 auto; border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--line-strong); background: var(--bg);
+  box-shadow: 0 30px 60px -40px rgb(0 0 0 / .35);
+}
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+
+/* ───────── Product UI ───────── */
+.header {
+  display: flex; align-items: center; gap: 28px;
+  height: 64px; padding: 0 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.logo { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 18px; letter-spacing: var(--track-h); }
+.logo img { width: 30px; height: 30px; }
+[data-theme="dark"] .logo img { filter: invert(1) brightness(1.6) hue-rotate(180deg); }
+.nav { display: flex; gap: 4px; }
+.nav a { padding: 6px 10px; border-radius: 8px; color: var(--subtle); font-weight: 500; }
+.nav a:hover { background: var(--hover); color: var(--fg); }
+.nav a.on { color: var(--fg); }
+.header .search {
+  margin-left: auto; width: 320px; height: 38px;
+  display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted);
+}
+.header .search kbd { margin-left: auto; font: inherit; font-size: 12px; color: var(--muted); }
+.icon-btn {
+  width: 38px; height: 38px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--subtle);
+}
+.icon-btn:hover { color: var(--fg); border-color: var(--line-strong); }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--stage); color: var(--subtle); font-weight: 600; font-size: 13px;
+}
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px;
+  border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface);
+  font-weight: 500; white-space: nowrap;
+}
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--subtle); }
+.btn.ghost:hover { color: var(--fg); background: var(--hover); }
+.btn.sm { height: 32px; padding: 0 11px; font-size: 13px; border-radius: 8px; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--subtle); font-size: 13px;
+}
+.chip:hover { border-color: var(--line-strong); color: var(--fg); }
+.chip .n { color: var(--muted); }
+
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--stage); }
+.seg button { border: 0; background: transparent; padding: 5px 12px; border-radius: 7px; color: var(--subtle); font-weight: 500; font-size: 13px; }
+.seg button.on { background: var(--surface); color: var(--fg); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / .06); }
+.seg .n { color: var(--muted); margin-left: 4px; }
+
+/* The edge and shadow follow the flag's painted shape (drop-shadow, not box-shadow),
+   so non-rectangular flags like Nepal don't get a box drawn around them. */
+.flag { display: block; filter: drop-shadow(0 0 0.6px var(--flag-edge)) drop-shadow(0 8px 12px rgb(0 0 0 / .13)); }
+.stage { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; background: var(--stage); min-height: 0; }
+.stage > img.flag { width: 100%; height: 100%; object-fit: contain; }
+
+/* Home */
+.browse-head { display: flex; align-items: center; gap: 16px; padding: 28px 28px 0; }
+.browse-head h1 { font-size: 30px; }
+.browse-head .count { color: var(--muted); font-size: 15px; }
+.browse-head .seg:first-of-type { margin-left: auto; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-row {
+  display: flex; gap: 8px; padding: 18px 28px 20px; overflow: hidden;
+  mask-image: linear-gradient(90deg, #000 92%, transparent);
+}
+.tag-row .chip { flex: none; height: 34px; padding: 0 14px; font-size: 13.5px; }
+.chip.on { background: var(--fg); color: var(--bg); border-color: transparent; }
+.eyebrow { color: var(--muted); font-size: 13px; }
+.link { color: var(--accent); font-weight: 500; }
+.link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 0 28px 32px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; transition: border-color .15s; position: relative; display: flex; flex-direction: column; }
+.card .stage { height: 236px; padding: 30px 26px; }
+.card .meta { display: flex; align-items: center; gap: 8px; padding: 14px 16px 16px; }
+.card .meta .name { font-weight: 500; font-size: 15px; }
+.card .meta .sub { color: var(--muted); font-size: 12.5px; }
+.fav-btn {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--subtle); font-size: 13px;
+}
+.fav-btn:hover { border-color: var(--line-strong); color: var(--fg); }
+.fav-btn.on { color: var(--accent); }
+.fav-btn.on .svg { fill: currentColor; }
+.card:hover, .card.is-hover { border-color: var(--line-strong); }
+
+.card.fotd { grid-column: span 2; grid-row: span 2; }
+.card.fotd .stage { flex: 1; height: auto; padding: 56px 64px; }
+.card.fotd .meta { padding: 20px 24px 22px; align-items: flex-end; }
+.card.fotd h2 { font-size: 30px; margin-top: 2px; }
+.card.fotd .meta .actions { margin-left: auto; }
+
+.footer { display: flex; gap: 20px; padding: 20px 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.footer span:first-child { margin-right: auto; }
+
+/* Flag page */
+.flagpage { display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; padding: 28px; }
+.flagpage .stage { border-radius: 16px; height: 420px; padding: 56px 64px; }
+.crumbs { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+.crumbs a:hover { color: var(--fg); }
+.fp-title { display: flex; align-items: baseline; gap: 12px; }
+.fp-title h1 { font-size: 36px; }
+.fp-title span { color: var(--muted); font-size: 15px; }
+.fp-sub { color: var(--subtle); margin-top: 6px; }
+.fp-desc { color: var(--subtle); font-size: 15px; line-height: 1.65; margin: 18px 0 20px; max-width: 54ch; }
+.actions { display: flex; gap: 8px; }
+.block { margin-top: 28px; }
+.block h3 { font-size: 14px; margin-bottom: 10px; }
+.swatches { display: flex; gap: 10px; }
+.swatch { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.swatch i { width: 26px; height: 26px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--flag-edge); }
+.swatch small { color: var(--muted); display: block; font-size: 12px; line-height: 1.2; }
+.swatch div { line-height: 1.25; }
+.table { width: 100%; border-collapse: collapse; }
+.table td { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.table td:first-child { color: var(--muted); width: 38%; }
+.table td.r { text-align: right; color: var(--muted); }
+.related { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.related a { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.related a:hover { border-color: var(--line-strong); }
+.related .s { height: 84px; padding: 12px 20px; border-radius: 8px; }
+
+/* Admin */
+.admin { display: grid; grid-template-columns: 236px 1fr; min-height: 720px; }
+.side { padding: 24px 16px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 22px; }
+.side .g { display: flex; flex-direction: column; gap: 1px; }
+.side .gl { color: var(--muted); font-size: 12.5px; padding: 0 10px 6px; }
+.side a { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 8px; color: var(--subtle); font-weight: 500; }
+.side a:hover { background: var(--hover); color: var(--fg); }
+.side a.on { background: var(--surface); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
+.side a .n { color: var(--muted); font-weight: 400; font-size: 13px; }
+.side a .new { color: var(--accent); font-weight: 500; font-size: 12px; }
+.main { padding: 28px 32px 40px; min-width: 0; }
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.page-head h1 { font-size: 26px; }
+.page-head p { color: var(--muted); margin-top: 4px; }
+.page-head .actions { margin-top: 2px; }
+
+.group { margin-top: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px 20px; }
+.group-head { display: flex; align-items: center; gap: 14px; }
+.check { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--line-strong); flex: none; background: var(--surface); display: grid; place-items: center; }
+.check.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.check.on .svg { width: 12px; height: 12px; stroke-width: 2.4; }
+.group-head .who b { font-weight: 600; }
+.group-head .who small { display: block; color: var(--muted); font-size: 13px; }
+.group-head .actions { margin-left: auto; }
+.group .warn { margin: 14px 0 0; color: var(--warn); font-size: 13px; }
+.qgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 14px; }
+.qcard { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; background: var(--surface); }
+.qcard .stage { height: 110px; padding: 18px 16px; }
+.qcard .stage svg { width: 100%; height: 100%; }
+.qcard .check { position: absolute; top: 8px; left: 8px; }
+.qcard .nm { padding: 8px 10px 10px; font-weight: 500; font-size: 13px; }
+.qcard .nm small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.qcard.dup { border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.qcard.dup .nm small { color: var(--warn); }
+
+/* Generate */
+.composer { margin-top: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.composer textarea {
+  display: block; width: 100%; min-height: 130px; resize: none; border: 0; outline: 0;
+  padding: 18px 20px; background: transparent; color: var(--fg); font: inherit; font-size: 14.5px; line-height: 1.75;
+}
+.composer .bar { display: flex; align-items: center; gap: 14px; padding: 12px 14px 12px 20px; border-top: 1px solid var(--line); }
+.opt { display: flex; align-items: center; gap: 8px; color: var(--subtle); font-size: 13px; }
+.opt select { font: inherit; color: var(--fg); background: var(--stage); border: 0; border-radius: 7px; padding: 4px 8px; }
+.composer .bar .cost { margin-left: auto; white-space: nowrap; color: var(--muted); font-size: 13px; }
+
+.drafts-head { display: flex; align-items: center; justify-content: space-between; margin: 30px 0 12px; }
+.drafts-head h2 { font-size: 17px; }
+.drafts-head span { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 8px; letter-spacing: 0; }
+.draft { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
+.draft-row { display: grid; grid-template-columns: 112px 1fr auto; gap: 18px; align-items: center; padding: 12px 14px 12px 12px; }
+.draft-row .stage { height: 72px; border-radius: 9px; padding: 10px 14px; }
+.draft-row .stage svg { width: 100%; height: 100%; }
+.draft-row .t { font-weight: 600; }
+.draft-row .d { color: var(--subtle); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70ch; }
+.status { font-size: 12.5px; color: var(--muted); }
+.status.ok { color: var(--good); }
+.status.warn { color: var(--warn); }
+.draft.open .draft-row { border-bottom: 1px solid var(--line); }
+.draft-body { display: grid; grid-template-columns: 340px 1fr; gap: 28px; padding: 20px; }
+.draft-body .big { border-radius: 12px; height: 220px; padding: 28px 32px; }
+.src-line { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; color: var(--muted); font-size: 12.5px; margin-bottom: 5px; }
+.field .val { border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; color: var(--fg); background: var(--bg); }
+.field .val.area { line-height: 1.6; color: var(--subtle); }
+.mini-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.mini-tags span { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12.5px; color: var(--subtle); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.sources a { display: block; color: var(--subtle); font-size: 13px; padding: 3px 0; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.foot-actions { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--line); }
+.foot-actions .left { margin-right: auto; color: var(--muted); font-size: 13px; align-self: center; }
+.skel { height: 10px; border-radius: 4px; background: var(--stage); margin: 6px 0; }
+</style>
+</head>
+<body>
+
+<div class="picker">
+  <b>Vexilo v3 mockups</b>
+  <span class="lbl">Font: Poppins</span>
+  <div class="grp"><span class="lbl">Accent</span>
+    <button data-set="accent" data-v="crimson" aria-pressed="true"><i class="sw" style="background:#b8232f"></i>Crimson</button>
+    <button data-set="accent" data-v="navy"><i class="sw" style="background:#203f8f"></i>Navy</button>
+    <button data-set="accent" data-v="forest"><i class="sw" style="background:#1d6b48"></i>Forest</button>
+    <button data-set="accent" data-v="ochre"><i class="sw" style="background:#b07214"></i>Ochre</button>
+    <button data-set="accent" data-v="ink"><i class="sw" style="background:#1b1c1f;box-shadow:0 0 0 1px #555"></i>Ink (no colour)</button>
+  </div>
+  <div class="grp"><span class="lbl">Theme</span>
+    <button data-set="theme" data-v="light" aria-pressed="true">Light</button>
+    <button data-set="theme" data-v="dark">Dark</button>
+  </div>
+</div>
+
+<div class="notes">
+  <div class="note">
+    <h3>Taken out</h3>
+    <ul>
+      <li>All-caps tracked mono labels (“FLAG OF THE DAY”, “INBOX”)</li>
+      <li>Pulsing status dots</li>
+      <li>Waving cloth, pole, grommets</li>
+      <li>Gradient gel buttons with coloured glow</li>
+      <li>Monospace numbers for counts</li>
+    </ul>
+  </div>
+  <div class="note">
+    <h3>Also on the AI-cliché list</h3>
+    <ul>
+      <li>An icon next to every nav item and button</li>
+      <li>Keyboard-hint chips on everything (kept ⌘K only)</li>
+      <li>Sparkle icon for AI features</li>
+      <li>Warning-triangle pills, glows, glassy blur</li>
+      <li>Lucide by default; here only 5 hand-drawn icons</li>
+    </ul>
+  </div>
+  <div class="note">
+    <h3>Kept</h3>
+    <ul>
+            <li>Browse layout with flag of the day as the big tile</li><li>Flags at true proportions, bigger in cards</li>
+      <li>Hairline edge that follows the flag’s shape (no box around Nepal)</li>
+      <li>Colour comes from the flags; the accent marks actions only</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═════════ Home ═════════ -->
+<div class="screen-label"><h2>Home</h2><span>Current browse layout, no hero. Flat flags, bigger. The Hong Kong card shows the hover state.</span></div>
+<div class="frame">
+  <div class="header" data-header="browse"></div>
+  <div class="browse-head">
+    <h1>Browse</h1><span class="count">12,814 flags</span>
+    <div class="seg"><button class="on">All</button><button>Favourites</button></div>
+    <div class="seg"><button class="on">Popular</button><button>Latest</button><button>A–Z</button></div>
+  </div>
+  <div class="tag-row" id="tags"></div>
+  <div class="grid" id="grid"></div>
+  <div class="footer"><span>Vexilo</span><a href="#">Guidelines</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Donate</a></div>
+</div>
+
+<!-- ═════════ Flag page ═════════ -->
+<div class="screen-label"><h2>Flag page</h2><span>Same structure, flat flag, sentence-case section titles</span></div>
+<div class="frame">
+  <div class="header" data-header="browse"></div>
+  <div class="flagpage">
+    <div>
+      <div class="stage"><img class="flag" id="d-img" alt="" /></div>
+      <div class="block">
+        <h3>Colours</h3>
+        <div class="swatches" id="d-swatches"></div>
+      </div>
+    </div>
+    <div>
+      <div class="crumbs"><a href="#">Browse</a> / <a href="#">national</a> / Canada</div>
+      <div class="fp-title"><h1 id="d-name"></h1><span>#2074</span></div>
+      <div class="fp-sub">National flag · adopted 1965 · added by mapmaker_ines</div>
+      <p class="fp-desc" id="d-desc"></p>
+      <div class="actions">
+        <button class="btn primary"><svg class="svg" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>Favourite · 31</button>
+        <button class="btn">Edit</button>
+        <button class="btn ghost">Report</button>
+      </div>
+      <div class="block"><h3>Tags</h3><div class="tags" id="d-tags"></div></div>
+      <div class="block"><h3>Details</h3><table class="table" id="d-facts"></table></div>
+      <div class="block"><h3>Traits</h3><table class="table" id="d-traits"></table></div>
+    </div>
+  </div>
+  <div style="padding: 0 28px 32px">
+    <div class="block" style="margin-top:8px"><h3>Similar flags</h3><div class="related" id="d-related"></div></div>
+  </div>
+</div>
+
+<!-- ═════════ Admin: review queue ═════════ -->
+<div class="screen-label"><h2>Admin · Review queue</h2><span>No caps section labels, no icon column, plain-text warning</span></div>
+<div class="frame">
+  <div class="header" data-header=""></div>
+  <div class="admin">
+    <div class="side" data-side="queue"></div>
+    <div class="main">
+      <div class="page-head">
+        <div><h1>Review queue</h1><p>7 waiting · oldest 4 hours ago</p></div>
+        <div class="actions"><button class="btn">Focus mode</button></div>
+      </div>
+      <div style="margin-top:18px" class="seg">
+        <button class="on">All<span class="n">7</span></button>
+        <button>New flags<span class="n">7</span></button>
+        <button>Edits<span class="n">0</span></button>
+        <button>Needs a look<span class="n">1</span></button>
+      </div>
+      <div class="group">
+        <div class="group-head">
+          <span class="check"></span>
+          <span class="avatar">T</span>
+          <div class="who"><b>Théo Bourgeois</b> added 7 flags<small>4 hours ago · 0 approved before, 0 declined</small></div>
+          <div class="actions">
+            <button class="btn sm">Trust Théo</button>
+            <button class="btn sm primary"><svg class="svg" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Approve 6</button>
+          </div>
+        </div>
+        <p class="warn">Argentina is already on Vexilo, so it’s left out. <a class="link" href="#">Compare</a></p>
+        <div class="qgrid" id="qgrid"></div>
+      </div>
+      <div class="group">
+        <div class="group-head">
+          <span class="check"></span>
+          <span class="avatar">AI</span>
+          <div class="who"><b>Generated drafts</b> from Create flags<small>12 minutes ago · researched with web search · $0.09</small></div>
+          <div class="actions">
+            <button class="btn sm">Open drafts</button>
+            <button class="btn sm primary">Approve 3</button>
+          </div>
+        </div>
+        <div class="qgrid" id="qgrid2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════ Admin: create flags with AI ═════════ -->
+<div class="screen-label"><h2>Admin · Create flags</h2><span>Type names or describe a flag. AI finds or draws the image and writes the details. Everything lands as a draft.</span></div>
+<div class="frame">
+  <div class="header" data-header=""></div>
+  <div class="admin">
+    <div class="side" data-side="create"></div>
+    <div class="main">
+      <div class="page-head">
+        <div><h1>Create flags</h1><p>One flag per line. Real flags use Wikimedia Commons images; anything without a source gets drawn as SVG.</p></div>
+        <div class="actions"><button class="btn">Upload CSV</button></div>
+      </div>
+      <div class="composer">
+        <textarea spellcheck="false">Scotland
+Texas
+Bermuda
+Moon Republic — navy field, silver crescent at the hoist, one white star in the fly</textarea>
+        <div class="bar">
+          <label class="opt">Image <select><option>Commons, else draw</option><option>Always draw</option><option>Commons only</option></select></label>
+          <label class="opt">Details <select><option>Web search</option><option>From name only</option></select></label>
+          <label class="opt">Model <select><option>gpt-5</option><option>gpt-5-mini</option></select></label>
+          <span class="cost">About $0.12 for 4 flags</span>
+          <button class="btn primary">Generate 4 drafts</button>
+        </div>
+      </div>
+
+      <div class="drafts-head">
+        <h2>Drafts<span>2 ready · 1 needs a look · 1 working</span></h2>
+        <div class="actions"><button class="btn sm ghost">Discard all</button><button class="btn sm primary">Send 2 to review queue</button></div>
+      </div>
+
+      <div class="draft open">
+        <div class="draft-row">
+          <div class="stage"><img class="flag" src="https://flagcdn.com/gb-sct.svg" alt="" /></div>
+          <div><div class="t">Scotland</div><div class="status ok">Ready · image from Wikimedia Commons · 2 sources</div></div>
+          <div class="actions"><span class="check on"><svg class="svg" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div>
+        </div>
+        <div class="draft-body">
+          <div>
+            <div class="big stage"><img class="flag" src="https://flagcdn.com/gb-sct.svg" alt="" /></div>
+            <div class="src-line">Flag_of_Scotland.svg · public domain · 5 : 3</div>
+            <div class="block" style="margin-top:18px">
+              <h3>Colours</h3>
+              <div class="swatches">
+                <div class="swatch"><i style="background:#005EB8"></i><div>Saltire blue<small>#005EB8</small></div></div>
+                <div class="swatch"><i style="background:#FFFFFF"></i><div>White<small>#FFFFFF</small></div></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="cols">
+              <div class="field"><label>Name</label><div class="val">Scotland</div></div>
+              <div class="field"><label>Type</label><div class="val">Country flag</div></div>
+            </div>
+            <div class="field"><label>Description</label><div class="val area">The Saltire, a white diagonal cross on a blue field, representing the cross of Saint Andrew. Traditionally dated to a 9th-century legend; in continuous use since at least the 14th century.</div></div>
+            <div class="field"><label>Tags</label><div class="mini-tags"><span>country</span><span>saltire</span><span>cross</span><span>bicolor</span><span>europe</span><span>united-kingdom</span><span>religious</span></div></div>
+            <div class="cols">
+              <div class="field"><label>Adopted</label><div class="val">c. 1385</div></div>
+              <div class="field"><label>Proportion</label><div class="val">3 : 5</div></div>
+            </div>
+            <div class="field sources"><label>Sources</label><a href="#">en.wikipedia.org/wiki/Flag_of_Scotland</a><a href="#">gov.scot/publications/flag-flying-guidance</a></div>
+          </div>
+        </div>
+        <div class="foot-actions">
+          <span class="left">gpt-5 · 2 web searches · $0.03</span>
+          <button class="btn sm ghost">Discard</button>
+          <button class="btn sm">Regenerate</button>
+          <button class="btn sm">Edit</button>
+        </div>
+      </div>
+
+      <div class="draft">
+        <div class="draft-row">
+          <div class="stage">
+            <svg viewBox="0 0 30 20" width="69" height="46" class="flag" style="border-radius:2px">
+              <rect width="30" height="20" fill="#1c2b4f"/>
+              <circle cx="8.6" cy="10" r="5" fill="#d9dde3"/>
+              <circle cx="10.6" cy="9" r="4.4" fill="#1c2b4f"/>
+              <path d="m22 7.4.7 2.1h2.2l-1.8 1.3.7 2.1-1.8-1.3-1.8 1.3.7-2.1-1.8-1.3h2.2z" fill="#fff"/>
+            </svg>
+          </div>
+          <div><div class="t">Moon Republic</div><div class="status">Drawn by AI · tagged fictional · no sources needed</div></div>
+          <div class="actions"><button class="btn sm">Edit SVG</button><span class="check on"><svg class="svg" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span></div>
+        </div>
+      </div>
+
+      <div class="draft">
+        <div class="draft-row">
+          <div class="stage"><img class="flag" src="https://flagcdn.com/bm.svg" alt="" /></div>
+          <div><div class="t">Bermuda</div><div class="status warn">Already on Vexilo as #1207 Bermuda</div></div>
+          <div class="actions"><button class="btn sm ghost">Discard</button><button class="btn sm">Compare</button></div>
+        </div>
+      </div>
+
+      <div class="draft">
+        <div class="draft-row">
+          <div class="stage"><img class="flag" src="https://flagcdn.com/us-tx.svg" alt="" style="opacity:.55" /></div>
+          <div><div class="t">Texas</div><div class="status">Researching · web search 1 of 2</div><div class="skel" style="width:46%"></div></div>
+          <div class="actions"><button class="btn sm ghost">Cancel</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="height:80px"></div>
+
+<script>
+const ICON = {
+  search: '<svg class="svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>',
+  heart: '<svg class="svg" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg>',
+  sun: '<svg class="svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>',
+  moon: '<svg class="svg" viewBox="0 0 24 24"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5Z"/></svg>',
+  plus: '<svg class="svg" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+};
+const img = (code) => FLAG_IMG(code);
+
+// Header
+document.querySelectorAll('[data-header]').forEach((el) => {
+  const on = el.dataset.header;
+  el.innerHTML = `
+    <a class="logo" href="#"><img src="../shared/logo.svg" alt="" />Vexilo</a>
+    <nav class="nav">
+      <a href="#" class="${on === 'browse' ? 'on' : ''}">Browse</a><a href="#">Quiz</a><a href="#">Leaderboard</a>
+    </nav>
+    <div class="search">${ICON.search}Search flags<kbd>⌘K</kbd></div>
+    <button class="icon-btn theme-toggle">${ICON.sun}</button>
+    <button class="btn primary">${ICON.plus}Post flag</button>
+    <span class="avatar">T</span>`;
+});
+
+// Admin sidebar
+document.querySelectorAll('[data-side]').forEach((el) => {
+  const on = el.dataset.side;
+  const item = (key, label, right = '') =>
+    `<a href="#" class="${on === key ? 'on' : ''}">${label}${right}</a>`;
+  el.innerHTML = `
+    <div class="g"><div class="gl">Inbox</div>
+      ${item('queue', 'Review queue', '<span class="n">7</span>')}
+      ${item('reports', 'Reports')}
+    </div>
+    <div class="g"><div class="gl">Library</div>
+      ${item('all', 'All flags', '<span class="n">12,814</span>')}
+      ${item('creators', 'Creators')}
+    </div>
+    <div class="g"><div class="gl">Tools</div>
+      ${item('create', 'Create flags', on === 'create' ? '' : '<span class="new">New</span>')}
+      ${item('import', 'Import')}
+      ${item('fotd', 'Flag of the day')}
+    </div>`;
+});
+
+// Home
+const F = FOTD;
+document.getElementById('tags').innerHTML = '<a class="chip on" href="#">All</a>' + TAGS
+  .map(([t, n]) => `<a class="chip" href="#">${t}<span class="n">${n.toLocaleString()}</span></a>`).join('');
+const fotdCard = `
+  <a class="card fotd" href="#">
+    <div class="stage"><img class="flag" src="${img(F.code)}" alt="" /></div>
+    <div class="meta">
+      <div>
+        <div class="eyebrow">Flag of the day, October 16</div>
+        <h2>${F.name}</h2>
+        <div class="sub">#${F.index} · adopted ${F.year}</div>
+      </div>
+      <div class="actions">
+        <button class="btn ghost">Past days</button>
+        <button class="btn">${ICON.heart}19</button>
+        <button class="btn">Open →</button>
+      </div>
+    </div>
+  </a>`;
+document.getElementById('grid').innerHTML = fotdCard + FLAGS.filter((f) => f.code !== F.code).slice(0, 12).map((f) => `
+  <a class="card ${f.code === 'hk' ? 'is-hover' : ''}" href="#">
+    <div class="stage"><img class="flag" src="${img(f.code)}" alt="" /></div>
+    <div class="meta">
+      <div><div class="name">${f.name}</div><div class="sub">#${f.index} · ${f.year}</div></div>
+      <span class="fav-btn ${f.code === 'hk' ? 'on' : ''}">${ICON.heart}${f.favs}</span>
+    </div>
+  </a>`).join('');
+
+// Flag page
+const D = DETAIL;
+document.getElementById('d-img').src = img(D.code);
+document.getElementById('d-name').textContent = D.name;
+document.getElementById('d-desc').textContent = D.description;
+document.getElementById('d-tags').innerHTML = D.tags.map((t) => `<a class="chip" href="#">${t}</a>`).join('');
+document.getElementById('d-swatches').innerHTML = D.colors
+  .map((c) => `<div class="swatch"><i style="background:${c.hex}"></i><div>${c.name}<small>${c.hex}</small></div></div>`).join('');
+document.getElementById('d-facts').innerHTML = D.facts.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+document.getElementById('d-traits').innerHTML = D.traits
+  .map(([k, v, r]) => `<tr><td>${k}</td><td>${v}</td><td class="r">${r} of flags</td></tr>`).join('');
+document.getElementById('d-related').innerHTML = D.related
+  .map((r) => `<a href="#"><div class="s stage"><img class="flag" src="${img(r.code)}" alt="" /></div>${r.name}</a>`).join('');
+
+// Queue
+const q = [['Maryland', 'us-md'], ['Wales', 'gb-wls'], ['Kiribati', 'ki'], ['Seychelles', 'sc'], ['Sri Lanka', 'lk'], ['Mozambique', 'mz'], ['Argentina', 'ar', true]];
+document.getElementById('qgrid').innerHTML = q.map(([n, c, dup]) => `
+  <div class="qcard ${dup ? 'dup' : ''}">
+    <span class="check"></span>
+    <div class="stage"><img class="flag" src="${img(c)}" alt="" /></div>
+    <div class="nm">${n}<small>${dup ? 'Already on Vexilo' : 'New flag'}</small></div>
+  </div>`).join('');
+document.getElementById('qgrid2').innerHTML = [['Scotland', 'gb-sct', 'Commons image'], ['Greenland', 'gl', 'Commons image']].map(([n, c, s]) => `
+  <div class="qcard">
+    <span class="check"></span>
+    <div class="stage"><img class="flag" src="${img(c)}" alt="" /></div>
+    <div class="nm">${n}<small>${s}</small></div>
+  </div>`).join('') + `
+  <div class="qcard">
+    <span class="check"></span>
+    <div class="stage"><svg viewBox="0 0 30 20" width="87" height="58" class="flag" style="border-radius:2px"><rect width="30" height="20" fill="#1c2b4f"/><circle cx="8.6" cy="10" r="5" fill="#d9dde3"/><circle cx="10.6" cy="9" r="4.4" fill="#1c2b4f"/><path d="m22 7.4.7 2.1h2.2l-1.8 1.3.7 2.1-1.8-1.3-1.8 1.3.7-2.1-1.8-1.3h2.2z" fill="#fff"/></svg></div>
+    <div class="nm">Moon Republic<small>Drawn by AI</small></div>
+  </div>`;
+
+// Picker
+const root = document.documentElement;
+function set(key, v) {
+  root.dataset[key] = v;
+  document.querySelectorAll(`.picker [data-set="${key}"]`).forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === v));
+  if (key === 'theme') document.querySelectorAll('.theme-toggle').forEach((b) => (b.innerHTML = v === 'dark' ? ICON.moon : ICON.sun));
+}
+document.querySelectorAll('.picker button').forEach((b) => b.addEventListener('click', () => set(b.dataset.set, b.dataset.v)));
+document.querySelectorAll('.theme-toggle').forEach((b) => b.addEventListener('click', () => set('theme', root.dataset.theme === 'dark' ? 'light' : 'dark')));
+</script>
+</body>
+</html>

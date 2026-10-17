@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock } from '@/components/icons';
 import { toast } from "sonner";
 
 interface ReportsProps {
@@ -47,9 +47,9 @@ export function Reports({ page }: ReportsProps) {
 					<Card key={i}>
 						<CardContent className="p-4">
 							<div className="space-y-2">
-								<div className="h-4 bg-gray-200 rounded w-1/4"></div>
-								<div className="h-4 bg-gray-200 rounded w-1/2"></div>
-								<div className="h-4 bg-gray-200 rounded w-3/4"></div>
+								<div className="h-4 animate-pulse bg-foreground/[0.06] rounded w-1/4"></div>
+								<div className="h-4 animate-pulse bg-foreground/[0.06] rounded w-1/2"></div>
+								<div className="h-4 animate-pulse bg-foreground/[0.06] rounded w-3/4"></div>
 							</div>
 						</CardContent>
 					</Card>
@@ -60,10 +60,10 @@ export function Reports({ page }: ReportsProps) {
 
 	if (!reportsData || reportsData.length === 0) {
 		return (
-			<div className="text-center py-8">
-				<AlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
-				<h3 className="mt-2 text-sm font-medium text-gray-900">No reports</h3>
-				<p className="mt-1 text-sm text-gray-500">
+			<div className="vx-tile text-center py-16">
+				<AlertTriangle className="mx-auto size-10 text-muted-foreground" />
+				<h3 className="mt-2 text-[17px] font-semibold tracking-[-0.02em] text-foreground">No reports</h3>
+				<p className="mt-1 text-[13px] text-muted-foreground">
 					There are no flag reports to review.
 				</p>
 			</div>
@@ -84,7 +84,7 @@ export function Reports({ page }: ReportsProps) {
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
-				<h2 className="text-2xl font-bold">Flag Reports</h2>
+				<h2 className="text-[22px] font-semibold tracking-[-0.03em]">Flag Reports</h2>
 				<Badge variant="neutral" className="text-sm">
 					{reportsData.length} Reports
 				</Badge>
@@ -101,14 +101,14 @@ export function Reports({ page }: ReportsProps) {
 										alt={report.flagName || "Flag"}
 										width={48}
 										height={32}
-										className="rounded border object-cover"
+										className="rounded-[4px] border border-line object-cover"
 										onError={(e) => {
 											e.currentTarget.src = "/logo.svg";
 										}}
 									/>
 								</div>
 								<div>
-									<CardTitle className="text-lg">
+									<CardTitle className="text-[17px] font-semibold tracking-[-0.02em]">
 										{report.flagName || "Unknown Flag"}
 									</CardTitle>
 									<div className="flex items-center gap-2 mt-1">
@@ -188,10 +188,10 @@ export function Reports({ page }: ReportsProps) {
 						)}
 
 						{report.resolved && report.resolvedAt && (
-							<div className="bg-green-50 border border-green-200 rounded-lg p-3">
+							<div className="bg-good-soft rounded-[11px] p-3">
 								<div className="flex items-center gap-2">
-									<CheckCircle className="w-4 h-4 text-green-600" />
-									<span className="text-sm font-medium text-green-800">
+									<CheckCircle className="size-4 text-good" />
+									<span className="text-sm font-medium text-good">
 										Resolved {formatDistanceToNow(new Date(report.resolvedAt))}
 									</span>
 								</div>

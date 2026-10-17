@@ -618,6 +618,7 @@ async function getFlagDetailFromNameQuery(flagName: string, userId?: string) {
       tags: flags.tags,
       description: flags.description,
       favorites: flags.favorites,
+      views: flags.views,
       relatedFlags: flags.relatedFlags,
       isFavorite: userId
         ? sql<boolean>`EXISTS (
@@ -677,6 +678,7 @@ export async function getFlagDetailFromName(flagName: string) {
     tags: row.tags,
     description: row.description,
     favorites: row.favorites,
+    views: row.views,
     relatedFlags: row.relatedFlags,
     isFavorite: row.isFavorite,
     metadata,
@@ -943,6 +945,12 @@ function orderByClause(
   orderBy: keyof typeof flags.$inferSelect,
   orderDirection: 'asc' | 'desc',
 ) {
+  // Most flags have few or no views yet, so ties fall back to favorites.
+  if (orderBy === 'views') {
+    return orderDirection === 'asc'
+      ? sql`${flags.views} asc, ${flags.favorites} asc`
+      : sql`${flags.views} desc, ${flags.favorites} desc`;
+  }
   if (orderDirection === 'asc') {
     return asc(flags[orderBy]);
   }

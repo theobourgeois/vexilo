@@ -21,7 +21,11 @@ function createLocalRedis() {
       }
       return entry.value as T;
     },
-    async set(key: string, value: unknown, options?: { ex?: number }) {
+    async set(key: string, value: unknown, options?: { ex?: number; nx?: boolean }) {
+      const existing = store.get(key);
+      if (options?.nx && existing && (existing.expiresAt === null || existing.expiresAt >= Date.now())) {
+        return null;
+      }
       store.set(key, {
         value: JSON.parse(JSON.stringify(value)),
         expiresAt: options?.ex ? Date.now() + options.ex * 1000 : null,

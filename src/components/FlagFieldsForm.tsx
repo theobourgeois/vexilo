@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Upload, Loader2 } from 'lucide-react';
+import { Upload, Loader2, Check } from '@/components/icons';
 import { Flag, RelatedFlag } from '@/lib/types';
 import { toast } from 'sonner';
 import { createFlagRequest } from '@/actions/requests';
@@ -166,149 +166,164 @@ export default function FlagFieldsForm({
   ]);
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-4 w-full'>
-      <div className=' gap-4'>
-        <div className='space-y-2'>
-          <label htmlFor='flagName' className='text-sm font-semibold'>
-            Flag Title
-          </label>
-          <Input
-            autoFocus
-            id='flagName'
-            placeholder='Enter the flag title...'
-            className='w-full'
-            value={flagName}
-            onChange={(e) => setFlagName(e.target.value)}
-          />
-        </div>
-        <div>
-          <div className='space-y-2'>
-            <label htmlFor='description' className='text-sm font-semibold'>
+    <form
+      onSubmit={handleSubmit}
+      className='grid w-full items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]'
+    >
+      <div className='grid gap-4'>
+        <FormSection title='Details'>
+          <div className='space-y-1.5'>
+            <label htmlFor='flagName' className='block text-[13px] font-medium'>
+              Name
+            </label>
+            <Input
+              autoFocus
+              id='flagName'
+              placeholder='Flag name'
+              className='w-full'
+              value={flagName}
+              onChange={(e) => setFlagName(e.target.value)}
+            />
+          </div>
+          <div className='space-y-1.5'>
+            <label
+              htmlFor='description'
+              className='block text-[13px] font-medium'
+            >
               Description
             </label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               id='description'
+              className='min-h-[140px]'
               placeholder='Describe the flag, its history, or any interesting facts...'
             />
           </div>
-        </div>
-        <TagInput tags={tags} onTagsChange={setTags} />
-        <SourcesInput sources={sources} onSourcesChange={setSources} />
-      </div>
-      <div className='space-y-2'>
-        <label htmlFor='flagImage' className='text-sm font-semibold'>
-          Flag Image
-        </label>
-        <div className='space-y-4'>
-          <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
-            <div
-              className='border-2 border-dashed border-main rounded-lg p-6 text-center bg-secondary-background hover:bg-secondary-background/80 transition-colors'
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-            >
-              <Upload className='mx-auto h-12 w-12 text-muted-foreground' />
-              <div className='mt-4'>
-                <input
-                  type='file'
-                  id='file-upload'
-                  accept='image/*,.svg'
-                  onChange={handleImageChange}
-                  className='hidden'
-                />
-                <label
-                  htmlFor='file-upload'
-                  className='cursor-pointer inline-block'
-                >
-                  <Button variant='neutral' className='mb-2' asChild>
-                    <span>Choose File</span>
-                  </Button>
-                </label>
-                {imageFile && (
-                  <p
-                    className='text-sm truncate text-green-600 mb-2'
-                    title={imageFile.name}
-                  >
-                    ✓ {imageFile.name}
-                  </p>
-                )}
-                <p className='text-sm text-muted-foreground'>
-                  Drag and drop an image here, or click to browse
-                </p>
-              </div>
-            </div>
-            {previewUrl && (
-              <div className='space-y-2 flex-col h-full'>
-                <div className='border rounded-lg p-4 bg-secondary-background flex-1 h-full flex items-center justify-center'>
-                  <Image
-                    width={100}
-                    height={100}
-                    src={previewUrl}
-                    alt='Flag preview'
-                    className='max-w-full h-auto max-h-64 mx-auto rounded'
-                    onError={() => setPreviewUrl('')}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-          <div className='space-y-2'>
-            <p className='text-sm text-muted-foreground text-center'>- or -</p>
-            <div className='space-y-2'>
-              <Input
-                placeholder='Paste image URL here...'
-                value={flagImage}
-                onChange={handleImageUrlChange}
-                className='w-full'
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-        <div className='space-y-2'>
-          <label htmlFor='userMessage' className='text-sm font-semibold'>
-            Message
-          </label>
+          <TagInput tags={tags} onTagsChange={setTags} />
+          <SourcesInput sources={sources} onSourcesChange={setSources} />
+        </FormSection>
+        <FormSection title='Note for moderators'>
           <Textarea
             id='userMessage'
-            placeholder='Enter a message for the admin...'
+            aria-label='Note for moderators'
+            placeholder='Anything the moderators should know about this edit?'
             value={userMessage}
             onChange={(e) => setUserMessage(e.target.value)}
             className='w-full'
           />
-        </div>
-        <div>
-          <label htmlFor='userMessage' className='text-sm font-semibold'>
-            Related Flags
-          </label>
+        </FormSection>
+      </div>
+
+      <div className='grid gap-4'>
+        <FormSection title='Image'>
+          <div className='grid h-[188px] place-items-center rounded-[14px] bg-stage p-4'>
+            {previewUrl ? (
+              <Image
+                width={320}
+                height={200}
+                src={previewUrl}
+                alt='Flag preview'
+                className='max-h-[150px] w-auto max-w-full object-contain drop-shadow-[0_2px_6px_rgb(0_0_0/0.18)]'
+                onError={() => setPreviewUrl('')}
+              />
+            ) : (
+              <span className='text-[13px] text-muted-foreground'>
+                No image
+              </span>
+            )}
+          </div>
+          <div
+            className='vx-well flex flex-col items-center gap-3 rounded-[14px] border border-dashed border-border px-4 py-5 text-center sm:flex-row sm:text-left'
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+          >
+            <Upload className='size-5 shrink-0 text-muted-foreground' />
+            <div className='min-w-0 flex-1'>
+              {imageFile ? (
+                <p
+                  className='flex items-center justify-center gap-1.5 truncate text-[13px] font-medium text-good sm:justify-start'
+                  title={imageFile.name}
+                >
+                  <Check className='size-3.5 shrink-0' />
+                  <span className='truncate'>{imageFile.name}</span>
+                </p>
+              ) : (
+                <p className='text-[13px] text-muted-foreground'>
+                  Drop an image here to replace it
+                </p>
+              )}
+            </div>
+            <input
+              type='file'
+              id='file-upload'
+              accept='image/*,.svg'
+              onChange={handleImageChange}
+              className='hidden'
+            />
+            <Button variant='neutral' size='sm' asChild>
+              <label htmlFor='file-upload' className='shrink-0'>
+                Choose file
+              </label>
+            </Button>
+          </div>
+          <div className='space-y-1.5'>
+            <label
+              htmlFor='flagImage'
+              className='block text-[13px] font-medium'
+            >
+              Image URL
+            </label>
+            <Input
+              id='flagImage'
+              placeholder='https://…'
+              value={flagImage}
+              onChange={handleImageUrlChange}
+              className='w-full'
+            />
+          </div>
+        </FormSection>
+
+        <FormSection title='Related flags'>
           <RelatedFlagInput
             relatedFlags={relatedFlags}
             onAdd={handleAddRelatedFlag}
             onRemove={handleRemoveRelatedFlag}
           />
-        </div>
+        </FormSection>
       </div>
-      <div className='flex gap-4 pt-4'>
-        <Button
-          className='flex-1'
-          type='submit'
-          disabled={!isChangeMade || isLoading}
-        >
-          {isLoading ? <Loader2 className='w-4 h-4 animate-spin' /> : 'Save'}
-        </Button>
+
+      <div className='flex justify-end gap-2 border-t border-line pt-4 lg:col-span-2'>
         {onCancel && (
-          <Button
-            variant='neutral'
-            className='flex-1'
-            type='button'
-            onClick={onCancel}
-          >
+          <Button variant='neutral' type='button' onClick={onCancel}>
             Cancel
           </Button>
         )}
+        <Button
+          type='submit'
+          disabled={!isChangeMade || isLoading}
+          className='min-w-[120px]'
+        >
+          {isLoading && <Loader2 className='animate-spin' />}
+          {isLoading ? 'Saving' : 'Save changes'}
+        </Button>
       </div>
     </form>
+  );
+}
+
+/** Tile on a page; flattens to a plain group when rendered inside a dialog (already a tile). */
+function FormSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className='vx-tile space-y-4 px-[22px] py-5 in-data-[slot=dialog-content]:p-0 in-data-[slot=dialog-content]:[background:none] in-data-[slot=dialog-content]:shadow-none'>
+      <h2 className='text-sm font-semibold tracking-[-0.01em]'>{title}</h2>
+      {children}
+    </section>
   );
 }

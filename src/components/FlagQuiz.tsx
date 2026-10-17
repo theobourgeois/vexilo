@@ -1,324 +1,340 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, CheckCircle, XCircle, Heart, Eye } from 'lucide-react';
+import React from 'react';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getRandomFlag } from '@/lib/get-random-flag';
 import { toggleFavoriteFlag } from '@/actions/flags';
-import { useQueryClient } from '@tanstack/react-query';
-import FlagDetailsDialog from './FlagDetailsDialog';
-import { useRouter } from 'next/navigation';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
+import FlagImage from '@/components/FlagImage';
+import { Button } from '@/components/ui/button';
+import { Segmented } from '@/components/ui/segmented';
+import {
+  ArrowUpRight,
+  CheckCircle,
+  Fire,
+  Flag as FlagIcon,
+  Heart,
+  SquaresFour,
+  Target,
+  Trophy,
+  XCircle,
+} from '@/components/icons';
+import { cn } from '@/lib/utils';
 
-type Flag = {
+type QuizFlag = {
   name: string;
   image: string;
   id: string;
-  link: string;
-  index: number;
-  sources: string[];
 };
 
-export default function FlagQuiz() {
-  const router = useRouter();
-  const [currentQuestion, setCurrentQuestion] = useState<Flag | null>(null);
-  const [options, setOptions] = useState<string[]>([]);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [score, setScore] = useState(0);
-  const [totalQuestions, setTotalQuestions] = useState(0);
-  const [loading, setLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_, setFavoriteCount] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [showFlagDialog, setShowFlagDialog] = useState(false);
+type Mode = 'name' | 'find';
 
+type Question = {
+  answer: QuizFlag;
+  options: QuizFlag[];
+};
+
+const BEST_KEY = 'vexilo-quiz-best';
+const LETTERS = ['A', 'B', 'C', 'D'];
+
+function makeQuestion(): Question {
+  const picked = new Map<string, QuizFlag>();
+  while (picked.size < 4) {
+    const flag = getRandomFlag() as unknown as QuizFlag;
+    if (flag?.name && !picked.has(flag.name)) picked.set(flag.name, flag);
+  }
+  const options = [...picked.values()];
+  const answer = options[0];
+  return { answer, options: options.sort(() => Math.random() - 0.5) };
+}
+
+function Stat({ icon, label, value, hot }: { icon: React.ReactNode; label: string; value: React.ReactNode; hot?: boolean }) {
+  return (
+    <span
+      className={cn(
+        'vx-well inline-flex h-[38px] items-center gap-2 rounded-[11px] px-3 text-[13px] text-subtle [&_svg]:size-[15px]',
+        hot && '[&_svg]:text-main',
+      )}
+    >
+      {icon}
+      <span className='hidden sm:inline'>{label}</span>
+      <b className='tabular-nums text-[13px] font-semibold text-foreground'>{value}</b>
+    </span>
+  );
+}
+
+export default function FlagQuiz() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const [mode, setMode] = React.useState<Mode>('name');
+  const [question, setQuestion] = React.useState<Question | null>(null);
+  const [selected, setSelected] = React.useState<string | null>(null);
+  const [score, setScore] = React.useState(0);
+  const [total, setTotal] = React.useState(0);
+  const [streak, setStreak] = React.useState(0);
+  const [best, setBest] = React.useState(0);
+  const [history, setHistory] = React.useState<boolean[]>([]);
+  const [isFavorite, setIsFavorite] = React.useState(false);
 
-  const handleFavoriteToggle = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  React.useEffect(() => {
+    setQuestion(makeQuestion());
+    setBest(Number(localStorage.getItem(BEST_KEY) || 0));
+  }, []);
+
+  const next = React.useCallback(() => {
+    setQuestion(makeQuestion());
+    setSelected(null);
+    setIsFavorite(false);
+  }, []);
+
+  const answer = React.useCallback(
+    (name: string) => {
+      if (!question || selected !== null) return;
+      const correct = name === question.answer.name;
+      setSelected(name);
+      setTotal((t) => t + 1);
+      setHistory((h) => [...h, correct].slice(-10));
+      if (correct) {
+        setScore((s) => s + 1);
+        setStreak((s) => {
+          const nextStreak = s + 1;
+          setBest((b) => {
+            if (nextStreak <= b) return b;
+            localStorage.setItem(BEST_KEY, String(nextStreak));
+            return nextStreak;
+          });
+          return nextStreak;
+        });
+      } else {
+        setStreak(0);
+      }
+    },
+    [question, selected],
+  );
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+      const n = Number(e.key);
+      if (question && n >= 1 && n <= 4 && selected === null) {
+        answer(question.options[n - 1].name);
+      } else if (e.key === 'Enter' && selected !== null) {
+        e.preventDefault();
+        next();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [question, selected, answer, next]);
+
+  const toggleFavorite = async () => {
     if (!session?.user) {
       toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
-    if (!currentQuestion) return;
-
-    if (isFavorite) {
-      setFavoriteCount((prev) => prev - 1);
-      setIsFavorite(false);
-    } else {
-      setFavoriteCount((prev) => prev + 1);
-      setIsFavorite(true);
-    }
-
-    toggleFavoriteFlag(currentQuestion.id).then((isSuccess) => {
-      queryClient.invalidateQueries({ queryKey: ['flags'] });
-      if (!isSuccess) {
-        setFavoriteCount((prev) => prev - 1);
-        setIsFavorite(false);
-      }
-    });
+    if (!question) return;
+    const previous = isFavorite;
+    setIsFavorite(!previous);
+    const ok = await toggleFavoriteFlag(question.answer.id);
+    queryClient.invalidateQueries({ queryKey: ['flags'] });
+    if (!ok) setIsFavorite(previous);
   };
 
-  const generateQuestion = async () => {
-    setLoading(true);
-    try {
-      // Get 4 random flags
-      const randomFlags = [
-        getRandomFlag(),
-        getRandomFlag(),
-        getRandomFlag(),
-        getRandomFlag(),
-      ] as unknown as Flag[];
-      if (!randomFlags || randomFlags.length < 4) {
-        console.error('Not enough flags found');
-        return;
-      }
+  const answered = selected !== null;
+  const correct = answered && selected === question?.answer.name;
+  const flagHref = question ? `/flag/${encodeURIComponent(question.answer.name)}` : '#';
 
-      // Pick the first one as the correct answer
-      const correctFlag = randomFlags[0];
-      const wrongOptions = randomFlags.slice(1).map((flag) => flag.name);
+  const historyDots = (
+    <div className='flex gap-[5px]' title='Last 10 answers'>
+      {Array.from({ length: 10 }).map((_, i) => {
+        const value = history[i];
+        return (
+          <i
+            key={i}
+            className={cn(
+              'size-2 rounded-full',
+              value === undefined
+                ? 'shadow-[inset_0_0_0_1.5px_var(--border)]'
+                : value
+                  ? 'bg-good'
+                  : 'bg-bad',
+            )}
+          />
+        );
+      })}
+    </div>
+  );
 
-      // Combine correct and wrong answers and shuffle
-      const allOptions = [correctFlag.name, ...wrongOptions];
-      const shuffledOptions = allOptions.sort(() => Math.random() - 0.5);
-
-      setCurrentQuestion(correctFlag);
-      setOptions(shuffledOptions);
-      setSelectedAnswer(null);
-      setIsCorrect(null);
-    } catch (error) {
-      console.error('Error generating question:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAnswerSelect = (answer: string) => {
-    if (selectedAnswer !== null || !currentQuestion) return; // Prevent multiple selections
-
-    setSelectedAnswer(answer);
-    const correct = answer === currentQuestion.name;
-    setIsCorrect(correct);
-
-    if (correct) {
-      setScore((prev) => prev + 1);
-    }
-    setTotalQuestions((prev) => prev + 1);
-  };
-
-  const handleNextQuestion = () => {
-    generateQuestion();
-  };
-
-  useEffect(() => {
-    generateQuestion();
-  }, []);
-
-  if (loading) {
-    return (
-      <Card className='h-full'>
-        <CardHeader className='text-center'>
-          <div className='flex flex-wrap items-center justify-between mb-4'>
-            <h2 className='text-2xl font-bold '>Flag Quiz</h2>
-            <div className='flex items-center gap-2 flex-wrap'>
-              <Badge variant='neutral'>
-                Score: {score}/{totalQuestions}
-              </Badge>
-              <Button
-                variant='neutral'
-                size='sm'
-                onClick={handleNextQuestion}
-                className='ml-2'
-              >
-                <RefreshCw className='w-4 h-4 mr-1' />
-                New Question
-              </Button>
-            </div>
-          </div>
-          <p className=''>Who does this flag belong to?</p>
-        </CardHeader>
-
-        <CardContent className='space-y-6 px-0 pb-0'>
-          {/* Flag Image Skeleton */}
-          <div className='relative aspect-[3/2] w-full max-w-md mx-auto'>
-            <Skeleton className='w-full h-full flex items-center justify-center'>
-              <RefreshCw className='w-8 h-8 animate-spin text-foreground/40' />
-            </Skeleton>
-          </div>
-
-          {/* Answer Options Skeleton */}
-          <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-            {[1, 2, 3, 4].map((index) => (
-              <Skeleton key={index} className='h-12' />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!currentQuestion) {
-    return (
-      <Card className='h-full'>
-        <CardContent className='flex items-center justify-center h-64 px-0 pb-0'>
-          <div className='text-center'>
-            <p>No flags available for quiz.</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const footer = answered && question && (
+    <div className='mt-[18px] flex flex-wrap items-center gap-3 border-t border-line pt-[18px]'>
+      <p className='min-w-0 flex-1 text-[13.5px] text-subtle'>
+        <b className={cn('font-semibold', correct ? 'text-good' : 'text-bad')}>
+          {correct ? 'Correct.' : 'Not quite.'}
+        </b>{' '}
+        {correct ? (
+          <>That’s {question.answer.name}.</>
+        ) : (
+          <>
+            The answer is <b className='font-semibold text-foreground'>{question.answer.name}</b>.
+          </>
+        )}
+      </p>
+      <Button variant='ghost' asChild>
+        <Link href={flagHref}>
+          View flag
+          <ArrowUpRight />
+        </Link>
+      </Button>
+      <Button onClick={next}>
+        Next flag
+        <kbd className='rounded-md bg-white/20 px-1.5 tabular-nums text-[11px] leading-5'>↵</kbd>
+      </Button>
+    </div>
+  );
 
   return (
-    <Card className='h-full p-6'>
-      <CardHeader className='text-center px-0 pt-0 pb-6 border-b-0'>
-        <div className='flex flex-wrap items-center justify-between mb-4'>
-          <h2 className='text-2xl font-bold '>Flag Quiz</h2>
-          <div className='flex items-center gap-2 flex-wrap'>
-            <Badge variant='neutral'>
-              Score: {score}/{totalQuestions}
-            </Badge>
-            <Button
-              variant='neutral'
-              size='sm'
-              onClick={handleNextQuestion}
-              className='ml-2'
-            >
-              <RefreshCw className='w-4 h-4 mr-1' />
-              New Question
-            </Button>
-          </div>
+    <div className='mx-auto max-w-[920px]'>
+      <div className='flex flex-wrap items-center gap-3 pb-4 pt-7'>
+        <Segmented
+          aria-label='Quiz mode'
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            next();
+          }}
+          options={[
+            { value: 'name', label: 'Name the flag', icon: <FlagIcon /> },
+            { value: 'find', label: 'Find the flag', icon: <SquaresFour /> },
+          ]}
+        />
+        <div className='flex gap-2 sm:ml-auto'>
+          <Stat icon={<Fire weight='fill' />} label='Streak' value={streak} hot={streak > 0} />
+          <Stat icon={<Target />} label='Score' value={`${score}/${total}`} />
+          <Stat icon={<Trophy />} label='Best' value={best} />
         </div>
-        <p className=''>Who does this flag belong to?</p>
-      </CardHeader>
+      </div>
 
-      <CardContent className='space-y-6'>
-        {/* Flag Image */}
-        <div className='relative aspect-[3/2] w-full max-w-md mx-auto group'>
-          <Image
-            src={currentQuestion.image}
-            alt='Quiz flag'
-            fill
-            className='object-contain rounded-lg'
-            sizes='(max-width: 768px) 100vw, 400px'
-          />
-          {/* Favorite Button */}
-          <Button
-            variant='neutral'
-            size='sm'
-            onClick={handleFavoriteToggle}
-            className='absolute top-0 right-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity bg-secondary-background/90 hover:bg-secondary-background backdrop-blur-sm'
-          >
-            <Heart
-              className={`w-5 h-5 ${
-                isFavorite ? 'fill-red-500 text-red-500' : 'text-foreground/60'
-              }`}
-            />
-          </Button>
-        </div>
-
-        {/* Answer Options */}
-        <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6'>
-          {options.map((option) => (
-            <Button
-              key={option}
-              variant={
-                selectedAnswer === option
-                  ? isCorrect
-                    ? 'default'
-                    : 'neutral'
-                  : 'neutral'
-              }
-              className={`h-12 text-left justify-start px-4 ${
-                selectedAnswer === option
-                  ? isCorrect
-                    ? 'bg-green-500 hover:bg-green-600 text-white'
-                    : 'bg-red-500 hover:bg-red-600 text-white'
-                  : ''
-              }`}
-              onClick={() => handleAnswerSelect(option)}
-              disabled={selectedAnswer !== null}
-            >
-              <div className='flex items-center gap-2 w-full' title={option}>
-                <span className='font-medium truncate'>{option}</span>
-                {selectedAnswer === option && (
-                  <>
-                    {isCorrect ? (
-                      <CheckCircle className='w-4 h-4 ml-auto' />
-                    ) : (
-                      <XCircle className='w-4 h-4 ml-auto' />
-                    )}
-                  </>
-                )}
+      {mode === 'name' ? (
+        <section className='vx-tile overflow-hidden'>
+          <div className='bg-stage relative h-[300px] [container-type:size] sm:h-[380px]'>
+            <span className='vx-label absolute left-[18px] top-4'>Question {total + (answered ? 0 : 1)}</span>
+            <div className='absolute right-[18px] top-[18px]'>{historyDots}</div>
+            {question && (
+              <div className='flag-stage absolute inset-x-8 bottom-8 top-14'>
+                <FlagImage
+                  key={question.answer.image}
+                  src={question.answer.image}
+                  alt='Mystery flag'
+                  maxHeight={230}
+                  area={340 * 220}
+                  eager
+                />
               </div>
-            </Button>
-          ))}
-        </div>
-
-        {/* Result Message */}
-        {selectedAnswer && (
-          <div
-            className={`text-center p-4 rounded-lg ${
-              isCorrect
-                ? 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/30'
-                : 'bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/30'
-            }`}
-          >
-            <p className='font-medium'>
-              {isCorrect
-                ? 'Correct! Well done!'
-                : `Incorrect. The correct answer is ${currentQuestion.name}.`}
-            </p>
-          </div>
-        )}
-
-        {/* Show Flag and Next Question Buttons */}
-        {selectedAnswer && (
-          <div className='text-center space-y-2'>
-            <div className='flex flex-col sm:flex-row gap-2 justify-center'>
+            )}
+            {answered && (
               <Button
                 variant='neutral'
-                onClick={() =>
-                  router.push(
-                    `/flag/${encodeURIComponent(currentQuestion.name)}`,
-                  )
-                }
-                className='flex items-center gap-2'
+                size='icon'
+                onClick={toggleFavorite}
+                className='absolute bottom-4 right-4'
+                title='Favorite this flag'
               >
-                <Eye className='w-4 h-4' />
-                Show Flag Details
+                <Heart weight={isFavorite ? 'fill' : 'bold'} className={cn(isFavorite && 'text-main')} />
               </Button>
-              <Button onClick={handleNextQuestion}>Next Question</Button>
-            </div>
+            )}
           </div>
-        )}
-
-        {/* Flag Details Dialog */}
-        {currentQuestion && (
-          <FlagDetailsDialog
-            open={showFlagDialog}
-            showEditControls
-            onOpenChange={setShowFlagDialog}
-            flag={{
-              id: currentQuestion.id,
-              sources: currentQuestion.sources,
-              flagName: currentQuestion.name,
-              flagImage: currentQuestion.image,
-              link: currentQuestion.link,
-              index: currentQuestion.index,
-              tags: [],
-              description: '',
-            }}
-          />
-        )}
-      </CardContent>
-    </Card>
+          <div className='px-6 pb-6 pt-[22px]'>
+            <h1 className='mb-4 text-lg font-semibold tracking-[-0.02em]'>Which flag is this?</h1>
+            <div className='grid gap-2.5 sm:grid-cols-2'>
+              {question?.options.map((option, i) => {
+                const isAnswer = option.name === question.answer.name;
+                const isPicked = option.name === selected;
+                return (
+                  <button
+                    key={option.name}
+                    type='button'
+                    disabled={answered}
+                    onClick={() => answer(option.name)}
+                    className={cn(
+                      'flex h-14 cursor-pointer items-center gap-3 rounded-[13px] pl-3 pr-3.5 text-left text-[15px] font-semibold transition-[transform,opacity] disabled:cursor-default',
+                      !(answered && (isAnswer || isPicked)) && 'vx-key',
+                      answered && isAnswer && 'bg-good-soft shadow-[inset_0_0_0_1.5px_var(--good)]',
+                      answered && isPicked && !isAnswer && 'bg-bad-soft shadow-[inset_0_0_0_1.5px_var(--bad)]',
+                      answered && !isAnswer && !isPicked && 'opacity-45',
+                    )}
+                  >
+                    <kbd
+                      className={cn(
+                        'grid h-[22px] min-w-[22px] shrink-0 place-items-center rounded-md tabular-nums text-[11px] font-medium',
+                        !(answered && (isAnswer || isPicked)) && 'vx-key text-subtle',
+                        answered && isAnswer && 'bg-good text-white',
+                        answered && isPicked && !isAnswer && 'bg-bad text-white',
+                      )}
+                    >
+                      {i + 1}
+                    </kbd>
+                    <span className='min-w-0 flex-1 truncate' title={option.name}>
+                      {option.name}
+                    </span>
+                    {answered && isAnswer && <CheckCircle className='size-[18px] shrink-0 text-good' />}
+                    {answered && isPicked && !isAnswer && <XCircle className='size-[18px] shrink-0 text-bad' />}
+                  </button>
+                );
+              })}
+            </div>
+            {footer}
+          </div>
+        </section>
+      ) : (
+        <section className='vx-tile p-5'>
+          <div className='mb-4 flex items-center gap-3'>
+            <h1 className='min-w-0 flex-1 text-base font-semibold tracking-[-0.02em]'>
+              Which one is <span className='text-main'>{question?.answer.name}</span>?
+            </h1>
+            {historyDots}
+          </div>
+          <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
+            {question?.options.map((option, i) => {
+              const isAnswer = option.name === question.answer.name;
+              const isPicked = option.name === selected;
+              return (
+                <button
+                  key={option.name}
+                  type='button'
+                  disabled={answered}
+                  onClick={() => answer(option.name)}
+                  className={cn(
+                    'vx-tile flex cursor-pointer flex-col transition-[transform,box-shadow,opacity] enabled:hover:shadow-tile-hover disabled:cursor-default',
+                    answered && isAnswer && 'shadow-[inset_0_0_0_1.5px_var(--good),var(--sh-tile)]',
+                    answered && isPicked && !isAnswer && 'shadow-[inset_0_0_0_1.5px_var(--bad),var(--sh-tile)]',
+                    answered && !isAnswer && !isPicked && 'opacity-50',
+                  )}
+                >
+                  <div className='flag-stage h-[150px] px-4'>
+                    <FlagImage src={option.image} alt={`Option ${LETTERS[i]}`} maxHeight={112} area={160 * 104} eager />
+                  </div>
+                  <div className='flex h-10 items-center justify-center pb-2 tabular-nums text-xs'>
+                    {answered && (isAnswer || isPicked) ? (
+                      <span className={cn('inline-flex items-center gap-1.5 truncate px-2', isAnswer ? 'text-good' : 'text-bad')}>
+                        {isAnswer ? <CheckCircle className='size-3.5 shrink-0' /> : <XCircle className='size-3.5 shrink-0' />}
+                        <span className='truncate'>{option.name}</span>
+                      </span>
+                    ) : (
+                      <kbd className='vx-key grid h-[22px] min-w-[22px] place-items-center rounded-md text-[11px] font-medium text-subtle'>
+                        {i + 1}
+                      </kbd>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {footer}
+        </section>
+      )}
+    </div>
   );
 }

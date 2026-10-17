@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, X, ArrowRight, Heart, Flag } from 'lucide-react';
-import { ArrowLeft } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-
-import FlagCard from './FlagCard';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, Heart } from '@/components/icons';
+import { Button } from '@/components/ui/button';
+import { Segmented } from '@/components/ui/segmented';
+import FlagCard from './FlagCard';
+import Tag from './Tag';
+import { FlagOfTheDayTile } from './flag-of-the-day-tile';
 import {
   getFavoriteFlagsCount,
   getFavouriteFlags,
@@ -19,34 +18,35 @@ import {
   getTopFlagTags,
 } from '@/actions/flags';
 import { flags } from '@/db/schema';
-import Tag from './Tag';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/useIsMobile';
 
 type OrderBy = keyof typeof flags.$inferSelect;
+type Sort = 'popular' | 'views' | 'latest' | 'az';
 
 const ITEMS_PER_PAGE = 56;
-const DEBOUNCE_DELAY = 300; // 300ms delay
-const MOBILE_TAGS_TO_SHOW = 7;
 
-// Flag Card Skeleton Component
+const SORTS: Record<Sort, { orderBy: OrderBy; direction: 'asc' | 'desc' }> = {
+  popular: { orderBy: 'favorites', direction: 'desc' },
+  views: { orderBy: 'views', direction: 'desc' },
+  latest: { orderBy: 'updatedAt', direction: 'desc' },
+  az: { orderBy: 'name', direction: 'asc' },
+};
+
+const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+
 function FlagCardSkeleton() {
   return (
-    <Card className='px-8 relative'>
-      <div className='relative overflow-hidden'>
-        <div className='aspect-[3/2] relative'>
-          <Skeleton className='w-full h-full' />
-        </div>
+    <div className='vx-tile flex h-[292px] flex-col'>
+      <div className='grid flex-1 place-items-center'>
+        <div className='h-[110px] w-[170px] animate-pulse rounded-sm bg-foreground/[0.06]' />
       </div>
-      <CardContent className='pb-2'>
-        <Skeleton className='h-6 w-3/4 mx-auto' />
-      </CardContent>
-    </Card>
+      <div className='space-y-2 px-4 pb-4'>
+        <div className='h-4 w-2/3 animate-pulse rounded bg-foreground/[0.06]' />
+        <div className='h-3 w-1/3 animate-pulse rounded bg-foreground/[0.06]' />
+      </div>
+    </div>
   );
 }
 
-// Simple Pagination Component
 function SimplePagination({
   currentPage,
   totalPages,
@@ -59,21 +59,27 @@ function SimplePagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className='flex items-center justify-center gap-4'>
+    <div className='flex items-center justify-center gap-3'>
       <Button
+        variant='neutral'
+        size='icon'
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
+        aria-label='Previous page'
       >
-        <ArrowLeft className='w-4 h-4' /> Previous
+        <ArrowLeft />
       </Button>
-      <span className='text-sm'>
-        Page {currentPage} of {totalPages}
+      <span className='min-w-28 text-center tabular-nums text-xs text-muted-foreground'>
+        {currentPage} / {totalPages}
       </span>
       <Button
+        variant='neutral'
+        size='icon'
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
+        aria-label='Next page'
       >
-        Next <ArrowRight className='w-4 h-4' />
+        <ArrowRight />
       </Button>
     </div>
   );
@@ -82,322 +88,147 @@ function SimplePagination({
 export default function FlagSearch() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isMobile = useIsMobile();
 
-  // Local state for search query with debouncing
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-  const [debouncedQuery, setDebouncedQuery] = useState(
-    searchParams.get('q') || '',
-  );
-
+  // The search box lives in the site header and writes `q` to the URL.
+  const query = searchParams.get('q') || '';
+  const tag = searchParams.get('tag') || '';
   const isFavorites = searchParams.get('favorites') === 'true';
-
-  // Pagination controlled by URL
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
-
   const orderBy = (searchParams.get('orderBy') as OrderBy) || 'favorites';
   const orderDirection =
     (searchParams.get('orderDirection') as 'asc' | 'desc') || 'desc';
+  const sort: Sort =
+    orderBy === 'name' ? 'az' : orderBy === 'updatedAt' ? 'latest' : orderBy === 'views' ? 'views' : 'popular';
 
   const { data: topFlagTags } = useQuery({
     queryKey: ['topFlagTags'],
-    queryFn: async () => {
-      return await getTopFlagTags(20);
-    },
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    queryFn: () => getTopFlagTags(20),
+    staleTime: 10 * 60 * 1000,
   });
 
-  const tag = searchParams.get('tag') || '';
-  const visibleTopTags = (topFlagTags || []).slice(
-    0,
-    isMobile ? MOBILE_TAGS_TO_SHOW : topFlagTags?.length,
-  );
-
   const { data: flags, isLoading: flagsLoading } = useQuery({
-    queryKey: [
-      'flags',
-      currentPage,
-      debouncedQuery,
-      isFavorites,
-      orderBy,
-      orderDirection,
-      tag,
-    ],
+    queryKey: ['flags', currentPage, query, isFavorites, orderBy, orderDirection, tag],
     queryFn: async () => {
       const fetchFn = isFavorites ? getFavouriteFlags : getFlags;
-      return await fetchFn(
-        currentPage,
-        ITEMS_PER_PAGE,
-        debouncedQuery,
-        orderBy,
-        orderDirection,
-        tag,
-      ).then((flags) => {
-        return flags.map((flag) => ({
-          favorites: flag.favorites,
-          flagName: flag.name,
-          flagImage: flag.image,
-          link: flag.link,
-          index: flag.index,
-          tags: flag.tags,
-          description: flag.description,
-          id: flag.id,
-          isFavorite: flag.isFavorite,
-          sources: flag.sources,
-        }));
-      });
+      const results = await fetchFn(currentPage, ITEMS_PER_PAGE, query, orderBy, orderDirection, tag);
+      return results.map((flag) => ({
+        favorites: flag.favorites,
+        flagName: flag.name,
+        flagImage: flag.image,
+        link: flag.link,
+        index: flag.index,
+        tags: flag.tags,
+        description: flag.description,
+        id: flag.id,
+        isFavorite: flag.isFavorite,
+        sources: flag.sources,
+      }));
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 
   const { data: flagsCount } = useQuery({
-    queryKey: ['flagsCount', debouncedQuery, isFavorites, tag],
-    queryFn: async () => {
-      const fetchFn = isFavorites ? getFavoriteFlagsCount : getFlagsCount;
-      return await fetchFn(debouncedQuery, tag);
-    },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    queryKey: ['flagsCount', query, isFavorites, tag],
+    queryFn: () => (isFavorites ? getFavoriteFlagsCount : getFlagsCount)(query, tag),
+    staleTime: 2 * 60 * 1000,
   });
 
-  const { data: totalFlags } = useQuery({
-    queryKey: ['totalFlags', isFavorites, tag],
-    queryFn: async () => {
-      const fetchFn = isFavorites ? getFavoriteFlagsCount : getFlagsCount;
-      return await fetchFn('', tag);
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, DEBOUNCE_DELAY);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Update URL when debounced query changes
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-
-    if (debouncedQuery.trim()) {
-      params.set('q', debouncedQuery);
-    } else {
-      params.delete('q');
-    }
-
-    const newUrl = params.toString()
-      ? `?${params.toString()}`
-      : window.location.pathname;
-    router.replace(newUrl, { scroll: false });
-  }, [debouncedQuery, router, searchParams]);
-
-  // Update page in URL
-  const updatePage = useCallback(
-    (newPage: number) => {
+  const updateParams = useCallback(
+    (update: (params: URLSearchParams) => void) => {
       const params = new URLSearchParams(searchParams);
-      if (newPage > 1) {
-        params.set('page', newPage.toString());
-      } else {
-        params.delete('page');
-      }
-
-      const newUrl = params.toString()
-        ? `?${params.toString()}`
-        : window.location.pathname;
-      router.replace(newUrl, { scroll: false });
+      update(params);
+      const qs = params.toString();
+      router.replace(qs ? `/?${qs}` : '/', { scroll: false });
     },
     [router, searchParams],
   );
+
+  const updatePage = (page: number) => {
+    updateParams((params) => {
+      if (page > 1) params.set('page', String(page));
+      else params.delete('page');
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const totalPages = Math.ceil((flagsCount || 0) / ITEMS_PER_PAGE);
-
-  const handleViewModeChange = useCallback(
-    (newViewMode: boolean) => {
-      const params = new URLSearchParams(searchParams);
-      params.set('favorites', newViewMode ? 'true' : 'false');
-      router.replace(`${window.location.pathname}?${params.toString()}`, {
-        scroll: false,
-      });
-    },
-    [router, searchParams],
-  );
-
-  const handleSortChange = useCallback(
-    (newOrderBy: OrderBy, newOrderDirection: 'asc' | 'desc') => {
-      const params = new URLSearchParams(searchParams);
-      params.set('orderBy', newOrderBy);
-      params.set('orderDirection', newOrderDirection);
-      // Reset to first page when sorting changes
-      params.set('page', '1');
-      router.replace(`${window.location.pathname}?${params.toString()}`, {
-        scroll: false,
-      });
-    },
-    [router, searchParams],
-  );
+  const showFeatured = currentPage === 1 && !query && !tag && !isFavorites;
+  const title = query ? `Results for “${query}”` : isFavorites ? 'Favorites' : 'Browse';
 
   return (
-    <div className='space-y-6'>
-      {/* Search Header */}
-      <Card>
-        <CardHeader id='search-header'>
-          <div className='space-y-4'>
-            <div className='flex gap-2'>
-              <Button
-                variant={isFavorites ? 'neutral' : 'default'}
-                onClick={() => handleViewModeChange(false)}
-              >
-                <Flag className='w-4 h-4' />
-                All Flags
-              </Button>
-              <Button
-                variant={isFavorites ? 'default' : 'neutral'}
-                onClick={() => handleViewModeChange(true)}
-              >
-                <Heart className='w-4 h-4' />
-                Favorites
-              </Button>
-            </div>
-            <div className='flex flex-col sm:flex-row gap-4 items-center'>
-              <div className='relative flex-1 md:max-w-md w-full'>
-                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground/40 w-4 h-4' />
-                <Input
-                  type='text'
-                  placeholder='Search flags...'
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    const params = new URLSearchParams(searchParams);
-                    // set page to 1
-                    params.set('page', '1');
-                    router.replace(
-                      `${window.location.pathname}?${params.toString()}`,
-                      { scroll: false },
-                    );
-                  }}
-                  className={cn('w-full pl-10', searchQuery && 'pr-10')}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      const params = new URLSearchParams(searchParams);
-                      params.delete('page');
-                      router.replace(
-                        `${window.location.pathname}?${params.toString()}`,
-                        { scroll: false },
-                      );
-                    }}
-                    className='absolute right-2 top-1/2 transform -translate-y-1/2 text-foreground/40 hover:text-foreground/60 transition-colors'
-                    type='button'
-                    aria-label='Clear search'
-                  >
-                    <X className='w-4 h-4' />
-                  </button>
-                )}
-              </div>
+    <div>
+      <div className='flex flex-wrap items-center gap-x-4 gap-y-3 pb-[18px] pt-7'>
+        <h1 className='flex min-w-0 items-baseline gap-2.5 text-[22px] font-semibold tracking-[-0.03em]'>
+          <span className='truncate'>{title}</span>
+          <span className='shrink-0 tabular-nums text-[13px] font-normal tracking-normal text-muted-foreground'>
+            {flagsCount !== undefined ? `${flagsCount.toLocaleString()} flags` : ''}
+          </span>
+        </h1>
+        <div className='flex flex-wrap items-center gap-2 sm:ml-auto'>
+          <Segmented
+            aria-label='Collection'
+            value={isFavorites ? 'favorites' : 'all'}
+            onChange={(v) =>
+              updateParams((params) => {
+                if (v === 'favorites') params.set('favorites', 'true');
+                else params.delete('favorites');
+                params.delete('page');
+              })
+            }
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'favorites', label: 'Favorites', icon: <Heart /> },
+            ]}
+          />
+          <Segmented
+            aria-label='Sort'
+            value={sort}
+            onChange={(v) =>
+              updateParams((params) => {
+                params.set('orderBy', SORTS[v].orderBy);
+                params.set('orderDirection', SORTS[v].direction);
+                params.delete('page');
+              })
+            }
+            options={[
+              { value: 'popular', label: 'Popular' },
+              { value: 'views', label: 'Most viewed' },
+              { value: 'latest', label: 'Latest' },
+              { value: 'az', label: 'A–Z' },
+            ]}
+          />
+        </div>
+      </div>
 
-              {/* Sort Buttons */}
-              <div className='flex gap-2'>
-                <Button
-                  variant={
-                    orderBy === 'updatedAt' && orderDirection === 'desc'
-                      ? 'default'
-                      : 'neutral'
-                  }
-                  onClick={() => handleSortChange('updatedAt', 'desc')}
-                >
-                  Latest
-                </Button>
-                <Button
-                  variant={
-                    orderBy === 'favorites' && orderDirection === 'desc'
-                      ? 'default'
-                      : 'neutral'
-                  }
-                  onClick={() => handleSortChange('favorites', 'desc')}
-                >
-                  Popular
-                </Button>
-              </div>
-
-              <div className='text-sm text-foreground/60'>
-                {flagsCount || 0} of {totalFlags || 0} flags
-                {searchQuery !== debouncedQuery && (
-                  <span className='ml-2 text-main'>(searching...)</span>
-                )}
-              </div>
-            </div>
-            <div>
-              {topFlagTags && (
-                <div className='flex flex-wrap gap-2 items-center'>
-                  <Tag
-                    onClick={() => {
-                      const params = new URLSearchParams(searchParams);
-                      params.delete('tag');
-                      router.replace(
-                        `${window.location.pathname}?${params.toString()}`,
-                        { scroll: false },
-                      );
-                    }}
-                    isActive={!tag}
-                    text='All'
-                  />
-                  {!topFlagTags.find((t) => t.tag === tag) && tag && (
-                    <Tag key={tag} text={tag} />
-                  )}
-                  {visibleTopTags.map((tag) => (
-                    <Tag key={tag.tag} text={tag.tag} count={tag.count} />
-                  ))}
-                  <Link className='text-main underline text-sm' href='/tags'>
-                    View all tags
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Top Pagination */}
-      <SimplePagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={updatePage}
-      />
-
-      {/* No Results Message */}
-      {!flagsLoading && flags && flags.length === 0 && (
-        <Card>
-          <CardContent className='text-center py-12'>
-            <p className='text-foreground/60 text-lg'>
-              {debouncedQuery
-                ? `No ${
-                    isFavorites ? 'favorite ' : ''
-                  }flags found matching "${debouncedQuery}"`
-                : `No ${isFavorites ? 'favorite ' : ''}flags found`}
-            </p>
-            {debouncedQuery && (
-              <Button
-                variant='default'
-                onClick={() => setSearchQuery('')}
-                className='mt-4'
-              >
-                Clear Search
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Results Grid */}
-      {!flagsLoading && flags && flags.length > 0 && (
-        <div
-          id='flags'
-          className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+      <div className='-mx-4 mb-[22px] flex gap-2 overflow-x-auto px-4 pb-1 pt-0.5 [mask-image:linear-gradient(90deg,#000_calc(100%-64px),transparent)] [scrollbar-width:none] md:mx-0 md:px-0.5'>
+        <Tag
+          variant='chip'
+          text='All'
+          isActive={!tag}
+          onClick={() => updateParams((params) => { params.delete('tag'); params.delete('page'); })}
+        />
+        {tag && !topFlagTags?.some((t) => t.tag === tag) && <Tag variant='chip' text={tag} />}
+        {topFlagTags?.map((t) => (
+          <Tag key={t.tag} variant='chip' text={t.tag} count={t.count} />
+        ))}
+        <Link
+          href='/tags'
+          className='inline-flex h-8 shrink-0 items-center gap-1 pl-2 pr-16 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground'
         >
+          All tags
+          <ArrowRight className='size-3.5' />
+        </Link>
+      </div>
+
+      {flagsLoading ? (
+        <div className={GRID}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <FlagCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : flags && flags.length > 0 ? (
+        <div id='flags' className={GRID}>
+          {showFeatured && <FlagOfTheDayTile className='sm:col-span-2 lg:row-span-2' />}
           {flags.map((flag) => (
             <FlagCard
               id={flag.id}
@@ -414,23 +245,29 @@ export default function FlagSearch() {
             />
           ))}
         </div>
-      )}
-
-      {/* Loading Skeleton */}
-      {flagsLoading && (
-        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-          {Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
-            <FlagCardSkeleton key={`skeleton-${index}`} />
-          ))}
+      ) : (
+        <div className='vx-tile flex flex-col items-center gap-3 px-6 py-16 text-center'>
+          <p className='text-[15px] font-medium'>
+            {query
+              ? `No ${isFavorites ? 'favorite ' : ''}flags match “${query}”`
+              : isFavorites
+                ? 'You haven’t favorited any flags yet'
+                : 'No flags found'}
+          </p>
+          <p className='text-sm text-muted-foreground'>
+            {query ? 'Try a different spelling or a broader term.' : 'Try clearing the tag filter.'}
+          </p>
+          {(query || tag) && (
+            <Button variant='neutral' onClick={() => router.replace('/', { scroll: false })} className='mt-2'>
+              Clear filters
+            </Button>
+          )}
         </div>
       )}
 
-      {/* Bottom Pagination */}
-      <SimplePagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={updatePage}
-      />
+      <div className='mt-7'>
+        <SimplePagination currentPage={currentPage} totalPages={totalPages} onPageChange={updatePage} />
+      </div>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import TagInput from '@/components/TagInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ExternalLink, Loader2, Trash2, X } from 'lucide-react';
+import { ExternalLink, Loader2, Trash2, X } from '@/components/icons';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -59,22 +59,22 @@ export function FlagEditDrawer({ flag, onClose, onSaved, onDelete }: FlagEditDra
   return (
     <aside
       aria-label='Edit flag'
-      className='fixed z-40 inset-0 sm:inset-auto sm:top-20 sm:right-4 sm:bottom-4 sm:w-[480px] flex flex-col overflow-hidden sm:rounded-2xl border border-white/90 dark:border-white/20 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] bg-[size:256px,auto] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.35)]'
+      className='fixed z-40 inset-0 sm:inset-auto sm:top-20 sm:right-4 sm:bottom-4 sm:w-[480px] flex flex-col overflow-hidden sm:rounded-[18px] bg-secondary-background shadow-pop'
     >
-      <div className='px-6 pt-5 pb-4 flex items-center justify-between gap-3 border-b border-border/70'>
-        <p className='text-lg font-bold truncate'>{flag.name}</p>
+      <div className='px-6 pt-5 pb-4 flex items-center justify-between gap-3 border-b border-line'>
+        <p className='text-[17px] font-semibold tracking-[-0.02em] truncate'>{flag.name}</p>
         <div className='flex items-center gap-3 shrink-0'>
-          <Link href={`/flag/${encodeURIComponent(flag.name)}`} target='_blank' aria-label='Open flag page' className='text-foreground/60 hover:text-foreground'>
+          <Link href={`/flag/${encodeURIComponent(flag.name)}`} target='_blank' aria-label='Open flag page' className='text-muted-foreground hover:text-foreground'>
             <ExternalLink className='size-4' />
           </Link>
-          <button type='button' onClick={onClose} aria-label='Close' className='text-foreground/60 hover:text-foreground cursor-pointer'>
+          <button type='button' onClick={onClose} aria-label='Close' className='text-muted-foreground hover:text-foreground cursor-pointer'>
             <X className='size-5' />
           </button>
         </div>
       </div>
 
       <div className='flex-1 overflow-y-auto px-6 py-5 space-y-4'>
-        <div className='h-40 rounded-xl bg-foreground/5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.08)] flex items-center justify-center'>
+        <div className='h-40 rounded-[14px] bg-well shadow-well flex items-center justify-center'>
           {draft.image && (
             <Image src={draft.image} alt={draft.name} width={320} height={200} className='max-h-28 w-auto max-w-[85%] object-contain drop-shadow-[0_2px_3px_rgba(0,0,0,0.18)]' />
           )}
@@ -110,8 +110,8 @@ export function FlagEditDrawer({ flag, onClose, onSaved, onDelete }: FlagEditDra
         />
       </div>
 
-      <div className='px-6 py-4 border-t border-border/70 flex items-center gap-3'>
-        <Button variant='neutral' size='sm' onClick={onDelete} className='text-red-600'>
+      <div className='px-6 py-4 border-t border-line flex items-center gap-3'>
+        <Button variant='neutral' size='sm' onClick={onDelete} className='text-bad'>
           <Trash2 />
           Delete
         </Button>

@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { X, Search } from "lucide-react";
+import { X, Search, Plus, Loader2 } from '@/components/icons';
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { getTopFlagTags, getAllFlagTags } from "@/actions/flags";
 import { useDebounce } from "use-debounce";
-import { Card, CardContent } from "./ui/card";
 
 type TagInputProps = {
 	tags: string[];
@@ -95,106 +94,123 @@ export default function TagInput({
 	const suggestions = debouncedSearch.length > 0 ? filteredTags?.tags : topTags;
 
 	return (
-		<div className="space-y-2" ref={dropdownRef}>
-			<label htmlFor="tags" className="text-sm font-semibold">
+		<div className="space-y-1.5" ref={dropdownRef}>
+			<label htmlFor="tags" className="block text-[13px] font-medium">
 				{label}
 			</label>
-			<div className="space-y-3">
-				<div className="relative">
-					<div className="relative">
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-						<Input
-							id="tags"
-							placeholder={placeholder}
-							value={inputValue}
-							onChange={handleInputChange}
-							onKeyDown={handleKeyDown}
-							className="pl-10 pr-4"
-						/>
-					</div>
+			<div className="relative">
+				<Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+				<Input
+					id="tags"
+					placeholder={placeholder}
+					value={inputValue}
+					onChange={handleInputChange}
+					onKeyDown={handleKeyDown}
+					className="pl-10"
+				/>
 
-					{/* Tag Suggestions Dropdown */}
-					{isDropdownOpen && (
-						<Card className="p-0 absolute top-full left-0 right-0 z-50 max-h-60 overflow-y-auto shadow-lg border-2 bg-secondary-background">
-							<CardContent className="p-2">
-								{isLoading ? (
-									<div className="flex items-center justify-center py-4">
-										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-									</div>
-								) : (
-									<div className="space-y-0">
-										{suggestions
-											?.filter((suggestion) => !isTagSelected(suggestion.tag))
-											?.slice(0, 10)
-											?.map((suggestion) => (
-												<button
-													key={suggestion.tag}
-													type="button"
-													className="flex items-center gap-3 p-2 hover:bg-secondary-background transition-colors cursor-pointer w-full text-left"
-													onClick={() => handleTagSelect(suggestion.tag)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
-															handleTagSelect(suggestion.tag);
-														}
-													}}
-												>
-													<span className="font-medium text-sm">
-														{suggestion.tag}
-													</span>
-													<span className="text-xs text-muted-foreground ml-auto">
-														{suggestion.count}
-													</span>
-												</button>
-											))}
+				{isDropdownOpen && (
+					<div className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-60 overflow-y-auto rounded-[14px] bg-popover p-1.5 shadow-pop">
+						{isLoading ? (
+							<div className="flex items-center justify-center py-4 text-muted-foreground">
+								<Loader2 className="size-4 animate-spin" />
+							</div>
+						) : (
+							<>
+								{suggestions
+									?.filter((suggestion) => !isTagSelected(suggestion.tag))
+									?.slice(0, 10)
+									?.map((suggestion) => (
+										<button
+											key={suggestion.tag}
+											type="button"
+											className="flex w-full cursor-pointer items-center gap-3 rounded-[9px] px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.06] focus-visible:outline-none"
+											onClick={() => handleTagSelect(suggestion.tag)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter" || e.key === " ") {
+													e.preventDefault();
+													handleTagSelect(suggestion.tag);
+												}
+											}}
+										>
+											<span className="truncate font-medium">{suggestion.tag}</span>
+											<span className="ml-auto tabular-nums text-[11px] text-muted-foreground">
+												{suggestion.count}
+											</span>
+										</button>
+									))}
 
-										{/* Add new tag option */}
-										{inputValue.trim() &&
-											!suggestions?.some(
-												(s) =>
-													s.tag.toLowerCase() ===
-													inputValue.trim().toLowerCase(),
-											) &&
-											!tags.includes(inputValue.trim()) && (
-												<button
-													type="button"
-													className="flex items-center gap-3 p-2 hover:bg-secondary-background transition-colors cursor-pointer w-full text-left border-t border-border"
-													onClick={() => handleTagSelect(inputValue.trim())}
-													onKeyDown={(e) => {
-														if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
-															handleTagSelect(inputValue.trim());
-														}
-													}}
-												>
-													<span className="font-medium text-sm text-primary">
-														Add &ldquo;{inputValue.trim()}&rdquo;
-													</span>
-												</button>
-											)}
-									</div>
-								)}
-							</CardContent>
-						</Card>
-					)}
-				</div>
-				{tags.length > 0 && (
-					<div className="flex flex-wrap gap-2">
-						{tags.map((tag) => (
-							<Badge key={tag} variant="neutral" className="gap-1">
-								{tag}
-								<button
-									type="button"
-									onClick={() => removeTag(tag)}
-									className="ml-1 hover:bg-foreground/10 rounded-full p-0.5"
-								>
-									<X className="h-3 w-3" />
-								</button>
-							</Badge>
-						))}
+								{inputValue.trim() &&
+									!suggestions?.some(
+										(s) =>
+											s.tag.toLowerCase() ===
+											inputValue.trim().toLowerCase(),
+									) &&
+									!tags.includes(inputValue.trim()) && (
+										<button
+											type="button"
+											className="mt-1 flex w-full cursor-pointer items-center gap-2 rounded-[9px] border-t border-line px-2.5 py-2 text-left text-[13px] font-medium transition-colors hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.06] focus-visible:outline-none"
+											onClick={() => handleTagSelect(inputValue.trim())}
+											onKeyDown={(e) => {
+												if (e.key === "Enter" || e.key === " ") {
+													e.preventDefault();
+													handleTagSelect(inputValue.trim());
+												}
+											}}
+										>
+											<Plus className="size-3.5 text-muted-foreground" />
+											Add &ldquo;{inputValue.trim()}&rdquo;
+										</button>
+									)}
+							</>
+						)}
 					</div>
 				)}
 			</div>
+			{tags.length > 0 && (
+				<div className="flex flex-wrap gap-1.5 pt-1">
+					{tags.map((tag) => (
+						<RemovablePill key={tag} onRemove={() => removeTag(tag)} removeLabel={`Remove tag ${tag}`}>
+							{tag}
+						</RemovablePill>
+					))}
+				</div>
+			)}
 		</div>
+	);
+}
+
+/** Quiet outline pill (matches the `Tag` outline variant) with a remove button. */
+export function RemovablePill({
+	children,
+	onRemove,
+	removeLabel,
+	title,
+	className,
+}: {
+	children: React.ReactNode;
+	onRemove: () => void;
+	removeLabel: string;
+	title?: string;
+	className?: string;
+}) {
+	return (
+		<span
+			title={title}
+			className={cn(
+				"inline-flex h-[26px] max-w-full items-center gap-1.5 rounded-full pl-2.5 pr-1 text-[12.5px] font-medium text-subtle shadow-[inset_0_0_0_1px_var(--border)]",
+				className,
+			)}
+		>
+			<span className="flex min-w-0 items-center gap-1.5 truncate">{children}</span>
+			<button
+				type="button"
+				onClick={onRemove}
+				aria-label={removeLabel}
+				className="grid size-[18px] shrink-0 cursor-pointer place-items-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			>
+				<X className="size-3" />
+			</button>
+		</span>
 	);
 }

@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vexilo — 04 Signal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<script src="./shared/flags.js"></script>
+<style>
+/* ------------------------------------------------------------------
+   TOKENS — heraldic tinctures on bone (light) / deep navy (dark)
+   spacing: 4 8 12 16 24 32 48 64 96 · radii: 8 / 12 / 999
+------------------------------------------------------------------- */
+:root {
+  --bg: #F5F1E8;
+  --paper: #FFFCF5;
+  --soft: #EBE5D6;
+  --ink: #141414;
+  --muted: #5E584D;
+  --stroke: #141414;
+  --shadow: #141414;
+  --gules: #D7262E;
+  --azure: #1C4FD8;
+  --or: #F2B705;
+  --vert: #0F8A4A;
+  --onyx: #141414;
+  --tint-amt: 17%;
+  --chip-amt: 16%;
+  --link: #1C4FD8;
+
+  --f-display: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
+  --f-body: "Inter", system-ui, sans-serif;
+  --f-mono: "Space Mono", ui-monospace, monospace;
+
+  --r-sm: 8px;
+  --r: 12px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  color-scheme: light;
+}
+html.dark {
+  --bg: #0E1320;
+  --paper: #161D2E;
+  --soft: #1E2740;
+  --ink: #F1ECE0;
+  --muted: #98A1B6;
+  --stroke: #C9C2B0;
+  --shadow: #34405F;
+  --gules: #E0353C;
+  --azure: #3A6BF0;
+  --or: #F2B705;
+  --vert: #14A05A;
+  --tint-amt: 24%;
+  --chip-amt: 22%;
+  --link: #8AA9FF;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px/1.55 var(--f-body);
+  -webkit-font-smoothing: antialiased;
+  transition: background .25s, color .25s;
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.wrap { max-width: 1440px; margin: 0 auto; padding: 0 64px; }
+.mono { font-family: var(--f-mono); }
+i.ph-bold, i.ph-fill { line-height: 1; }
+
+/* ---------------- Buttons ---------------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 44px; padding: 0 18px;
+  border: 2px solid var(--stroke); border-radius: 10px;
+  background: var(--paper);
+  font: 700 15px/1 var(--f-body); letter-spacing: -.005em;
+  box-shadow: 3px 3px 0 var(--shadow);
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease), background .15s;
+  white-space: nowrap;
+}
+.btn i { font-size: 18px; }
+.btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--shadow); }
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--shadow); }
+.btn--red { background: var(--gules); color: #fff; }
+.btn--ink { background: var(--ink); color: var(--bg); }
+.btn--flat { box-shadow: none; border-color: transparent; background: transparent; padding: 0 12px; }
+.btn--flat:hover { box-shadow: none; transform: none; background: var(--soft); }
+.icon-btn {
+  width: 44px; height: 44px; display: grid; place-items: center;
+  border: 2px solid var(--stroke); border-radius: 10px; background: var(--paper);
+  box-shadow: 3px 3px 0 var(--shadow);
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease);
+}
+.icon-btn i { font-size: 19px; }
+.icon-btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--shadow); }
+
+/* ---------------- Header ---------------- */
+.header { border-bottom: 2px solid var(--stroke); background: var(--bg); position: sticky; top: 0; z-index: 20; }
+.header .wrap { height: 80px; display: flex; align-items: center; gap: 48px; }
+.wordmark { display: flex; align-items: center; gap: 10px; }
+.wordmark svg { width: 34px; height: 34px; flex: none; }
+.wordmark span {
+  font: 800 28px/1 var(--f-display); letter-spacing: -.02em;
+  font-variation-settings: "opsz" 96;
+}
+.nav { display: flex; gap: 32px; }
+.nav a {
+  font: 600 15px/1 var(--f-body); color: var(--muted);
+  padding: 8px 0; position: relative; transition: color .15s;
+}
+.nav a::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 3px;
+  background: var(--or); border-radius: 2px; transform: scaleX(0); transform-origin: left;
+  transition: transform .2s var(--ease);
+}
+.nav a:hover { color: var(--ink); }
+.nav a:hover::after { transform: scaleX(1); }
+.nav a.is-active { color: var(--ink); }
+.nav a.is-active::after { background: var(--gules); transform: scaleX(1); }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+/* ---------------- Section kicker ---------------- */
+.kicker {
+  display: inline-flex; align-items: center; gap: 10px;
+  font: 700 12px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase;
+}
+.kicker b {
+  background: var(--ink); color: var(--bg); padding: 5px 8px; border-radius: 6px; font-weight: 700;
+}
+.kicker span { color: var(--muted); }
+
+/* ---------------- Hero ---------------- */
+.hero { padding: 64px 0 72px; }
+.hero .wrap { display: grid; grid-template-columns: 1.08fr 1fr; gap: 72px; align-items: center; }
+.hero h1 {
+  margin: 24px 0 20px;
+  font: 800 100px/.9 var(--f-display); letter-spacing: -.045em;
+  font-variation-settings: "opsz" 96;
+}
+.hero h1 em { font-style: normal; color: var(--gules); }
+.hero h1 .hl {
+  position: relative; display: inline-block; z-index: 0;
+}
+.hero h1 .hl::before {
+  content: ""; position: absolute; z-index: -1; left: -6px; right: -8px; bottom: 6px; height: 30px;
+  background: var(--or); border-radius: 4px; transform: rotate(-1.5deg);
+}
+html.dark .hero h1 .hl::before { opacity: .85; }
+.hero .lede { font-size: 19px; line-height: 1.5; color: var(--muted); max-width: 520px; margin: 0 0 32px; }
+
+.search {
+  display: flex; align-items: center; height: 68px; padding: 0 8px 0 22px; gap: 14px;
+  background: var(--paper); border: 2px solid var(--stroke); border-radius: 14px;
+  box-shadow: 5px 5px 0 var(--shadow); max-width: 620px;
+  transition: box-shadow .15s var(--ease), transform .15s var(--ease);
+}
+.search:focus-within { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--shadow); }
+.search > i { font-size: 24px; }
+.search input {
+  flex: 1; border: 0; outline: 0; background: transparent; color: var(--ink);
+  font: 500 18px/1 var(--f-body);
+}
+.search input::placeholder { color: var(--muted); }
+.search kbd {
+  font: 700 12px/1 var(--f-mono); color: var(--muted);
+  border: 1.5px solid var(--muted); border-radius: 6px; padding: 4px 7px; opacity: .8;
+}
+.search .btn { height: 50px; padding: 0 22px; font-size: 16px; box-shadow: none; border-radius: 9px; }
+.search .btn:hover { transform: none; box-shadow: none; background: var(--gules); color: #fff; }
+
+.chips-label { margin: 32px 0 12px; font: 700 12px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; max-width: 640px; }
+.chip {
+  --c: var(--gules);
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 14px 0 10px;
+  border: 2px solid var(--stroke); border-radius: 999px;
+  background: color-mix(in srgb, var(--c) var(--chip-amt), var(--paper));
+  font: 600 14px/1 var(--f-body);
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease);
+}
+.chip::before {
+  content: ""; width: 12px; height: 12px; border-radius: 3px; background: var(--c);
+  border: 1.5px solid var(--stroke);
+}
+.chip small { font: 400 12px/1 var(--f-mono); color: var(--muted); }
+.chip:hover { transform: translate(-2px, -2px); box-shadow: 3px 3px 0 var(--shadow); }
+
+.contributors { display: flex; align-items: center; gap: 16px; margin-top: 36px; }
+.avatars { display: flex; }
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  border: 2px solid var(--stroke); font: 800 11px/1 var(--f-display); letter-spacing: .02em; color: #fff;
+  margin-left: -4px; position: relative; box-shadow: 0 0 0 2px var(--bg);
+}
+.avatar:first-child { margin-left: 0; }
+.contributors p { margin: 0; font-size: 14px; color: var(--muted); }
+.contributors p b { color: var(--ink); }
+.contributors a { color: var(--link); font-weight: 600; }
+
+/* FOTD */
+.fotd-wrap { position: relative; padding: 24px 8px 8px 0; }
+.fotd {
+  position: relative; transform: rotate(-2deg);
+  background: var(--paper); border: 2px solid var(--stroke); border-radius: 16px;
+  box-shadow: 8px 8px 0 var(--shadow); overflow: hidden;
+  transition: transform .25s var(--ease), box-shadow .25s var(--ease);
+}
+.fotd:hover { transform: rotate(-1deg) translate(-3px, -3px); box-shadow: 11px 11px 0 var(--shadow); }
+.fotd .stage { height: 330px; }
+.fotd-body { padding: 24px 28px 28px; }
+.fotd-meta { display: flex; align-items: center; gap: 10px; }
+.fotd h2 { margin: 12px 0 10px; font: 800 52px/.95 var(--f-display); letter-spacing: -.035em; font-variation-settings: "opsz" 96; }
+.fotd p { margin: 0 0 22px; font-size: 16px; color: var(--muted); line-height: 1.55; max-width: 520px; }
+.fotd-actions { display: flex; gap: 12px; align-items: center; }
+.fotd-actions .spacer { flex: 1; }
+
+.sticker {
+  position: absolute; top: -18px; right: -14px; z-index: 3;
+  width: 136px; height: 136px; transform: rotate(10deg);
+}
+.sticker .ring { width: 100%; height: 100%; animation: spin 28s linear infinite; display: block; }
+.sticker .ring circle.disc { fill: var(--gules); stroke: var(--stroke); stroke-width: 2; }
+.sticker .ring text { fill: #fff; font: 700 11.5px var(--f-mono); letter-spacing: .06em; }
+.sticker-center {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: #fff;
+}
+.sticker-center div { font: 800 30px/.85 var(--f-display); letter-spacing: -.03em; }
+.sticker-center small { display: block; font: 700 11px/1 var(--f-mono); letter-spacing: .12em; margin-bottom: 4px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sticker .ring { animation: none; } }
+
+/* ---------------- Stage + flag (shared) ---------------- */
+.stage {
+  --tint: #888;
+  position: relative; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--tint) var(--tint-amt), var(--paper));
+  border-bottom: 2px solid var(--stroke);
+}
+.flag {
+  display: block; object-fit: contain; border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--stroke), 4px 4px 0 2px var(--shadow);
+  background: transparent;
+  transition: transform .25s var(--ease);
+}
+/* Non-rectangular flags (Nepal) get an outline that follows their silhouette */
+.flag--shaped {
+  box-shadow: none; border-radius: 0;
+  filter:
+    drop-shadow(2px 0 0 var(--stroke)) drop-shadow(-2px 0 0 var(--stroke))
+    drop-shadow(0 2px 0 var(--stroke)) drop-shadow(0 -2px 0 var(--stroke))
+    drop-shadow(4px 4px 0 var(--shadow));
+}
+
+/* ---------------- Bunting divider ---------------- */
+.bunting { display: block; width: 100%; height: 40px; }
+.bunting .string { fill: none; stroke: var(--stroke); stroke-width: 1.5; }
+.bunting polygon { stroke: var(--stroke); stroke-width: 1.5; stroke-linejoin: round; }
+
+/* ---------------- Browse ---------------- */
+.browse { padding: 56px 0 96px; }
+.section-head { display: flex; align-items: flex-end; gap: 24px; margin-bottom: 36px; }
+.section-head h2 {
+  margin: 14px 0 0; font: 800 52px/1 var(--f-display); letter-spacing: -.035em; font-variation-settings: "opsz" 96;
+}
+.section-head p { margin: 8px 0 0; color: var(--muted); }
+.section-head .tools { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+.seg {
+  display: inline-flex; padding: 4px; gap: 4px; height: 44px;
+  border: 2px solid var(--stroke); border-radius: 10px; background: var(--paper);
+  box-shadow: 3px 3px 0 var(--shadow);
+}
+.seg button {
+  border: 0; background: transparent; padding: 0 14px; border-radius: 6px;
+  font: 600 14px/1 var(--f-body); color: var(--muted); transition: background .15s, color .15s;
+}
+.seg button:hover { color: var(--ink); background: var(--soft); }
+.seg button.is-on { background: var(--ink); color: var(--bg); }
+
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px 28px; }
+.card {
+  position: relative; background: var(--paper);
+  border: 2px solid var(--stroke); border-radius: var(--r); overflow: hidden;
+  box-shadow: 4px 4px 0 var(--shadow);
+  transition: transform .18s var(--ease), box-shadow .18s var(--ease);
+  cursor: pointer;
+}
+.card .stage { height: 188px; }
+.card:hover, .card.is-hover { transform: translate(-3px, -3px); box-shadow: 7px 7px 0 var(--shadow); }
+.card:hover .flag, .card.is-hover .flag { transform: rotate(-1.5deg) scale(1.03); }
+.card-body { padding: 14px 16px 16px; }
+.card-name {
+  margin: 0 0 10px; font: 800 21px/1.1 var(--f-display); letter-spacing: -.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card-meta { display: flex; align-items: center; gap: 8px; }
+.idx {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 8px;
+  border: 1.5px solid var(--stroke); border-radius: 999px;
+  font: 700 12px/1 var(--f-mono); letter-spacing: .02em; background: var(--bg);
+}
+.year { font: 400 12px/1 var(--f-mono); color: var(--muted); }
+.favs { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font: 700 14px/1 var(--f-body); }
+.favs i { font-size: 17px; }
+.favs.is-faved i { color: var(--gules); }
+
+.fav-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  width: 38px; height: 38px; display: grid; place-items: center;
+  border: 2px solid var(--stroke); border-radius: 10px; background: var(--paper);
+  box-shadow: 2px 2px 0 var(--shadow);
+  opacity: 0; transform: translateY(-4px); transition: opacity .15s, transform .15s var(--ease), background .15s;
+}
+.fav-btn i { font-size: 18px; }
+.card:hover .fav-btn, .card.is-hover .fav-btn { opacity: 1; transform: none; }
+.fav-btn:hover { background: var(--gules); color: #fff; }
+.tag-peek {
+  position: absolute; left: 12px; top: 12px; z-index: 2;
+  font: 700 11px/1 var(--f-mono); letter-spacing: .04em; text-transform: uppercase;
+  background: var(--paper); border: 1.5px solid var(--stroke); border-radius: 6px; padding: 5px 7px;
+  opacity: 0; transform: translateY(-4px); transition: opacity .15s, transform .15s var(--ease);
+}
+.card:hover .tag-peek, .card.is-hover .tag-peek { opacity: 1; transform: none; }
+
+.load-more { display: flex; justify-content: center; margin-top: 48px; gap: 16px; align-items: center; }
+.load-more span { font: 400 13px/1 var(--f-mono); color: var(--muted); }
+
+/* ---------------- Detail ---------------- */
+.detail { padding: 56px 0 96px; }
+.detail-intro { display: flex; align-items: center; gap: 16px; margin-bottom: 40px; }
+.detail-intro .rule { flex: 1; height: 2px; background: var(--stroke); }
+.crumbs { display: flex; align-items: center; gap: 8px; font: 600 14px/1 var(--f-body); color: var(--muted); }
+.crumbs a:hover { color: var(--ink); }
+.crumbs i { font-size: 12px; }
+
+.detail-grid { display: grid; grid-template-columns: 1.22fr 1fr; gap: 56px; align-items: start; }
+
+.frame {
+  background: var(--paper); border: 2px solid var(--stroke); border-radius: 16px; overflow: hidden;
+  box-shadow: 6px 6px 0 var(--shadow);
+}
+.frame .stage { height: 440px; overflow: hidden; place-items: start center; padding-top: 52px; }
+.hoist { display: flex; align-items: flex-start; }
+.pole {
+  width: 10px; height: 460px; background: var(--stroke); border-radius: 5px 5px 0 0; position: relative; margin-top: -18px;
+}
+.pole::before {
+  content: ""; position: absolute; left: 50%; top: -18px; width: 22px; height: 22px; transform: translateX(-50%);
+  border-radius: 50%; background: var(--or); border: 2px solid var(--stroke);
+}
+.hoist .flag { box-shadow: 0 0 0 2px var(--stroke), 6px 6px 0 2px var(--shadow); }
+.frame-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; }
+.frame-bar .ratio { font: 700 13px/1 var(--f-mono); margin-right: auto; padding-left: 6px; }
+.frame-bar .ratio span { color: var(--muted); font-weight: 400; }
+.frame-bar .btn { height: 36px; padding: 0 12px; font-size: 13px; box-shadow: 2px 2px 0 var(--shadow); border-radius: 8px; }
+.frame-bar .btn i { font-size: 16px; }
+
+.block-title { display: flex; align-items: baseline; gap: 12px; margin: 48px 0 16px; }
+.block-title h3 { margin: 0; font: 800 26px/1 var(--f-display); letter-spacing: -.02em; }
+.block-title span { font: 400 13px/1 var(--f-mono); color: var(--muted); }
+
+.swatches { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.swatch {
+  position: relative; height: 148px; border: 2px solid var(--stroke); border-radius: var(--r);
+  box-shadow: 4px 4px 0 var(--shadow); padding: 18px; display: flex; flex-direction: column; justify-content: flex-end;
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease);
+}
+.swatch:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--shadow); }
+.swatch b { font: 800 30px/1 var(--f-display); letter-spacing: -.02em; }
+.swatch code { font: 700 15px/1 var(--f-mono); margin-top: 8px; letter-spacing: .02em; }
+.swatch .copy {
+  position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; display: grid; place-items: center;
+  border: 2px solid currentColor; border-radius: 9px; background: transparent; color: inherit; opacity: .9;
+}
+.swatch .copy i { font-size: 17px; }
+.swatch .copy:hover { opacity: 1; background: rgba(0,0,0,.08); }
+
+.detail-head .meta-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.detail-head .meta-row .type { font: 600 14px/1 var(--f-body); color: var(--muted); }
+.detail-head h1 {
+  margin: 0 0 20px; font: 800 112px/.86 var(--f-display); letter-spacing: -.05em; font-variation-settings: "opsz" 96;
+}
+.detail-head .desc { font-size: 18px; line-height: 1.55; margin: 0 0 28px; max-width: 560px; }
+.detail-actions { display: flex; gap: 12px; align-items: center; margin-bottom: 36px; }
+.detail-actions .count { font: 700 13px/1 var(--f-mono); background: rgba(0,0,0,.18); padding: 4px 7px; border-radius: 6px; margin-left: 2px; }
+.detail .chips { max-width: none; }
+.sub-label { font: 700 12px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+
+.facts {
+  margin-top: 36px; border: 2px solid var(--stroke); border-radius: var(--r); overflow: hidden; background: var(--paper);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+.facts table { width: 100%; border-collapse: collapse; }
+.facts th, .facts td { padding: 14px 18px; text-align: left; border-bottom: 1.5px solid color-mix(in srgb, var(--stroke) 22%, transparent); }
+.facts tr:last-child th, .facts tr:last-child td { border-bottom: 0; }
+.facts th {
+  width: 38%; font: 700 12px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+  background: color-mix(in srgb, var(--soft) 55%, var(--paper));
+  border-right: 2px solid var(--stroke);
+}
+.facts td { font: 600 15px/1.3 var(--f-body); }
+.facts td a { color: var(--link); display: inline-flex; align-items: center; gap: 4px; }
+.facts td a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.traits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.trait {
+  border: 2px solid var(--stroke); border-radius: var(--r); background: var(--paper); padding: 18px 18px 20px;
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+.trait .lbl { display: flex; justify-content: space-between; align-items: center; }
+.trait .lbl span { font: 700 11px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.tier {
+  --c: var(--or);
+  font: 700 11px/1 var(--f-mono); letter-spacing: .04em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 6px; border: 1.5px solid var(--stroke);
+  background: var(--c); color: var(--onyx);
+}
+.tier.t-rare { --c: var(--azure); color: #fff; }
+.tier.t-uncommon { --c: var(--vert); color: #fff; }
+.trait .val { font: 800 24px/1.1 var(--f-display); letter-spacing: -.02em; margin: 14px 0 16px; }
+.bar {
+  height: 18px; border: 2px solid var(--stroke); border-radius: 999px; background: var(--bg); overflow: hidden; position: relative;
+}
+.bar i {
+  display: block; height: 100%; background: var(--c, var(--gules)); border-right: 2px solid var(--stroke);
+  background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,.18) 0 6px, transparent 6px 12px);
+}
+.trait .foot { display: flex; justify-content: space-between; margin-top: 10px; font: 400 12px/1.2 var(--f-mono); color: var(--muted); }
+.trait .foot b { color: var(--ink); font-weight: 700; }
+
+.related { display: grid; grid-template-columns: repeat(4, 1fr) 1fr; gap: 24px; }
+.mini .stage { height: 120px; }
+.mini .card-body { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; }
+.mini .card-name { margin: 0; font-size: 17px; }
+.mini .card-body i { font-size: 18px; transition: transform .15s var(--ease); }
+.mini:hover .card-body i { transform: translateX(3px); }
+.more-tile {
+  border: 2px dashed var(--stroke); border-radius: var(--r); display: grid; place-content: center; text-align: center; gap: 10px;
+  color: var(--ink); transition: background .15s;
+}
+.more-tile:hover { background: var(--paper); }
+.more-tile i { font-size: 28px; justify-self: center; }
+.more-tile b { font: 800 18px/1.1 var(--f-display); }
+.more-tile span { font: 400 12px/1 var(--f-mono); color: var(--muted); }
+
+/* ---------------- Footer ---------------- */
+.footer { border-top: 2px solid var(--stroke); padding: 28px 0 36px; }
+.footer .wrap { display: flex; align-items: center; gap: 32px; }
+.footer .wordmark span { font-size: 20px; }
+.footer .wordmark svg { width: 24px; height: 24px; }
+.footer nav { display: flex; gap: 24px; font: 600 14px/1 var(--f-body); color: var(--muted); }
+.footer nav a:hover { color: var(--ink); }
+.footer small { margin-left: auto; font: 400 12px/1 var(--f-mono); color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- Burgee symbol (swallow-tailed pennant on a staff) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="burgee" viewBox="0 0 32 32">
+    <rect x="4" y="2" width="3.5" height="28" rx="1.75" style="fill:var(--stroke)"/>
+    <path d="M7.5 4.5 H29 L21 11.5 L29 18.5 H7.5 Z" style="fill:#D7262E;stroke:var(--stroke)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="5.75" cy="2.8" r="2.4" style="fill:#F2B705;stroke:var(--stroke)" stroke-width="1.5"/>
+  </symbol>
+</svg>
+
+<header class="header">
+  <div class="wrap">
+    <a class="wordmark" href="#" aria-label="Vexilo home">
+      <svg><use href="#burgee"/></svg>
+      <span>VEXILO</span>
+    </a>
+    <nav class="nav">
+      <a href="#" class="is-active">Browse</a>
+      <a href="#">Quiz</a>
+      <a href="#">Leaderboard</a>
+      <a href="#">Donate</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="themeToggle" aria-label="Toggle dark mode"><i class="ph-bold ph-moon"></i></button>
+      <button class="btn"><i class="ph-bold ph-google-logo"></i>Sign in</button>
+      <button class="btn btn--red"><i class="ph-bold ph-plus"></i>Post flag</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="kicker"><b>01</b><span>The open flag encyclopedia</span></div>
+        <h1>Every flag,<br><span class="hl">ever</span> <em>flown.</em></h1>
+        <p class="lede">Nations, cities, ships, rebels and fictions — 15,284 flags catalogued, described and argued over by people who care far too much about stripes.</p>
+
+        <form class="search" onsubmit="return false">
+          <i class="ph-bold ph-magnifying-glass"></i>
+          <input type="text" placeholder="Search 15,284 flags…" aria-label="Search flags">
+          <kbd>/</kbd>
+          <button class="btn btn--ink" type="submit">Search</button>
+        </form>
+
+        <div class="chips-label">Popular tags</div>
+        <div class="chips" id="heroTags"></div>
+
+        <div class="contributors">
+          <div class="avatars">
+            <span class="avatar" style="background:var(--gules)">ML</span>
+            <span class="avatar" style="background:var(--azure)">HR</span>
+            <span class="avatar" style="background:var(--or);color:#141414">NC</span>
+            <span class="avatar" style="background:var(--vert)">TB</span>
+          </div>
+          <p><b>@mapleleaf_mo</b>, <b>@heraldica</b> and 2,904 others added flags this month · <a href="#">Leaderboard</a></p>
+        </div>
+      </div>
+
+      <div class="fotd-wrap">
+        <div class="sticker" aria-hidden="true">
+          <svg class="ring" viewBox="0 0 136 136">
+            <defs><path id="ringPath" d="M68,68 m-50,0 a50,50 0 1,1 100,0 a50,50 0 1,1 -100,0"/></defs>
+            <circle class="disc" cx="68" cy="68" r="66"/>
+            <circle cx="68" cy="68" r="38" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="2 4"/>
+            <text><textPath href="#ringPath" textLength="312" lengthAdjust="spacing">FLAG OF THE DAY • FLAG OF THE DAY •</textPath></text>
+          </svg>
+          <div class="sticker-center"><div><small>OCT</small>16</div></div>
+        </div>
+        <article class="fotd" id="fotd"></article>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap"><svg class="bunting" data-bunting viewBox="0 0 1312 40" preserveAspectRatio="xMidYMin meet"></svg></div>
+
+  <!-- ============ BROWSE ============ -->
+  <section class="browse">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="kicker"><b>02</b><span>Browse</span></div>
+          <h2>The collection</h2>
+          <p>Showing 16 of 15,284 · most favourited this week</p>
+        </div>
+        <div class="tools">
+          <div class="seg" role="tablist" aria-label="Sort">
+            <button class="is-on">Popular</button>
+            <button>Newest</button>
+            <button>A–Z</button>
+          </div>
+          <button class="btn"><i class="ph-bold ph-sliders-horizontal"></i>Filters</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="load-more">
+        <button class="btn"><i class="ph-bold ph-arrow-down"></i>Load 16 more</button>
+        <span>16 / 15,284</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap"><svg class="bunting" data-bunting data-offset="2" viewBox="0 0 1312 40" preserveAspectRatio="xMidYMin meet"></svg></div>
+
+  <!-- ============ DETAIL ============ -->
+  <section class="detail">
+    <div class="wrap">
+      <div class="detail-intro">
+        <div class="kicker"><b>03</b><span>Flag page</span></div>
+        <div class="rule"></div>
+        <nav class="crumbs"><a href="#">Browse</a><i class="ph-bold ph-caret-right"></i><a href="#">National</a><i class="ph-bold ph-caret-right"></i><span style="color:var(--ink)">Canada</span></nav>
+      </div>
+
+      <div class="detail-grid" id="detail"></div>
+
+      <div class="block-title"><h3>Traits</h3><span>how this flag compares to all 15,284</span></div>
+      <div class="traits" id="traits"></div>
+
+      <div class="block-title"><h3>Related flags</h3><span>similar layout or emblem</span></div>
+      <div class="related" id="related"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <a class="wordmark" href="#"><svg><use href="#burgee"/></svg><span>VEXILO</span></a>
+    <nav><a href="#">About</a><a href="#">Guidelines</a><a href="#">API</a><a href="#">Contact</a></nav>
+    <small>© 2026 Vexilo · Flags via Wikimedia Commons &amp; flagcdn</small>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const TINCTURES = ['var(--gules)', 'var(--azure)', 'var(--or)', 'var(--vert)'];
+  const pad = n => '#' + String(n).padStart(4, '0');
+  const fmt = n => n.toLocaleString('en-US');
+  const isNeutral = c => ['#FFFFFF', '#000000'].includes(c.toUpperCase());
+  const tintOf = colors => colors.find(c => !isNeutral(c)) || colors[0];
+  const fit = (r, maxW, maxH) => {
+    let h = maxH, w = h * r;
+    if (w > maxW) { w = maxW; h = w / r; }
+    return { w: Math.round(w), h: Math.round(h) };
+  };
+  const flagImg = (f, maxW, maxH) => {
+    const { w, h } = fit(f.ratio, maxW, maxH);
+    const shaped = (f.tags || []).includes('non-rectangular');
+    return `<img class="flag${shaped ? ' flag--shaped' : ''}" src="${FLAG_IMG(f.code)}" width="${w}" height="${h}" style="width:${w}px;height:${h}px" alt="Flag of ${f.name}">`;
+  };
+  const faved = new Set(['bt', 'ca', 'jp']);
+
+  /* Hero tags */
+  document.getElementById('heroTags').innerHTML = TAGS.map(([t, n], i) =>
+    `<a href="#" class="chip" style="--c:${TINCTURES[i % 4]}">${t}<small>${fmt(n)}</small></a>`).join('');
+
+  /* Flag of the day */
+  const bt = FLAGS.find(f => f.code === FOTD.code);
+  document.getElementById('fotd').innerHTML = `
+    <div class="stage" style="--tint:${tintOf(bt.colors)}">${flagImg({ ...FOTD, tags: [] }, 440, 250)}</div>
+    <div class="fotd-body">
+      <div class="fotd-meta"><span class="idx">${pad(FOTD.index)}</span><span class="year">National flag · ${FOTD.year}</span></div>
+      <h2>${FOTD.name}</h2>
+      <p>${FOTD.blurb}</p>
+      <div class="fotd-actions">
+        <a href="#" class="btn btn--ink">Open flag<i class="ph-bold ph-arrow-right"></i></a>
+        <button class="btn"><i class="ph-fill ph-heart" style="color:var(--gules)"></i>${bt.favs}</button>
+        <span class="spacer"></span>
+        <a href="#" class="btn btn--flat"><i class="ph-bold ph-clock-counter-clockwise"></i>Past days</a>
+      </div>
+    </div>`;
+
+  /* Browse grid */
+  document.getElementById('grid').innerHTML = FLAGS.map(f => {
+    const fav = faved.has(f.code);
+    return `
+    <article class="card${f.code === 'gb-wls' ? ' is-hover' : ''}">
+      <div class="stage" style="--tint:${tintOf(f.colors)}">
+        <span class="tag-peek">${f.tags[0]}</span>
+        <button class="fav-btn" aria-label="Favourite ${f.name}"><i class="${fav ? 'ph-fill' : 'ph-bold'} ph-heart"></i></button>
+        ${flagImg(f, 226, 116)}
+      </div>
+      <div class="card-body">
+        <h3 class="card-name">${f.name}</h3>
+        <div class="card-meta">
+          <span class="idx">${pad(f.index)}</span>
+          <span class="year">${f.year}</span>
+          <span class="favs${fav ? ' is-faved' : ''}"><i class="${fav ? 'ph-fill' : 'ph-bold'} ph-heart"></i>${f.favs}</span>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+
+  /* Detail */
+  const D = DETAIL;
+  const lum = hex => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+  const { w: dw, h: dh } = fit(D.ratio, 560, 280);
+  document.getElementById('detail').innerHTML = `
+    <div>
+      <div class="frame">
+        <div class="stage" style="--tint:${D.colors[0].hex}">
+          <div class="hoist">
+            <span class="pole"></span>
+            <img class="flag" src="${FLAG_IMG(D.code)}" style="width:${dw}px;height:${dh}px" alt="Flag of ${D.name}">
+          </div>
+        </div>
+        <div class="frame-bar">
+          <span class="ratio">1 : 2 <span>· ${dw * 4} × ${dh * 4} px</span></span>
+          <button class="btn"><i class="ph-bold ph-download-simple"></i>SVG</button>
+          <button class="btn"><i class="ph-bold ph-download-simple"></i>PNG</button>
+          <button class="btn"><i class="ph-bold ph-code"></i>Embed</button>
+        </div>
+      </div>
+
+      <div class="block-title"><h3>Colours</h3><span>${D.colors.length} tinctures</span></div>
+      <div class="swatches">
+        ${D.colors.map(c => {
+          const fg = lum(c.hex) > .6 ? '#141414' : '#FFFFFF';
+          return `<div class="swatch" style="background:${c.hex};color:${fg}">
+            <button class="copy" aria-label="Copy ${c.hex}"><i class="ph-bold ph-copy"></i></button>
+            <b>${c.name}</b><code>${c.hex}</code></div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="detail-head">
+      <div class="meta-row"><span class="idx">${pad(D.index)}</span><span class="type">National flag · adopted ${D.year}</span></div>
+      <h1>${D.name}</h1>
+      <p class="desc">${D.description}</p>
+      <div class="detail-actions">
+        <button class="btn btn--red"><i class="ph-fill ph-heart"></i>Favourited<span class="count">${D.favs}</span></button>
+        <button class="btn"><i class="ph-bold ph-pencil-simple"></i>Edit</button>
+        <button class="icon-btn" aria-label="Share"><i class="ph-bold ph-share-network"></i></button>
+        <button class="btn btn--flat" style="margin-left:auto"><i class="ph-bold ph-warning-circle"></i>Report</button>
+      </div>
+      <p class="sub-label">Tags</p>
+      <div class="chips">${D.tags.map((t, i) => `<a href="#" class="chip" style="--c:${TINCTURES[i % 4]}">${t}</a>`).join('')}</div>
+      <div class="facts"><table>
+        ${D.facts.map(([k, v]) => `<tr><th>${k}</th><td>${k === 'Source' ? `<a href="#">${v}<i class="ph-bold ph-arrow-up-right"></i></a>` : v}</td></tr>`).join('')}
+      </table></div>
+    </div>`;
+
+  /* Traits — bar shows rarity (share of flags that do NOT have the trait) */
+  const tier = pct => pct < 2 ? ['Legendary', 't-legendary', 'var(--or)'] : pct < 10 ? ['Rare', 't-rare', 'var(--azure)'] : pct < 25 ? ['Uncommon', 't-uncommon', 'var(--vert)'] : ['Common', '', 'var(--gules)'];
+  document.getElementById('traits').innerHTML = D.traits.map(([label, val, share]) => {
+    const pct = share.startsWith('<') ? 0.6 : parseFloat(share);
+    const [name, cls, color] = tier(pct);
+    const rarer = Math.round(100 - pct);
+    return `<div class="trait">
+      <div class="lbl"><span>${label}</span><span class="tier ${cls}">${name}</span></div>
+      <div class="val">${val}</div>
+      <div class="bar" style="--c:${color}"><i style="width:${Math.min(rarer, 100)}%"></i></div>
+      <div class="foot"><span>Rarer than <b>${share.startsWith('<') ? '99' : rarer}%</b></span><span>${share} share</span></div>
+    </div>`;
+  }).join('');
+
+  /* Related */
+  const REL = { us: { ratio: 1.9, tint: '#B22234' }, pe: { ratio: 1.5, tint: '#D91023' }, lb: { ratio: 1.5, tint: '#ED1C24' }, ng: { ratio: 2, tint: '#008751' } };
+  document.getElementById('related').innerHTML = D.related.map(r => {
+    const meta = REL[r.code] || { ratio: 1.5, tint: '#888888' };
+    return `<a href="#" class="card mini">
+      <div class="stage" style="--tint:${meta.tint}">${flagImg({ ...r, ratio: meta.ratio, tags: [] }, 140, 68)}</div>
+      <div class="card-body"><h3 class="card-name">${r.name}</h3><i class="ph-bold ph-arrow-right"></i></div>
+    </a>`;
+  }).join('') + `<a href="#" class="more-tile"><i class="ph-bold ph-squares-four"></i><b>All tricolours</b><span>640 flags</span></a>`;
+
+  /* Bunting — pennants hung on a sagging line */
+  document.querySelectorAll('[data-bunting]').forEach(svg => {
+    const W = 1312, swags = 4, sag = 9, top = 4, step = 30;
+    const offset = +(svg.dataset.offset || 0);
+    const fills = ['#D7262E', '#1C4FD8', '#F2B705', '#0F8A4A', 'var(--paper)'];
+    const sw = W / swags;
+    const yAt = x => { const t = (x % sw) / sw; return top + sag * 4 * t * (1 - t); };
+    let d = '';
+    for (let s = 0; s < swags; s++) d += `M${s * sw},${top} Q${s * sw + sw / 2},${top + sag * 2} ${(s + 1) * sw},${top} `;
+    let out = `<path class="string" d="${d}"/>`;
+    let i = offset;
+    for (let x = step / 2 + 4; x < W - 6; x += step) {
+      const xm = x % sw;
+      if (xm < 10 || xm > sw - 10) continue;
+      const y = yAt(x), y1 = yAt(x - 9), y2 = yAt(x + 9);
+      out += `<polygon points="${(x - 9).toFixed(1)},${y1.toFixed(1)} ${(x + 9).toFixed(1)},${y2.toFixed(1)} ${x.toFixed(1)},${(y + 22).toFixed(1)}" style="fill:${fills[i++ % fills.length]}"/>`;
+    }
+    svg.innerHTML = out;
+  });
+
+  /* Theme toggle */
+  const tgl = document.getElementById('themeToggle');
+  tgl.addEventListener('click', () => {
+    const dark = document.documentElement.classList.toggle('dark');
+    tgl.innerHTML = `<i class="ph-bold ${dark ? 'ph-sun' : 'ph-moon'}"></i>`;
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); document.querySelector('.search input').focus(); }
+  });
+})();
+</script>
+</body>
+</html>

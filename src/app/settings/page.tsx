@@ -7,23 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  ArrowLeft,
-  Settings,
-  User,
-  Loader2,
-  Eye,
-  Flag,
-  Search,
-  X,
-} from 'lucide-react';
+import { Check, Flag, Loader2, Search, X } from '@/components/icons';
+import FlagImage from '@/components/FlagImage';
+import { cn } from '@/lib/utils';
 import {
   changeName,
   changeIsAnonymous,
@@ -34,8 +20,27 @@ import { getFlags } from '@/actions/flags';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
-import Image from 'next/image';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
+
+function SettingsPanel({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className='vx-tile p-5 sm:p-6'>
+      <div className='mb-4'>
+        <h2 className='text-sm font-semibold tracking-[-0.01em]'>{title}</h2>
+        {description && <p className='mt-0.5 text-[13px] text-muted-foreground'>{description}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -86,10 +91,6 @@ export default function SettingsPage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  const handleBackToHome = () => {
-    router.push('/');
-  };
 
   const handleNameChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,9 +154,15 @@ export default function SettingsPage() {
 
   if (status === 'loading' || userDataLoading) {
     return (
-      <div className='max-w-4xl mx-auto px-4 py-12'>
-        <div className='flex items-center justify-center min-h-[400px]'>
-          <Loader2 className='h-8 w-8 animate-spin' />
+      <div className='mx-auto max-w-[760px] px-4 pb-16 md:px-8'>
+        <div className='pb-[18px] pt-7'>
+          <div className='h-6 w-28 animate-pulse rounded bg-foreground/[0.06]' />
+          <div className='mt-2 h-3.5 w-56 animate-pulse rounded bg-foreground/[0.06]' />
+        </div>
+        <div className='space-y-4'>
+          <div className='vx-tile h-[150px] animate-pulse' />
+          <div className='vx-tile h-[300px] animate-pulse' />
+          <div className='vx-tile h-[110px] animate-pulse' />
         </div>
       </div>
     );
@@ -163,220 +170,188 @@ export default function SettingsPage() {
 
   if (!session) {
     return (
-      <div className='max-w-4xl mx-auto px-4 py-12'>
-        <Card className='w-full max-w-md mx-auto'>
-          <CardHeader className='text-center'>
-            <CardTitle className='text-2xl'>Sign in Required</CardTitle>
-            <CardDescription>
-              You need to be signed in to access settings
-            </CardDescription>
-          </CardHeader>
-          <CardContent className='space-y-4 flex flex-col items-center'>
-            <Button onClick={() => router.push('/')}>Go to Home</Button>
-          </CardContent>
-        </Card>
+      <div className='mx-auto max-w-[760px] px-4 pb-16 pt-7 md:px-8'>
+        <div className='vx-tile mx-auto max-w-md px-6 py-10 text-center'>
+          <h1 className='text-[17px] font-semibold tracking-[-0.02em]'>Sign in required</h1>
+          <p className='mt-1 text-[13px] text-muted-foreground'>
+            You need to be signed in to access settings.
+          </p>
+          <Button variant='neutral' className='mt-5' onClick={() => router.push('/')}>
+            Go to browse
+          </Button>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className='max-w-4xl mx-auto px-4 py-12'>
-      <div className='space-y-6'>
-        {/* Header */}
-        <div className='flex items-center gap-4'>
-          <Button
-            variant='neutral'
-            size='icon'
-            onClick={handleBackToHome}
-            className='h-10 w-10'
-          >
-            <ArrowLeft className='h-5 w-5' />
-          </Button>
-          <div>
-            <h1 className='text-3xl font-bold tracking-tight flex items-center gap-2'>
-              <Settings className='h-8 w-8' />
-              Settings
-            </h1>
-            <p className='text-muted-foreground mt-1'>
-              Manage your account preferences
-            </p>
-          </div>
-        </div>
+  const favoriteFlag = userData?.user?.favoriteFlag ?? null;
 
-        {/* Settings Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2'>
-              <User className='h-5 w-5' />
-              Profile Settings
-            </CardTitle>
-            <CardDescription>Update your profile information</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleNameChange} className='space-y-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='name'>Display Name</Label>
-                <Input
-                  id='name'
-                  type='text'
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder='Enter your display name'
-                  disabled={isLoading}
-                />
-              </div>
-              <Button type='submit' disabled={isLoading} className='w-full'>
+  return (
+    <div className='mx-auto max-w-[760px] px-4 pb-16 md:px-8'>
+      <div className='pb-[18px] pt-7'>
+        <h1 className='text-[22px] font-semibold tracking-[-0.03em]'>Settings</h1>
+        <p className='mt-0.5 text-[13px] text-muted-foreground'>
+          {userData?.user?.email ?? session.user?.email ?? 'Manage your account preferences.'}
+        </p>
+      </div>
+
+      <div className='space-y-4'>
+        {/* Profile */}
+        <SettingsPanel title='Profile' description='Your name as shown on flags, edits and the leaderboard.'>
+          <form onSubmit={handleNameChange} className='space-y-2'>
+            <Label htmlFor='name' className='text-[13px] font-medium'>
+              Display name
+            </Label>
+            <div className='flex flex-col gap-2 sm:flex-row'>
+              <Input
+                id='name'
+                type='text'
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder='Enter your display name'
+                disabled={isLoading}
+                className='flex-1'
+              />
+              <Button type='submit' disabled={isLoading} className='sm:w-[120px]'>
                 {isLoading ? (
                   <>
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    Updating...
+                    <Loader2 className='animate-spin' />
+                    Saving
                   </>
                 ) : (
-                  'Update Name'
+                  'Save'
                 )}
               </Button>
-            </form>
-          </CardContent>
-        </Card>
+            </div>
+          </form>
+        </SettingsPanel>
 
-        {/* Privacy Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2'>
-              <Eye className='h-5 w-5' />
-              Privacy Settings
-            </CardTitle>
-            <CardDescription>
-              Control your privacy and visibility
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className='space-y-4'>
-              <div className='flex items-center justify-between'>
-                <div className='space-y-0.5'>
-                  <Label className='text-base'>Anonymous Mode</Label>
-                  <p className='text-sm text-muted-foreground'>
-                    When enabled, your name won&apos;t appear on leaderboards
-                    and your profile will be hidden
-                  </p>
+        {/* Profile flag */}
+        <SettingsPanel title='Profile flag' description='Shown as a badge on your profile picture.'>
+          <div className='space-y-4'>
+            {favoriteFlag ? (
+              <div className='vx-well flex items-center gap-4 rounded-[14px] p-2.5 pr-3'>
+                <div className='flag-stage relative h-[64px] w-[92px] shrink-0 rounded-[10px] bg-stage shadow-[inset_0_0_0_2px_var(--main)]'>
+                  <FlagImage
+                    src={favoriteFlag.image}
+                    alt={favoriteFlag.name}
+                    maxHeight={44}
+                    area={66 * 44}
+                  />
                 </div>
-                <Switch
-                  checked={isAnonymous}
-                  onCheckedChange={handleAnonymousChange}
-                  disabled={isAnonymousLoading}
+                <div className='min-w-0 flex-1'>
+                  <span className='vx-label flex items-center gap-1.5 text-main'>
+                    <Check className='size-3' />
+                    Current
+                  </span>
+                  <p className='mt-1.5 truncate font-semibold tracking-[-0.015em]'>{favoriteFlag.name}</p>
+                </div>
+                <Button
+                  variant='neutral'
+                  onClick={() => handleFavoriteFlagChange(null)}
+                  disabled={isFavoriteFlagLoading}
+                >
+                  {isFavoriteFlagLoading ? <Loader2 className='animate-spin' /> : <X />}
+                  Remove
+                </Button>
+              </div>
+            ) : (
+              <div className='vx-well flex items-center gap-4 rounded-[14px] p-2.5'>
+                <div className='grid h-[64px] w-[92px] shrink-0 place-items-center rounded-[10px] text-muted-foreground shadow-[inset_0_0_0_1px_var(--border)] [border-style:dashed]'>
+                  <Flag className='size-5' />
+                </div>
+                <p className='text-[13px] text-muted-foreground'>No profile flag selected.</p>
+              </div>
+            )}
+
+            <div className='space-y-2' ref={flagDropdownRef}>
+              <Label htmlFor='flag-search' className='text-[13px] font-medium'>
+                {favoriteFlag ? 'Change profile flag' : 'Select a profile flag'}
+              </Label>
+              <div className='relative'>
+                <Search className='pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground' />
+                <Input
+                  id='flag-search'
+                  placeholder='Search for a flag'
+                  value={flagSearch}
+                  onChange={(e) => setFlagSearch(e.target.value)}
+                  className='pl-10'
+                  onFocus={() => setIsFlagDropdownOpen(true)}
+                  disabled={isFavoriteFlagLoading}
+                  autoComplete='off'
                 />
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Favorite Flag Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2'>
-              <Flag className='h-5 w-5' />
-              Profile Flag
-            </CardTitle>
-            <CardDescription>
-              Choose a flag to display as a badge on your profile picture
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className='space-y-4'>
-              {/* Current favorite flag display */}
-              {userData?.user?.favoriteFlag && (
-                <div className='flex items-center gap-3 p-3 bg-secondary-background rounded-lg border-2 border-border'>
-                  <div className='relative w-10 h-7 rounded overflow-hidden border border-border flex-shrink-0'>
-                    <Image
-                      src={userData.user.favoriteFlag.image}
-                      alt={userData.user.favoriteFlag.name}
-                      fill
-                      className='object-cover'
-                    />
-                  </div>
-                  <span className='font-medium flex-1'>
-                    {userData.user.favoriteFlag.name}
-                  </span>
-                  <Button
-                    variant='neutral'
-                    size='sm'
-                    onClick={() => handleFavoriteFlagChange(null)}
-                    disabled={isFavoriteFlagLoading}
-                  >
-                    {isFavoriteFlagLoading ? (
-                      <Loader2 className='h-4 w-4 animate-spin' />
-                    ) : (
-                      <X className='h-4 w-4' />
-                    )}
-                    Remove
-                  </Button>
-                </div>
-              )}
-
-              {/* Flag search */}
-              <div className='space-y-2' ref={flagDropdownRef}>
-                <Label>
-                  {userData?.user?.favoriteFlag
-                    ? 'Change favorite flag'
-                    : 'Select a favorite flag'}
-                </Label>
-                <div className='relative'>
-                  <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4' />
-                  <Input
-                    placeholder='Search for a flag...'
-                    value={flagSearch}
-                    onChange={(e) => setFlagSearch(e.target.value)}
-                    className='pl-10'
-                    onFocus={() => setIsFlagDropdownOpen(true)}
-                    disabled={isFavoriteFlagLoading}
-                  />
-
-                  {/* Search Results Dropdown */}
-                  {flagSearch && isFlagDropdownOpen && (
-                    <Card className='absolute top-full left-0 right-0 z-50 mt-2 max-h-60 overflow-y-auto shadow-lg border-2'>
-                      <CardContent className='p-2'>
-                        {flagSearchLoading ? (
-                          <div className='flex items-center justify-center py-4'>
-                            <Loader2 className='h-6 w-6 animate-spin' />
-                          </div>
-                        ) : flagSearchResults &&
-                          flagSearchResults.length > 0 ? (
-                          <div className='space-y-0'>
-                            {flagSearchResults.map((flag) => (
-                              <div
-                                key={flag.id}
-                                className='flex items-center gap-3 p-2 rounded-md hover:bg-secondary-background transition-colors cursor-pointer'
-                                onClick={() =>
-                                  handleFavoriteFlagChange(flag.id)
-                                }
-                              >
-                                <div className='relative w-8 h-6 rounded overflow-hidden border border-border flex-shrink-0'>
-                                  <Image
-                                    src={flag.image}
-                                    alt={flag.name}
-                                    fill
-                                    className='object-cover'
-                                  />
-                                </div>
-                                <span className='font-medium text-sm'>
-                                  {flag.name}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className='text-center py-4 text-muted-foreground text-sm'>
-                            No flags found
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+              {flagSearch && isFlagDropdownOpen && (
+                <div className='pt-2'>
+                  {flagSearchLoading || flagSearch !== debouncedFlagSearch ? (
+                    <div className='grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-5'>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className='h-[118px] animate-pulse rounded-[14px] bg-foreground/[0.06]' />
+                      ))}
+                    </div>
+                  ) : flagSearchResults && flagSearchResults.length > 0 ? (
+                    <div className='grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-5'>
+                      {flagSearchResults.map((flag) => {
+                        const isCurrent = favoriteFlag?.id === flag.id;
+                        return (
+                          <button
+                            key={flag.id}
+                            type='button'
+                            onClick={() => handleFavoriteFlagChange(flag.id)}
+                            disabled={isFavoriteFlagLoading}
+                            aria-pressed={isCurrent}
+                            title={flag.name}
+                            className={cn(
+                              'vx-key relative flex cursor-pointer flex-col overflow-hidden rounded-[14px] text-left transition-[transform,box-shadow] disabled:cursor-wait disabled:opacity-60',
+                              isCurrent && 'outline-2 outline-offset-2 outline-main',
+                            )}
+                          >
+                            {isCurrent && (
+                              <span className='absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full bg-main text-white'>
+                                <Check className='size-3' />
+                              </span>
+                            )}
+                            <div className='flag-stage h-[80px] px-3'>
+                              <FlagImage src={flag.image} alt={flag.name} maxHeight={56} area={84 * 56} />
+                            </div>
+                            <span className='truncate border-t border-line px-2.5 py-2 text-[12.5px] font-medium'>
+                              {flag.name}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className='rounded-[14px] py-6 text-center text-[13px] text-muted-foreground shadow-[inset_0_0_0_1px_var(--line)]'>
+                      No flags found
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </SettingsPanel>
+
+        {/* Privacy */}
+        <SettingsPanel title='Privacy'>
+          <div className='flex items-center justify-between gap-6'>
+            <div>
+              <Label htmlFor='anonymous' className='text-[14px] font-medium'>
+                Anonymous mode
+              </Label>
+              <p className='mt-1 text-[13px] text-muted-foreground'>
+                Your name won&apos;t appear on leaderboards and your profile will be hidden.
+              </p>
+            </div>
+            <Switch
+              id='anonymous'
+              checked={isAnonymous}
+              onCheckedChange={handleAnonymousChange}
+              disabled={isAnonymousLoading}
+            />
+          </div>
+        </SettingsPanel>
       </div>
     </div>
   );

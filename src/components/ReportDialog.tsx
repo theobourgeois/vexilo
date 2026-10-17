@@ -5,22 +5,16 @@ import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogHeader,
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { createReport } from "@/actions/reports";
 import { toast } from "sonner";
-import { AlertTriangle } from "lucide-react";
+import { Loader2 } from '@/components/icons';
+import { cn } from "@/lib/utils";
 import { toastErrorWithLogin } from "@/lib/toast-auth";
 
 interface ReportDialogProps {
@@ -93,56 +87,78 @@ export function ReportDialog({
 	return (
 		<Dialog open={isOpen} onOpenChange={handleOpenChange}>
 			<DialogTrigger asChild>{children}</DialogTrigger>
-			<DialogContent className="sm:max-w-[425px]">
+			<DialogContent className="sm:max-w-[460px]">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<AlertTriangle className="w-5 h-5 text-orange-500" />
-						Report Flag
+					<DialogTitle className="text-[17px] font-semibold tracking-[-0.02em]">
+						Report flag
 					</DialogTitle>
+					<DialogDescription className="text-[13px] text-muted-foreground">
+						Tell the moderators what&apos;s wrong with{" "}
+						<span className="font-medium text-foreground">{flagName}</span>.
+					</DialogDescription>
 				</DialogHeader>
 
 				<form onSubmit={handleSubmit} className="space-y-4">
-					<div>
-						<p className="text-sm text-muted-foreground mt-1">{flagName}</p>
-					</div>
-
-					<div className="space-y-2">
-						<Label htmlFor="reason">Reason for report *</Label>
-						<Select value={reason} onValueChange={setReason}>
-							<SelectTrigger className="bg-secondary-background w-full">
-								<SelectValue placeholder="Select a reason" />
-							</SelectTrigger>
-							<SelectContent className="bg-secondary-background">
-								{REPORT_REASONS.map((r) => (
-									<SelectItem
-										className="hover:bg-black/10 cursor-pointer"
+					<fieldset className="space-y-1.5">
+						<legend className="mb-1.5 text-[13px] font-medium">Reason</legend>
+						<div className="grid gap-1.5 sm:grid-cols-2">
+							{REPORT_REASONS.map((r) => {
+								const selected = reason === r;
+								return (
+									<label
 										key={r}
-										value={r}
+										className={cn(
+											"flex h-10 cursor-pointer items-center gap-2.5 rounded-[11px] px-3 text-[13px] transition-shadow has-[:focus-visible]:shadow-[var(--sh-well),0_0_0_2px_var(--main)]",
+											selected
+												? "bg-well font-medium text-foreground shadow-[var(--sh-well),inset_0_0_0_1.5px_var(--main)]"
+												: "vx-well text-subtle hover:text-foreground",
+										)}
 									>
+										<input
+											type="radio"
+											name="report-reason"
+											value={r}
+											checked={selected}
+											onChange={() => setReason(r)}
+											className="sr-only"
+										/>
+										<span
+											aria-hidden
+											className={cn(
+												"grid size-4 shrink-0 place-items-center rounded-full",
+												selected
+													? "bg-main"
+													: "shadow-[inset_0_0_0_1.5px_var(--border)]",
+											)}
+										>
+											{selected && <span className="size-1.5 rounded-full bg-white" />}
+										</span>
 										{r}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
+									</label>
+								);
+							})}
+						</div>
+					</fieldset>
 
-					<div className="space-y-2">
-						<Label htmlFor="description">Description *</Label>
+					<div className="space-y-1.5">
+						<label htmlFor="description" className="block text-[13px] font-medium">
+							Details
+						</label>
 						<Textarea
 							id="description"
-							placeholder="Please provide details about the issue..."
+							placeholder="What should be fixed?"
 							value={description}
 							onChange={(e) => setDescription(e.target.value)}
 							rows={4}
 							maxLength={500}
 							required
 						/>
-						<p className="text-xs text-muted-foreground">
-							{description.length}/500 characters
+						<p className="text-right tabular-nums text-[11px] text-muted-foreground">
+							{description.length}/500
 						</p>
 					</div>
 
-					<div className="flex gap-2 pt-4">
+					<div className="flex justify-end gap-2 pt-1">
 						<Button
 							type="button"
 							variant="neutral"
@@ -154,9 +170,9 @@ export function ReportDialog({
 						<Button
 							type="submit"
 							disabled={isSubmitting || !reason || !description.trim()}
-							className="flex-1"
 						>
-							{isSubmitting ? "Submitting..." : "Submit Report"}
+							{isSubmitting && <Loader2 className="animate-spin" />}
+							{isSubmitting ? "Sending" : "Send report"}
 						</Button>
 					</div>
 				</form>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vexilo — Browse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<link rel="stylesheet" href="v2.css" />
+<style>
+  .toolbar { padding: 28px 0 18px; display: flex; align-items: center; gap: 16px; }
+  .toolbar h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.03em; display: flex; align-items: baseline; gap: 10px; }
+  .toolbar h1 .mono { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .toolbar .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .tags-row { position: relative; display: flex; gap: 8px; padding: 2px 2px 22px; overflow: hidden;
+    -webkit-mask: linear-gradient(90deg, #000 92%, transparent); mask: linear-gradient(90deg, #000 92%, transparent); }
+
+  .grid { grid-auto-rows: auto; }
+  .fotd { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; overflow: hidden; }
+  .fotd .stage-panel { flex: 1; min-height: 360px; border-bottom: 1px solid var(--line); }
+  .fotd .mast { position: absolute; left: 64px; top: 40px; bottom: 0; }
+  .fotd .badge {
+    position: absolute; top: 16px; right: 16px;
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 28px; padding: 0 10px; border-radius: 999px;
+    background: var(--raised-bg); box-shadow: var(--shadow-key);
+    font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2);
+  }
+  .fotd .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .fotd .info { padding: 18px 20px 20px; display: flex; gap: 20px; align-items: flex-end; }
+  .fotd .info > div:first-child { flex: 1; min-width: 0; }
+  .fotd h3 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.03em; }
+  .fotd .sub { font: 400 12px/1 var(--mono); color: var(--muted); margin: 6px 0 10px; }
+  .fotd p { margin: 0; color: var(--text-2); max-width: 52ch; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .fotd .actions { display: flex; gap: 8px; flex: none; }
+
+  .more { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="toolbar">
+    <h1>Browse <span class="mono">15,284 flags</span></h1>
+    <div class="right">
+      <div class="seg">
+        <button class="on"><i class="ph-bold ph-fire"></i>Popular</button>
+        <button>Newest</button>
+        <button>A–Z</button>
+      </div>
+      <button class="btn"><i class="ph-bold ph-sliders-horizontal"></i>Filters</button>
+    </div>
+  </div>
+  <div class="tags-row" id="tags"></div>
+  <div class="grid" id="grid"></div>
+  <div class="more">
+    <button class="btn"><i class="ph-bold ph-arrow-down"></i>Load more</button>
+    <span class="mono muted" style="font-size:12px">16 of 15,284</span>
+  </div>
+</main>
+
+<script src="../shared/flags.js"></script>
+<script src="v2.js"></script>
+<script>
+  V.mount('home');
+
+  document.getElementById('tags').innerHTML =
+    `<a class="chip on" href="#">All</a>` +
+    TAGS.map(([t, n]) => `<a class="chip" href="#">${t}<span class="n">${n.toLocaleString()}</span></a>`).join('') +
+    `<a class="chip" href="#">europe<span class="n">2,104</span></a><a class="chip" href="#">asia<span class="n">1,377</span></a>`;
+
+  const F = FOTD;
+  const fotd = `
+    <article class="tile fotd">
+      <div class="stage-panel">
+        <span class="badge"><span class="dot"></span>Flag of the day · Oct 16</span>
+        <div class="mast"><div class="pole"></div>${V.cloth(F.code, F.ratio, F.name, { h: 240, size: 'lg', live: true })}</div>
+      </div>
+      <div class="info">
+        <div>
+          <h3>${F.name}</h3>
+          <div class="sub">#${V.pad(F.index)} · adopted ${F.year} · national</div>
+          <p>${F.blurb}</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn--icon" title="Favorite"><i class="ph-bold ph-heart"></i></button>
+          <a class="btn" href="flag.html">Open<i class="ph-bold ph-arrow-right"></i></a>
+        </div>
+      </div>
+    </article>`;
+
+  const AREA = 190 * 124;
+  const cards = FLAGS.filter(f => f.code !== 'bt' && f.code !== 'ca').concat([{ name: 'Scotland', code: 'gb-sct', index: 981, favs: 8, ratio: 1.667, tags: ['country'] }], FLAGS.filter(f => f.code === 'ca')).map((f, i) => {
+    const h = V.fitH(f.ratio, AREA, 250, 168);
+    const hover = f.code === 'hk' ? ' is-hover' : '';
+    const on = ['ch', 'jp'].includes(f.code);
+    return `
+      <article class="tile card${hover}" onclick="location.href='flag.html'">
+        <div class="quick">
+          <button class="btn btn--sm btn--icon" title="Set as profile flag"><i class="ph-bold ph-user-circle"></i></button>
+          <button class="btn btn--sm btn--icon" title="Edit"><i class="ph-bold ph-pencil-simple"></i></button>
+        </div>
+        <div class="stage">${V.cloth(f.code, f.ratio, f.name, { h, size: 'md' })}</div>
+        <div class="meta">
+          <div>
+            <div class="name">${f.name}</div>
+            <div class="sub">#${V.pad(f.index)} · ${f.tags[0]}</div>
+          </div>
+          <span class="fav${on ? ' is-on' : ''}"><i class="${on ? 'ph-fill' : 'ph-bold'} ph-heart"></i>${f.favs}</span>
+        </div>
+      </article>`;
+  });
+  document.getElementById('grid').innerHTML = fotd + cards.join('');
+</script>
+</body>
+</html>

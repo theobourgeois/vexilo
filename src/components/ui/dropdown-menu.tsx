@@ -1,7 +1,7 @@
 "use client"
 
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
-import { Check, ChevronRight, Circle } from "lucide-react"
+import { Check, ChevronRight, Circle } from '@/components/icons'
 
 import * as React from "react"
 
@@ -61,7 +61,7 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        "flex cursor-default select-none items-center rounded-sm border border-transparent px-2 py-1.5 text-sm font-base outline-hidden focus:bg-white/10 dark:focus:bg-white/5 focus:border-border gap-2 data-[inset=true]:pl-8 [&_svg]:pointer-events-none [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 hover:bg-black/5 dark:hover:bg-white/5",
+        "flex cursor-default select-none items-center rounded-lg px-2.5 py-2 text-sm font-medium outline-hidden focus:bg-foreground/[0.06] gap-2.5 data-[inset=true]:pl-8 [&_svg]:pointer-events-none [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 ",
         className,
       )}
       {...props}
@@ -79,7 +79,7 @@ function DropdownMenuSubContent({
   return (
     <DropdownMenuPrimitive.SubContent
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-base border border-border/50 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] bg-[size:256px,auto] p-1 font-base text-foreground shadow-lg backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-dropdown-menu-content-transform-origin)",
+        "z-50 min-w-[8rem] overflow-hidden rounded-[14px] bg-popover p-1.5 text-foreground shadow-pop data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-dropdown-menu-content-transform-origin)",
         className,
       )}
       {...props}
@@ -98,7 +98,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-[8rem] overflow-hidden rounded-base border border-border/50 bg-[image:var(--background-image-noise),var(--background-image-glossy-card)] dark:bg-[image:var(--background-image-noise),var(--background-image-glossy-card-dark)] bg-[size:256px,auto] p-1 font-base text-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),inset_0_4px_8px_rgba(255,255,255,0.4),0_6px_10px_rgba(0,0,0,0.15)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),inset_0_4px_8px_rgba(255,255,255,0.05),0_6px_10px_rgba(0,0,0,0.6)] backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-dropdown-menu-content-transform-origin)",
+          "z-50 min-w-[8rem] overflow-hidden rounded-[14px] bg-popover p-1.5 text-foreground shadow-pop backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-dropdown-menu-content-transform-origin)",
           className,
         )}
         {...props}
@@ -119,7 +119,7 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-inset={inset}
       className={cn(
-        "relative gap-2 [&_svg]:pointer-events-none [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 flex cursor-default select-none items-center rounded-sm border border-transparent data-[inset=true]:pl-8 px-2 py-1.5 text-sm font-base outline-hidden transition-colors focus:bg-white/10 dark:focus:bg-white/5 focus:border-border data-disabled:pointer-events-none data-disabled:opacity-50 hover:bg-black/5 dark:hover:bg-white/5",
+        "relative gap-2 [&_svg]:pointer-events-none [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 flex cursor-default select-none items-center rounded-lg data-[inset=true]:pl-8 px-2.5 py-2 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50 ",
         className,
       )}
       {...props}
@@ -136,7 +136,7 @@ function DropdownMenuCheckboxItem({
   return (
     <DropdownMenuPrimitive.CheckboxItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-base border-2 border-transparent gap-2 py-1.5 pl-8 pr-2 text-sm font-base text-main-foreground outline-hidden transition-colors focus:border-border data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex cursor-default select-none items-center rounded-lg gap-2 py-2 pl-8 pr-2.5 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       checked={checked}
@@ -160,7 +160,7 @@ function DropdownMenuRadioItem({
   return (
     <DropdownMenuPrimitive.RadioItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-base border-2 border-transparent gap-2 py-1.5 pl-8 pr-2 text-sm font-base outline-hidden transition-colors focus:border-border data-disabled:pointer-events-none data-disabled:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-lg gap-2 py-2 pl-8 pr-2.5 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50",
         className,
       )}
       {...props}
@@ -201,7 +201,7 @@ function DropdownMenuSeparator({
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
   return (
     <DropdownMenuPrimitive.Separator
-      className={cn("-mx-1 my-1 h-0.5 bg-border", className)}
+      className={cn("-mx-1.5 my-1.5 h-px bg-line", className)}
       {...props}
     />
   )

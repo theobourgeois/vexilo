@@ -3,85 +3,139 @@
 
 @custom-variant dark (&:is(.dark *));
 
-html {
-    font-family: "DM Sans", system-ui, sans-serif;
-}
+/* ───────────────────────── Tokens ───────────────────────── */
 
 :root {
-    --background: oklch(95% 0.01 255);
-    --secondary-background: oklch(98% 0.005 255);
-    --foreground: oklch(25% 0.02 255);
-    --main-foreground: oklch(100% 0 0);
-    --main: oklch(65% 0.15 259);
-    --border: oklch(85% 0.02 255);
-    --ring: oklch(65% 0.15 259);
-    --overlay: oklch(0% 0 0 / 0.4);
-    --shadow: inset 0 2px 4px 0 oklch(100% 0 0 / 0.5), 0 4px 8px -2px oklch(0% 0 0 / 0.05), 0 2px 4px -2px oklch(0% 0 0 / 0.03);
-    --chart-1: #5294ff;
-    --chart-2: #ff4d50;
-    --chart-3: #facc00;
-    --chart-4: #05e17a;
-    --chart-5: #7a83ff;
-    --chart-active-dot: #000;
-    --font-family-base: var(--font-dm-sans), system-ui, sans-serif;
-    --font-family-heading: var(--font-dm-sans), system-ui, sans-serif;
-    --font-family-mono: ui-monospace, monospace;
+    --background: #f3f2ef;
+    --surface: #ffffff;
+    --surface-hi: #ffffff;
+    --secondary-background: var(--surface);
+    --foreground: #1b1c1f;
+    --subtle: #56575c;
+    --muted: #e9e8e4;
+    --muted-foreground: #8b8a86;
+    --main: #b8232f;
+    --main-deep: #9e1c27;
+    --main-soft: rgb(184 35 47 / 0.09);
+    --main-foreground: #ffffff;
+    --border: rgb(27 28 31 / 0.14);
+    --line: rgb(27 28 31 / 0.08);
+    --ring: #b8232f;
+    --overlay: rgb(0 0 0 / 0.4);
+    --well: #ecebe7;
+    --good: #1f7a4d;
+    --good-soft: rgb(31 122 77 / 0.1);
+    --bad: #c0362c;
+    --bad-soft: rgb(192 54 44 / 0.09);
+    --warn: #a8551a;
+    --warn-soft: rgb(168 85 26 / 0.1);
+
+    --raised: var(--surface);
+    --stage: #ecebe7;
+    --sh-tile: 0 0 0 1px rgb(27 28 31 / 0.08);
+    --sh-tile-hover: 0 0 0 1px rgb(27 28 31 / 0.16);
+    --sh-key: 0 0 0 1px rgb(27 28 31 / 0.14);
+    --sh-key-press: 0 0 0 1px rgb(27 28 31 / 0.2);
+    --sh-well: inset 0 0 0 1px rgb(27 28 31 / 0.06);
+    --sh-pop: 0 0 0 1px rgb(27 28 31 / 0.08), 0 12px 32px -8px rgb(27 28 31 / 0.2);
+
+    --flag-edge: rgb(27 28 31 / 0.12);
+    --logo-ink: #003566;
 }
 
 .dark {
-    --background: oklch(22% 0.005 255);
-    --secondary-background: oklch(26% 0.005 255);
-    --foreground: oklch(95% 0.005 255);
-    --main-foreground: oklch(100% 0 0);
-    --main: oklch(60% 0.15 259);
-    --border: oklch(35% 0.005 255);
-    --ring: oklch(60% 0.15 259);
-    --overlay: oklch(0% 0 0 / 0.6);
-    --shadow: inset 0 2px 4px 0 oklch(100% 0 0 / 0.05), 0 4px 8px -2px oklch(0% 0 0 / 0.2), 0 2px 4px -2px oklch(0% 0 0 / 0.1);
-    --chart-1: #6ba3ff;
-    --chart-2: #ff7a7d;
-    --chart-3: #f0c800;
-    --chart-4: #10d87a;
-    --chart-5: #9098ff;
-    --chart-active-dot: #fff;
+    --background: #131416;
+    --surface: #1b1c1f;
+    --surface-hi: #1f2023;
+    --foreground: #ecebe7;
+    --subtle: #b0afab;
+    --muted: #26272a;
+    --muted-foreground: #76777c;
+    --main: #e0464f;
+    --main-deep: #c93a43;
+    --main-soft: rgb(224 70 79 / 0.14);
+    --ring: #e0464f;
+    --border: rgb(255 255 255 / 0.12);
+    --line: rgb(255 255 255 / 0.07);
+    --overlay: rgb(0 0 0 / 0.6);
+    --well: #18191b;
+    --good: #5cc48d;
+    --good-soft: rgb(92 196 141 / 0.14);
+    --bad: #ef7266;
+    --bad-soft: rgb(239 114 102 / 0.14);
+    --warn: #e0a066;
+    --warn-soft: rgb(224 160 102 / 0.14);
+
+    --stage: #222327;
+    --sh-tile: 0 0 0 1px rgb(255 255 255 / 0.07);
+    --sh-tile-hover: 0 0 0 1px rgb(255 255 255 / 0.14);
+    --sh-key: 0 0 0 1px rgb(255 255 255 / 0.12);
+    --sh-key-press: 0 0 0 1px rgb(255 255 255 / 0.18);
+    --sh-well: inset 0 0 0 1px rgb(255 255 255 / 0.05);
+    --sh-pop: 0 0 0 1px rgb(255 255 255 / 0.08), 0 16px 40px -8px rgb(0 0 0 / 0.7);
+
+    --flag-edge: rgb(0 0 0 / 0.3);
+    --logo-ink: #e6e9ef;
 }
 
 @theme inline {
-    --background-image-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.15'/%3E%3C/svg%3E");
-    --background-image-glossy-main: linear-gradient(to bottom, oklch(75% 0.15 259) 0%, oklch(65% 0.15 259) 45%, oklch(50% 0.15 259) 50%, oklch(45% 0.15 259) 100%);
-    --background-image-glossy-neutral: linear-gradient(to bottom, oklch(100% 0 0) 0%, oklch(95% 0.01 255) 45%, oklch(90% 0.01 255) 50%, oklch(85% 0.01 255) 100%);
-    --background-image-glossy-neutral-dark: linear-gradient(to bottom, oklch(35% 0.005 255) 0%, oklch(30% 0.005 255) 45%, oklch(22% 0.005 255) 50%, oklch(18% 0.005 255) 100%);
-    --background-image-glossy-card: linear-gradient(to bottom, oklch(98% 0.005 255) 0%, oklch(95% 0.005 255) 100%);
-    --background-image-glossy-card-dark: linear-gradient(to bottom, oklch(25% 0.005 255) 0%, oklch(20% 0.005 255) 100%);
-
-    --color-main: var(--main);
     --color-background: var(--background);
+    --color-surface: var(--surface);
+    --color-surface-hi: var(--surface-hi);
     --color-secondary-background: var(--secondary-background);
     --color-foreground: var(--foreground);
+    --color-subtle: var(--subtle);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-main: var(--main);
+    --color-main-deep: var(--main-deep);
+    --color-main-soft: var(--main-soft);
     --color-main-foreground: var(--main-foreground);
     --color-border: var(--border);
-    --color-overlay: var(--overlay);
+    --color-line: var(--line);
     --color-ring: var(--ring);
-    --color-chart-1: var(--chart-1);
-    --color-chart-2: var(--chart-2);
-    --color-chart-3: var(--chart-3);
-    --color-chart-4: var(--chart-4);
-    --color-chart-5: var(--chart-5);
+    --color-overlay: var(--overlay);
+    --color-well: var(--well);
+    --color-good: var(--good);
+    --color-good-soft: var(--good-soft);
+    --color-bad: var(--bad);
+    --color-bad-soft: var(--bad-soft);
+    --color-warn: var(--warn);
+    --color-warn-soft: var(--warn-soft);
 
-    --spacing-boxShadowX: 4px;
-    --spacing-boxShadowY: 4px;
-    --spacing-reverseBoxShadowX: -4px;
-    --spacing-reverseBoxShadowY: -4px;
-    --radius-base: 5px;
-    --shadow-shadow: var(--shadow);
-    --font-weight-base: 500;
-    --font-weight-heading: 700;
+    --color-popover: var(--surface-hi);
+    --color-popover-foreground: var(--foreground);
+    --color-input: var(--border);
+    --color-accent: var(--muted);
+    --color-accent-foreground: var(--foreground);
+    --color-destructive: var(--bad);
+
+    --shadow-tile: var(--sh-tile);
+    --shadow-tile-hover: var(--sh-tile-hover);
+    --shadow-key: var(--sh-key);
+    --shadow-key-press: var(--sh-key-press);
+    --shadow-well: var(--sh-well);
+    --shadow-pop: var(--sh-pop);
+
+    --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --radius-base: 10px;
+    --font-weight-base: 400;
+    --font-weight-heading: 600;
 }
 
 @layer base {
+    html {
+        -webkit-font-smoothing: antialiased;
+    }
+
     body {
-        @apply text-foreground font-base bg-background;
-        font-family: var(--font-family-base);
+        @apply bg-background text-foreground font-sans;
+        font-size: 14px;
+        line-height: 1.5;
+        letter-spacing: 0;
+        font-variant-numeric: tabular-nums;
     }
 
     h1,
@@ -90,7 +144,88 @@ html {
     h4,
     h5,
     h6 {
-        @apply font-heading;
-        font-family: var(--font-family-heading);
+        letter-spacing: -0.02em;
     }
+
+    ::selection {
+        background: var(--main);
+        color: var(--main-foreground);
+    }
+}
+
+/* ───────────────────────── Surfaces ───────────────────────── */
+
+@utility vx-tile {
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--sh-tile);
+}
+
+@utility bg-primary {
+    background: var(--main);
+}
+
+@utility bg-raised {
+    background: var(--raised);
+}
+
+@utility bg-stage {
+    background: var(--stage);
+}
+
+@utility vx-key {
+    background: var(--raised);
+    box-shadow: var(--sh-key);
+}
+
+@utility vx-well {
+    background: var(--well);
+    box-shadow: var(--sh-well);
+}
+
+@utility vx-label {
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--muted-foreground);
+}
+
+/* ───────────────────────── Flags ─────────────────────────
+   Flat flags at true proportions. The edge and shadow are drop-shadows so they follow
+   the flag's painted shape (no box around Nepal or pennants). */
+
+.flag-stage {
+    display: grid;
+    place-items: center;
+    container-type: size;
+}
+
+.flag-img {
+    --area: 24000;
+    --hmax: 160px;
+    display: block;
+    flex: none;
+    max-width: none;
+    aspect-ratio: var(--r);
+    height: min(
+        calc(sqrt(var(--area) / var(--r)) * 1px),
+        var(--hmax),
+        calc(100cqw / var(--r)),
+        100cqh
+    );
+    width: auto;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    filter: drop-shadow(0 0 0.6px rgb(28 29 31 / 0.45)) drop-shadow(0 8px 12px rgb(28 29 31 / 0.13));
+    transition: opacity 0.25s ease;
+}
+.flag-img[data-ready='false'] {
+    opacity: 0;
+}
+.flag-img--fixed {
+    height: var(--hmax);
+}
+.dark .flag-img {
+    filter: brightness(0.95) drop-shadow(0 0 0.6px rgb(0 0 0 / 0.7)) drop-shadow(0 10px 14px rgb(0 0 0 / 0.4));
 }
