@@ -6,6 +6,7 @@ import { users, accounts, sessions, verificationTokens } from "@/db/schema";
 import { db } from "@/db";
 import { Adapter } from "next-auth/adapters";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { eq } from "drizzle-orm";
 
 declare module "next-auth" {
   interface Session extends DefaultSession {
@@ -29,12 +30,26 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
         // @ts-expect-error - this is a custom field
         token.isAdmin = user.isAdmin;
+      }
+      // The client calls `update()` after changing its name or picture; re-read
+      // them so the session (and header avatar) reflect the change.
+      if (trigger === "update" && token.id) {
+        const fresh = await db
+          .select({ name: users.name, image: users.image })
+          .from(users)
+          .where(eq(users.id, token.id as string))
+          .limit(1)
+          .then((res) => res[0]);
+        if (fresh) {
+          token.name = fresh.name;
+          token.picture = fresh.image;
+        }
       }
       return token;
     },
