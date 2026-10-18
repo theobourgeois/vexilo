@@ -9,11 +9,14 @@ export default function WavingFlag({
   src,
   alt,
   wind = 1,
+  texture,
   className,
 }: {
   src: string;
   alt: string;
   wind?: number;
+  /** A same-origin image to wave as-is, instead of fetching `src` through the texture route. */
+  texture?: string;
   className?: string;
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -29,7 +32,7 @@ export default function WavingFlag({
 
     import('@/lib/flag-cloth').then(({ createWavingFlag }) => {
       if (cancelled) return;
-      flagRef.current = createWavingFlag(container, `/api/flag-texture?src=${encodeURIComponent(src)}`, {
+      flagRef.current = createWavingFlag(container, texture ?? `/api/flag-texture?src=${encodeURIComponent(src)}`, {
         wind: windRef.current,
         reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         onReady: () => !cancelled && setState('ready'),
@@ -42,7 +45,7 @@ export default function WavingFlag({
       flagRef.current?.dispose();
       flagRef.current = null;
     };
-  }, [src]);
+  }, [src, texture]);
 
   React.useEffect(() => {
     windRef.current = wind;

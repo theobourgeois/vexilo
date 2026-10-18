@@ -230,3 +230,53 @@
 .dark .flag-img {
     filter: brightness(0.95) drop-shadow(0 0 0.6px rgb(0 0 0 / 0.7)) drop-shadow(0 10px 14px rgb(0 0 0 / 0.4));
 }
+
+/* ───────────────────────── Flag maker ───────────────────────── */
+
+.studio-flag {
+    filter: drop-shadow(0 0 0.6px rgb(28 29 31 / 0.45)) drop-shadow(0 14px 24px rgb(28 29 31 / 0.16));
+}
+.dark .studio-flag {
+    filter: drop-shadow(0 0 0.6px rgb(0 0 0 / 0.7)) drop-shadow(0 16px 28px rgb(0 0 0 / 0.45));
+}
+.studio-dots {
+    background-image: radial-gradient(color-mix(in srgb, var(--foreground) 9%, transparent) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+.studio-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 18px;
+    background: transparent;
+    cursor: pointer;
+}
+.studio-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+.studio-range::-moz-range-track {
+    height: 4px;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+.studio-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12), 0 1px 3px rgb(0 0 0 / 0.35);
+}
+.studio-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12), 0 1px 3px rgb(0 0 0 / 0.35);
+}
+.studio-range:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px var(--ring);
+}

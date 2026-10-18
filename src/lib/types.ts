@@ -1,3 +1,5 @@
+import type { StudioDesign } from '@/lib/studio-design';
+
 export type RelatedFlag = {
   name: string;
   image: string;
@@ -16,6 +18,9 @@ export type Flag = {
   isFavorite?: boolean;
   relatedFlags?: RelatedFlag[];
   sources: string[];
+  /** Set for flags made in the flag maker. */
+  remixOf?: string | null;
+  design?: StudioDesign | null;
 };
 
 export type FlagRequestWithUser = {

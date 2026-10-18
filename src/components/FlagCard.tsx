@@ -15,6 +15,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
 import FlagImage from '@/components/FlagImage';
 import { cn } from '@/lib/utils';
+import { MakerBadge } from '@/components/MakerBadge';
 
 type FlagCardProps = Flag;
 
@@ -134,7 +135,8 @@ export default function FlagCard({
         </div>
       )}
 
-      <div className='flag-stage bg-stage h-[228px] px-6 py-7'>
+      <div className='flag-stage bg-stage relative h-[228px] px-6 py-7'>
+        <MakerBadge tags={tags} className='absolute left-2.5 top-2.5 z-[1]' />
         <FlagImage src={flagImage} alt={flagName} maxHeight={180} area={250 * 166} />
       </div>
 
