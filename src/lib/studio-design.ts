@@ -52,6 +52,8 @@ export type StudioRepeat = {
 export type StudioCutout = {
   box: [number, number, number, number];
   field: { layout: LayoutId; params: Record<string, number>; colors: string[] };
+  /** Points on the shape (fractions of the image); only parts connected to them are kept. */
+  seeds?: [number, number][];
 };
 
 export type StudioOutline = { color: string; /** fraction of flag height */ width: number };

@@ -51,7 +51,7 @@ const EXPLAINED = 48;
 const MIN_EXPLAINED = 0.7;
 /** Each extra slot has to explain this much more of the flag to be worth it. */
 const SLOT_COST = 0.004;
-const MAX_CUTOUTS = 6;
+const MAX_CUTOUTS = 8;
 
 type Match = { layout: LayoutId; params: Record<string, number>; medians: number[][]; unexplained: number; score: number };
 
@@ -165,36 +165,50 @@ export async function buildRemixDesign(source: RemixSource): Promise<StudioDesig
     return colorDistance(color, match) < 14 ? match : color;
   });
   const params = { ...defaultParams(best.layout), ...best.params };
+  const slots = label(best.layout, params);
+
+  /** The flag's own colours inside a box, beyond the field, most used first. */
+  const colorsIn = (box: [number, number, number, number]) => {
+    const inside: [number, number, number][] = [];
+    for (let y = Math.max(0, Math.floor(box[1] * h)); y < Math.min(h, Math.ceil(box[3] * h)); y++)
+      for (let x = Math.max(0, Math.floor(box[0] * w)); x < Math.min(w, Math.ceil(box[2] * w)); x++) {
+        const p = y * w + x;
+        if (pixels[p * 4 + 3] < 200 || (slots[p] >= 0 && !off(p, best.medians[slots[p]]))) continue;
+        inside.push([pixels[p * 4], pixels[p * 4 + 1], pixels[p * 4 + 2]]);
+      }
+    return cutoutPalette(inside, source.palette);
+  };
+
   const layers = source.placements.map(({ emblem, box }) => {
     const layer = newLayer(emblem, { x: (box[0] + box[2]) / 2, y: (box[1] + box[3]) / 2, size: box[3] - box[1] });
-    // The library copy may come from a variant with slightly different shades; use this flag's own.
-    layer.colors = layer.colors.map((color) => {
+    // Library emblems are shared between flags that use the same shape (Kazakhstan's sun is
+    // Bangladesh's disc), so their colours come from what this flag paints where they sit.
+    const found = colorsIn(box);
+    layer.colors = layer.colors.map((color, i) => {
       const match = nearest(color, source.palette);
-      return colorDistance(color, match) < 25 ? match : color;
+      const close = colorDistance(color, match) < 25;
+      if (close && (found.length === 0 || found.includes(match))) return match;
+      return found[Math.min(i, found.length - 1)] ?? (close ? match : color);
     });
     return layer;
   });
 
   // Whatever the layout and known emblems don't explain becomes cutouts of the flag image.
-  const slots = label(best.layout, params);
   const stray = new Uint8Array(w * h);
   for (let p = 0; p < w * h; p++) {
     const slot = slots[p];
     if (!masked[p] && slot >= 0 && off(p, best.medians[slot])) stray[p] = 1;
   }
   const field = { layout: best.layout, params: best.params, colors };
-  for (const box of strayBoxes(stray, w, h)) {
-    const inside: [number, number, number][] = [];
-    for (let y = Math.floor(box[1] * h); y < Math.ceil(box[3] * h); y++)
-      for (let x = Math.floor(box[0] * w); x < Math.ceil(box[2] * w); x++)
-        if (stray[y * w + x]) inside.push([pixels[(y * w + x) * 4], pixels[(y * w + x) * 4 + 1], pixels[(y * w + x) * 4 + 2]]);
+  for (const { box, seeds, pixels: shape } of strayShapes(stray, w, h)) {
+    const inside = shape.map((p) => [pixels[p * 4], pixels[p * 4 + 1], pixels[p * 4 + 2]] as [number, number, number]);
     const palette = cutoutPalette(inside, source.palette);
     layers.push({
       id: uid(),
       emblemId: 'cutout',
       name: layers.some((l) => l.emblemId === 'cutout') ? 'Detail' : 'Emblem',
       src: source.image,
-      cutout: { box, field },
+      cutout: { box, field, seeds },
       aspect: ((box[2] - box[0]) * W) / (box[3] - box[1]),
       palette,
       colors: [...palette],
@@ -211,11 +225,15 @@ export async function buildRemixDesign(source: RemixSource): Promise<StudioDesig
   return { version: 1, ratio, field: { kind: 'layout', layout: best.layout, colors, params: best.params }, layers };
 }
 
+type StrayShape = { box: [number, number, number, number]; seeds: [number, number][]; pixels: number[]; area: number };
+
 /**
- * Groups stray pixels into boxes (fractions of the flag): thin slivers along band edges are
- * dropped, nearby pieces merged, and each box padded a little.
+ * Groups stray pixels into separate shapes: thin slivers along band edges are dropped and
+ * pieces a couple of pixels apart join up, but shapes that are apart stay apart even when one
+ * sits inside the other's box (two leaves beside a river that runs across the flag). Each
+ * shape gets a padded box and seed points on its pieces, so its cutout keeps only itself.
  */
-function strayBoxes(stray: Uint8Array, w: number, h: number): [number, number, number, number][] {
+function strayShapes(stray: Uint8Array, w: number, h: number): StrayShape[] {
   const at = (mask: Uint8Array, x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && mask[y * w + x] === 1;
   const morph = (mask: Uint8Array, grow: boolean) => {
     const out = new Uint8Array(w * h);
@@ -226,57 +244,69 @@ function strayBoxes(stray: Uint8Array, w: number, h: number): [number, number, n
       }
     return out;
   };
-  // Open (drop one-pixel slivers), then grow so pieces of one shape join up.
-  const mask = morph(morph(morph(morph(stray, false), true), true), true);
+  // Open (drop one-pixel slivers), then grow so the pieces of one shape (letters, a stem) join.
+  const opened = morph(morph(stray, false), true);
+  const mask = morph(morph(morph(opened, true), true), true);
 
-  const seen = new Uint8Array(w * h);
-  let boxes: { x0: number; y0: number; x1: number; y1: number; area: number }[] = [];
-  for (let start = 0; start < w * h; start++) {
-    if (!mask[start] || seen[start]) continue;
-    const box = { x0: w, y0: h, x1: 0, y1: 0, area: 0 };
-    const stack = [start];
+  /** Connected pixels from a start, within a mask. */
+  const flood = (start: number, inside: (p: number) => boolean, seen: Uint8Array, diagonal: boolean) => {
+    const found = [start];
     seen[start] = 1;
-    while (stack.length) {
-      const p = stack.pop()!;
+    for (let i = 0; i < found.length; i++) {
+      const p = found[i];
       const [x, y] = [p % w, Math.floor(p / w)];
-      box.x0 = Math.min(box.x0, x);
-      box.y0 = Math.min(box.y0, y);
-      box.x1 = Math.max(box.x1, x + 1);
-      box.y1 = Math.max(box.y1, y + 1);
-      box.area++;
       for (let dy = -1; dy <= 1; dy++)
         for (let dx = -1; dx <= 1; dx++) {
-          const q = (y + dy) * w + x + dx;
-          if (at(mask, x + dx, y + dy) && !seen[q]) {
+          if ((!dx && !dy) || (!diagonal && dx && dy)) continue;
+          const [nx, ny] = [x + dx, y + dy];
+          const q = ny * w + nx;
+          if (nx >= 0 && ny >= 0 && nx < w && ny < h && !seen[q] && inside(q)) {
             seen[q] = 1;
-            stack.push(q);
+            found.push(q);
           }
         }
     }
-    if (box.area >= w * h * 0.002) boxes.push(box);
-  }
+    return found;
+  };
 
-  // Merge boxes that touch or nearly do.
-  const gap = Math.max(2, h * 0.03);
-  for (let merged = true; merged; ) {
-    merged = false;
-    outer: for (let i = 0; i < boxes.length; i++)
-      for (let j = i + 1; j < boxes.length; j++) {
-        const [a, b] = [boxes[i], boxes[j]];
-        if (a.x0 - gap <= b.x1 && b.x0 - gap <= a.x1 && a.y0 - gap <= b.y1 && b.y0 - gap <= a.y1) {
-          boxes[i] = { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1), area: a.area + b.area };
-          boxes.splice(j, 1);
-          merged = true;
-          break outer;
-        }
-      }
+  const seen = new Uint8Array(w * h);
+  const shapes: StrayShape[] = [];
+  for (let start = 0; start < w * h; start++) {
+    if (!mask[start] || seen[start]) continue;
+    const region = flood(start, (q) => mask[q] === 1, seen, true);
+    if (region.length < w * h * 0.002) continue;
+    const pixels = region.filter((p) => stray[p] && opened[p]);
+    if (pixels.length === 0) continue;
+
+    // A seed on each separate piece, biggest first.
+    const member = new Uint8Array(w * h);
+    for (const p of pixels) member[p] = 1;
+    const pieceSeen = new Uint8Array(w * h);
+    const pieces = pixels
+      .filter((p) => !pieceSeen[p])
+      .map((p) => (pieceSeen[p] ? [] : flood(p, (q) => member[q] === 1, pieceSeen, true)))
+      .filter((piece) => piece.length > 0)
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 32);
+    const seeds = pieces.map((piece) => {
+      const p = piece[piece.length >> 1];
+      return [((p % w) + 0.5) / w, (Math.floor(p / w) + 0.5) / h] as [number, number];
+    });
+
+    const xs = pixels.map((p) => p % w);
+    const ys = pixels.map((p) => Math.floor(p / w));
+    const pad = 0.015;
+    shapes.push({
+      box: [
+        Math.max(0, Math.min(...xs) / w - pad / (w / h)),
+        Math.max(0, Math.min(...ys) / h - pad),
+        Math.min(1, (Math.max(...xs) + 1) / w + pad / (w / h)),
+        Math.min(1, (Math.max(...ys) + 1) / h + pad),
+      ],
+      seeds,
+      pixels,
+      area: region.length,
+    });
   }
-  boxes = boxes.sort((a, b) => b.area - a.area).slice(0, MAX_CUTOUTS);
-  const pad = 0.015;
-  return boxes.map((b) => [
-    Math.max(0, b.x0 / w - pad / (w / h)),
-    Math.max(0, b.y0 / h - pad),
-    Math.min(1, b.x1 / w + pad / (w / h)),
-    Math.min(1, b.y1 / h + pad),
-  ]);
+  return shapes.sort((a, b) => b.area - a.area).slice(0, MAX_CUTOUTS);
 }

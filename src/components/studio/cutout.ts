@@ -31,7 +31,7 @@ export function loadImage(src: string) {
  * outline) stay part of the cutout.
  */
 export async function renderCutout(key: string, toUrl: (src: string) => string): Promise<string> {
-  const { src, box, field } = JSON.parse(key.slice(PREFIX.length)) as StudioCutout & { src: string };
+  const { src, box, field, seeds } = JSON.parse(key.slice(PREFIX.length)) as StudioCutout & { src: string };
   const img = await loadImage(toUrl(src));
   const [iw, ih] = [img.naturalWidth, img.naturalHeight];
   const [sx, sy, sw, sh] = [box[0] * iw, box[1] * ih, (box[2] - box[0]) * iw, (box[3] - box[1]) * ih];
@@ -151,6 +151,44 @@ export async function renderCutout(key: string, toUrl: (src: string) => string):
       for (const q of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, p - w, p + w]) if (q >= 0 && q < w * h && misplaced(q)) next.push(q);
     }
     front = next;
+  }
+
+  // Keep only the shape itself: what's connected to its seeds, not other shapes in its box.
+  if (seeds?.length) {
+    const reached = new Uint8Array(w * h);
+    const queue: number[] = [];
+    const reach = Math.ceil(((iw / 240) * k) * 1.5) + 1;
+    for (const [fx, fy] of seeds) {
+      const cx = Math.round((fx * iw - sx) * k);
+      const cy = Math.round((fy * ih - sy) * k);
+      // The seed was picked on a coarser sample; look nearby for a pixel of the shape.
+      search: for (let r = 0; r <= reach; r++)
+        for (let dy = -r; dy <= r; dy++)
+          for (let dx = -r; dx <= r; dx++) {
+            const [x, y] = [cx + dx, cy + dy];
+            if (x < 0 || y < 0 || x >= w || y >= h) continue;
+            const p = y * w + x;
+            if (!outside[p] && !reached[p]) {
+              reached[p] = 1;
+              queue.push(p);
+              break search;
+            }
+          }
+    }
+    for (let i = 0; i < queue.length; i++) {
+      const p = queue[i];
+      const [x, y] = [p % w, Math.floor(p / w)];
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const [nx, ny] = [x + dx, y + dy];
+          const q = ny * w + nx;
+          if (nx >= 0 && ny >= 0 && nx < w && ny < h && !outside[q] && !reached[q]) {
+            reached[q] = 1;
+            queue.push(q);
+          }
+        }
+    }
+    if (queue.length) for (let p = 0; p < w * h; p++) if (!reached[p]) outside[p] = 1;
   }
 
   // How far each kept pixel is from the field, up to EDGE_RING; edge pixels are mixes of field

@@ -77,6 +77,7 @@ export function StudioCanvas({
   onDoubleClickLayer,
   onDoubleClickField,
   onDropEmblem,
+  onDropFiles,
   renderOverlay,
 }: {
   studio: Studio;
@@ -88,6 +89,7 @@ export function StudioCanvas({
   onDoubleClickLayer?: (id: string, at: { x: number; y: number }) => void;
   onDoubleClickField?: (slot: number, at: { x: number; y: number }) => void;
   onDropEmblem?: (emblemId: string, at: { x: number; y: number }) => void;
+  onDropFiles?: (files: File[], at: { x: number; y: number }) => void;
   renderOverlay?: (rects: { selection: Rect | null; flag: Rect; container: { w: number; h: number }; busy: boolean }) => React.ReactNode;
 }) {
   const { design, W, selection, selectedLayers, fieldSelected, setSelection, update, history } = studio;
@@ -517,7 +519,8 @@ export function StudioCanvas({
   }
 
   function onDragOver(e: React.DragEvent) {
-    if (!e.dataTransfer.types.includes(EMBLEM_MIME)) return;
+    const files = onDropFiles && e.dataTransfer.types.includes('Files');
+    if (!e.dataTransfer.types.includes(EMBLEM_MIME) && !files) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     const [u, v] = toUnits(local(e));
@@ -526,11 +529,14 @@ export function StudioCanvas({
 
   function onDrop(e: React.DragEvent) {
     const id = e.dataTransfer.getData(EMBLEM_MIME);
+    const files = [...e.dataTransfer.files];
     setDropAnchor(null);
-    if (!id) return;
+    if (!id && files.length === 0) return;
     e.preventDefault();
     const [u, v] = toUnits(local(e));
-    onDropEmblem?.(id, { x: clamp(u / W, 0, 1), y: clamp(v, 0, 1) });
+    const at = { x: clamp(u / W, 0, 1), y: clamp(v, 0, 1) };
+    if (id) onDropEmblem?.(id, at);
+    else onDropFiles?.(files, at);
   }
 
   // ---- overlay geometry (screen space) ----

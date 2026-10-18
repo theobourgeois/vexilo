@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Eye, EyeSlash, Lock, Search, Unlock, X } from '@/components/icons';
+import { Eye, EyeSlash, Lock, Search, Unlock, Upload, X } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
 import { luminance, PALETTES } from './colors';
@@ -50,10 +50,12 @@ function tileTone(colors: string[]) {
 export function EmblemsPanel({
   emblems,
   onAdd,
+  onUpload,
   columns = 3,
 }: {
   emblems: StudioEmblem[];
   onAdd: (emblem: StudioEmblem) => void;
+  onUpload?: (files: File[]) => void;
   columns?: number;
 }) {
   const [query, setQuery] = React.useState('');
@@ -98,6 +100,24 @@ export function EmblemsPanel({
       </div>
       <div className='-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-2'>
         <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+          {onUpload && !q && collection === 'all' && (
+            <label
+              title='Your own image'
+              className='grid aspect-square min-w-0 cursor-pointer place-items-center rounded-[12px] text-muted-foreground shadow-[inset_0_0_0_1.5px_var(--border)] transition-colors focus-within:ring-2 focus-within:ring-ring hover:text-foreground hover:shadow-[inset_0_0_0_2px_var(--main)] [&_svg]:size-6'
+            >
+              <Upload />
+              <input
+                type='file'
+                accept='image/png,image/jpeg,image/webp,image/svg+xml'
+                multiple
+                className='sr-only'
+                onChange={(e) => {
+                  onUpload([...(e.target.files ?? [])]);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
           {shown.map((emblem) => (
             <button
               key={emblem.id}
@@ -269,9 +289,9 @@ export function ColoursPanel({ studio }: { studio: Studio }) {
 function LayerThumb({ layer }: { layer: StudioLayer }) {
   const url = useRecolored(layerImage(layer), layer.palette, layer.colors);
   return (
-    <span className={cn('grid size-8 shrink-0 place-items-center rounded-[7px]', tileTone(layer.colors))}>
+    <span className={cn('relative size-8 shrink-0 overflow-hidden rounded-[7px]', tileTone(layer.colors))}>
       {/* eslint-disable-next-line @next/next/no-img-element -- recoloured blob */}
-      <img src={url} alt='' className='max-h-[78%] max-w-[78%] object-contain' style={{ transform: `scaleX(${layer.flipX ? -1 : 1})` }} />
+      <img src={url} alt='' className='absolute inset-[11%] size-[78%] object-contain' style={{ transform: `scaleX(${layer.flipX ? -1 : 1})` }} />
     </span>
   );
 }

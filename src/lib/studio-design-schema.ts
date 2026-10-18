@@ -45,6 +45,7 @@ const layer = z.object({
     .object({
       box: z.tuple([unit, unit, unit, unit]),
       field: z.object({ layout, params: z.record(z.string(), unit), colors: z.array(hex).max(8) }),
+      seeds: z.array(z.tuple([unit, unit])).max(32).optional(),
     })
     .optional(),
   aspect: z.number().positive().max(50),

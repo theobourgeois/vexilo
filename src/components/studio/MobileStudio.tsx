@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { ExportMenu, FlagName, PostDialog, RatioControl, RemixPill, StartOver, UndoRedo, ViewModeControl, WavePreview, type Remix } from './chrome';
 import type { StudioEmblem } from './model';
+import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
 import { AlignControls, FieldSwatches, LayerMoreMenu, LayerSwatches, OutlineControls, RepeatControls } from './tools';
@@ -104,6 +105,7 @@ export function MobileStudio({
   const [posting, setPosting] = React.useState(false);
   const { selectedLayers, fieldSelected, actions } = studio;
   const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
+  const importImages = useImageImport(studio);
 
   return (
     <div className='fixed inset-0 z-30 flex flex-col bg-stage'>
@@ -222,6 +224,11 @@ export function MobileStudio({
               actions.addEmblem(emblem);
               setMode('flat');
               setPanel(null);
+            }}
+            onUpload={(files) => {
+              setPanel(null);
+              setMode('flat');
+              void importImages(files);
             }}
           />
         )}
