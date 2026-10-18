@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Check, Flag, Loader2, Search, X } from '@/components/icons';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Check, Flag, Loader2, Search, Trash2, Upload, X } from '@/components/icons';
 import FlagImage from '@/components/FlagImage';
 import { cn } from '@/lib/utils';
 import {
@@ -15,12 +16,34 @@ import {
   changeIsAnonymous,
   getUserData,
   changeFavoriteFlag,
+  changeProfilePicture,
+  removeProfilePicture,
 } from '@/actions/users';
 import { getFlags } from '@/actions/flags';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
+
+const PROFILE_PICTURE_MAX_SOURCE_BYTES = 15 * 1024 * 1024;
+const PROFILE_PICTURE_UPLOAD_SIZE = 512;
+
+/** Center-crops an image to a square and shrinks it so uploads stay small. */
+async function toSquareWebp(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const size = Math.min(side, PROFILE_PICTURE_UPLOAD_SIZE);
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  canvas
+    .getContext('2d')!
+    .drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
+  bitmap.close();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Encoding failed'))), 'image/webp', 0.9),
+  );
+}
 
 function SettingsPanel({
   title,
@@ -43,7 +66,7 @@ function SettingsPanel({
 }
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update: updateSession } = useSession();
   const router = useRouter();
   const [name, setName] = useState(session?.user?.name || '');
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +75,9 @@ export default function SettingsPage() {
   const [isFavoriteFlagLoading, setIsFavoriteFlagLoading] = useState(false);
   const [flagSearch, setFlagSearch] = useState('');
   const [isFlagDropdownOpen, setIsFlagDropdownOpen] = useState(false);
+  const [isPictureLoading, setIsPictureLoading] = useState(false);
   const flagDropdownRef = useRef<HTMLDivElement>(null);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const [debouncedFlagSearch] = useDebounce(flagSearch, 300);
@@ -104,6 +129,7 @@ export default function SettingsPage() {
       const result = await changeName(name.trim());
       queryClient.invalidateQueries({ queryKey: ['userData'] });
       if (result.success) {
+        await updateSession();
         toast.success(result.message);
       } else {
         toastErrorWithLogin(result.message);
@@ -112,6 +138,56 @@ export default function SettingsPage() {
       toast.error('Failed to update name. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+    if (file.size > PROFILE_PICTURE_MAX_SOURCE_BYTES) {
+      toast.error('Image must be 15 MB or smaller.');
+      return;
+    }
+
+    setIsPictureLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', await toSquareWebp(file), 'avatar.webp');
+      const result = await changeProfilePicture(formData);
+      if (result.success) {
+        await updateSession();
+        queryClient.invalidateQueries({ queryKey: ['userData'] });
+        toast.success(result.message);
+      } else {
+        toastErrorWithLogin(result.message);
+      }
+    } catch {
+      toast.error('Failed to update profile picture. Please try again.');
+    } finally {
+      setIsPictureLoading(false);
+    }
+  };
+
+  const handlePictureRemove = async () => {
+    setIsPictureLoading(true);
+    try {
+      const result = await removeProfilePicture();
+      if (result.success) {
+        await updateSession();
+        queryClient.invalidateQueries({ queryKey: ['userData'] });
+        toast.success(result.message);
+      } else {
+        toastErrorWithLogin(result.message);
+      }
+    } catch {
+      toast.error('Failed to remove profile picture. Please try again.');
+    } finally {
+      setIsPictureLoading(false);
     }
   };
 
@@ -185,6 +261,8 @@ export default function SettingsPage() {
   }
 
   const favoriteFlag = userData?.user?.favoriteFlag ?? null;
+  const profilePicture = userData?.user?.image ?? null;
+  const displayName = userData?.user?.name || session.user?.name || 'User';
 
   return (
     <div className='mx-auto max-w-[760px] px-4 pb-16 md:px-8'>
@@ -197,7 +275,45 @@ export default function SettingsPage() {
 
       <div className='space-y-4'>
         {/* Profile */}
-        <SettingsPanel title='Profile' description='Your name as shown on flags, edits and the leaderboard.'>
+        <SettingsPanel title='Profile' description='Your name and picture as shown on flags, edits and the leaderboard.'>
+          <div className='mb-5 flex flex-wrap items-center gap-4'>
+            <Avatar className='size-16 text-xl'>
+              <AvatarImage src={profilePicture || ''} alt={displayName} />
+              <AvatarFallback>{displayName.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div className='min-w-0 flex-1'>
+              <p className='text-[13px] font-medium'>Profile picture</p>
+              <p className='mt-0.5 text-[13px] text-muted-foreground'>PNG, JPG, WebP or GIF. Cropped to a square.</p>
+            </div>
+            <div className='flex gap-2'>
+              <input
+                ref={pictureInputRef}
+                type='file'
+                accept='image/png,image/jpeg,image/webp,image/gif'
+                className='hidden'
+                onChange={handlePictureChange}
+              />
+              <Button
+                variant='neutral'
+                onClick={() => pictureInputRef.current?.click()}
+                disabled={isPictureLoading}
+              >
+                {isPictureLoading ? <Loader2 className='animate-spin' /> : <Upload />}
+                {profilePicture ? 'Change' : 'Upload'}
+              </Button>
+              {profilePicture && (
+                <Button
+                  variant='neutral'
+                  size='icon'
+                  title='Remove profile picture'
+                  onClick={handlePictureRemove}
+                  disabled={isPictureLoading}
+                >
+                  <Trash2 />
+                </Button>
+              )}
+            </div>
+          </div>
           <form onSubmit={handleNameChange} className='space-y-2'>
             <Label htmlFor='name' className='text-[13px] font-medium'>
               Display name
