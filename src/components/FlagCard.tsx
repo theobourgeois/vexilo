@@ -1,6 +1,6 @@
 'use client';
 
-import { Heart, Edit, UserCircle, Check } from '@/components/icons';
+import { Heart, Edit, UserCircle, Check, Shuffle } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Flag } from '@/lib/types';
 import { useSession } from 'next-auth/react';
@@ -117,23 +117,36 @@ export default function FlagCard({
       className='vx-tile group relative flex h-full cursor-pointer flex-col overflow-hidden transition-shadow duration-200 hover:shadow-tile-hover'
       onClick={handleCardClick}
     >
-      {session?.user && (
-        <div className='absolute right-2.5 top-2.5 z-10 flex gap-1.5 transition-[opacity,transform] duration-200 sm:-translate-y-0.5 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100'>
-          <Button
-            variant='neutral'
-            size='icon-sm'
-            onClick={handleSetProfileFlag}
-            disabled={isSettingProfileFlag}
-            title={isCurrentProfileFlag ? 'Your profile flag' : 'Set as profile flag'}
-            className={cn(isCurrentProfileFlag && 'text-main')}
-          >
-            {isCurrentProfileFlag ? <Check /> : <UserCircle />}
-          </Button>
-          <Button variant='neutral' size='icon-sm' onClick={handleEditClick} title='Edit'>
-            <Edit />
-          </Button>
-        </div>
-      )}
+      <div className='absolute right-2.5 top-2.5 z-10 flex gap-1.5 transition-[opacity,transform] duration-200 sm:-translate-y-0.5 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100'>
+        <Button
+          variant='neutral'
+          size='icon-sm'
+          title='Remix'
+          onClick={(e) => {
+            e.stopPropagation();
+            router.push(`/create?remix=${id}`);
+          }}
+        >
+          <Shuffle />
+        </Button>
+        {session?.user && (
+          <>
+            <Button
+              variant='neutral'
+              size='icon-sm'
+              onClick={handleSetProfileFlag}
+              disabled={isSettingProfileFlag}
+              title={isCurrentProfileFlag ? 'Your profile flag' : 'Set as profile flag'}
+              className={cn(isCurrentProfileFlag && 'text-main')}
+            >
+              {isCurrentProfileFlag ? <Check /> : <UserCircle />}
+            </Button>
+            <Button variant='neutral' size='icon-sm' onClick={handleEditClick} title='Edit'>
+              <Edit />
+            </Button>
+          </>
+        )}
+      </div>
 
       <div className='flag-stage bg-stage relative h-[228px] px-6 py-7'>
         <MakerBadge tags={tags} className='absolute left-2.5 top-2.5 z-[1]' />

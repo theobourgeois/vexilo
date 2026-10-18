@@ -17,6 +17,8 @@ export function useShortcuts(
   options: {
     setView: React.Dispatch<React.SetStateAction<View>>;
     onExport: () => void;
+    /** Images pasted from the system clipboard. Returns whether it used them. */
+    onPasteFiles?: (files: File[]) => Promise<boolean>;
     setPanel?: (panel: Panel) => void;
     enabled: boolean;
   },
@@ -44,7 +46,8 @@ export function useShortcuts(
         if (key === 'y') return run(history.redo);
         if (key === 'c') return run(actions.copy);
         if (key === 'x') return run(actions.cut);
-        if (key === 'v') return run(actions.paste);
+        // ⌘V is left to the paste event, which can also bring in images.
+        if (key === 'v') return;
         if (key === 'd') return run(() => actions.duplicateSelected());
         if (key === 'a') return run(actions.selectAll);
         if (key === 'e') return run(options.onExport);
@@ -80,7 +83,21 @@ export function useShortcuts(
       const panel = PANELS[Number(key) - 1];
       if (panel && options.setPanel) return run(() => options.setPanel!(panel));
     };
+    const onPaste = async (e: ClipboardEvent) => {
+      const { studio, options } = latest.current;
+      if (!options.enabled) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"]')) return;
+      e.preventDefault();
+      const files = [...(e.clipboardData?.files ?? [])];
+      if (files.length && options.onPasteFiles && (await options.onPasteFiles(files))) return;
+      studio.actions.paste();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('paste', onPaste);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('paste', onPaste);
+    };
   }, []);
 }

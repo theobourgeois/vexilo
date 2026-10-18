@@ -22,6 +22,7 @@ import {
   type Remix,
 } from './chrome';
 import { documentColors, type StudioEmblem } from './model';
+import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel, PanelTitle } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
 import { ContextToolbar } from './tools';
@@ -56,10 +57,12 @@ export function DesktopStudio({
   const [posting, setPosting] = React.useState(false);
   const [colorTarget, setColorTarget] = React.useState<ColorTarget | null>(null);
   const exporter = useExport(studio);
+  const importImages = useImageImport(studio);
 
   useShortcuts(studio, {
     setView,
     onExport: exporter.png,
+    onPasteFiles: (files) => importImages(files),
     setPanel: (next) => setPanel((current) => (current === next ? null : next)),
     enabled: !posting,
   });
@@ -86,6 +89,7 @@ export function DesktopStudio({
           onContextMenu={setMenu}
           onDoubleClickField={(slot, at) => setColorTarget({ ...at, kind: 'field', slot })}
           onDoubleClickLayer={(id, at) => setColorTarget({ ...at, kind: 'layer', id })}
+          onDropFiles={(files, at) => importImages(files, at)}
           onDropEmblem={(id, at) => {
             const emblem = emblems.find((e) => e.id === id);
             if (emblem) addEmblem(emblem, at);
@@ -129,7 +133,7 @@ export function DesktopStudio({
               <X className='size-4' />
             </button>
           </div>
-          {panel === 'emblems' && <EmblemsPanel emblems={emblems} onAdd={(emblem) => addEmblem(emblem)} />}
+          {panel === 'emblems' && <EmblemsPanel emblems={emblems} onAdd={(emblem) => addEmblem(emblem)} onUpload={(files) => importImages(files)} />}
           {panel === 'layout' && <LayoutPanel studio={studio} />}
           {panel === 'colors' && <ColoursPanel studio={studio} />}
           {panel === 'layers' && <LayersPanel studio={studio} />}
