@@ -5,7 +5,7 @@ import type { StudioDesign, StudioField, StudioLayer } from '@/lib/studio-design
 import { layerImage } from './cutout';
 import { useRecolored } from './images';
 import { defaultParams, LAYOUTS } from './layouts';
-import { flagWidth, layerCopies, layerWidth } from './model';
+import { flagWidth, layerBounds, layerCopies, layerWidth } from './model';
 
 type Hrefs = { field?: string; layers?: Record<string, string> };
 
@@ -36,17 +36,38 @@ export function FlagArt({
         <clipPath id={`${id}-clip`}>
           <rect width={W} height={1} />
         </clipPath>
-        {outlined.map((layer) => (
-          <filter key={layer.id} id={`${id}-o-${layer.id}`} x='-50%' y='-50%' width='200%' height='200%' colorInterpolationFilters='sRGB'>
-            <feMorphology in='SourceAlpha' operator='dilate' radius={layer.outline!.width} result='grown' />
-            <feFlood floodColor={layer.outline!.color} />
-            <feComposite in2='grown' operator='in' result='ring' />
-            <feMerge>
-              <feMergeNode in='ring' />
-              <feMergeNode in='SourceGraphic' />
-            </feMerge>
-          </filter>
-        ))}
+        {outlined.map((layer) => {
+          // Blur the shape's alpha and cut it off sharply: a round, even outline, unlike a
+          // morphology dilate, whose square brush leaves flat slabs at every tip.
+          const width = layer.outline!.width;
+          const blur = width / 2;
+          const box = layerBounds(layer, W);
+          const pad = width * 2;
+          return (
+            <filter
+              key={layer.id}
+              id={`${id}-o-${layer.id}`}
+              filterUnits='userSpaceOnUse'
+              x={box.x0 - pad}
+              y={box.y0 - pad}
+              width={box.x1 - box.x0 + pad * 2}
+              height={box.y1 - box.y0 + pad * 2}
+              colorInterpolationFilters='sRGB'
+            >
+              <feGaussianBlur in='SourceAlpha' stdDeviation={blur} result='soft' />
+              <feComponentTransfer in='soft' result='grown'>
+                {/* Alpha ≈ 0.023 is where the blur sits one outline-width out from the edge. */}
+                <feFuncA type='linear' slope={120} intercept={-2.236} />
+              </feComponentTransfer>
+              <feFlood floodColor={layer.outline!.color} />
+              <feComposite in2='grown' operator='in' result='ring' />
+              <feMerge>
+                <feMergeNode in='ring' />
+                <feMergeNode in='SourceGraphic' />
+              </feMerge>
+            </filter>
+          );
+        })}
       </defs>
       <g clipPath={`url(#${id}-clip)`}>
         <FieldArt field={design.field} W={W} href={hrefs?.field} />
