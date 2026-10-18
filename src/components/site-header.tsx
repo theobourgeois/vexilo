@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Logo from '@/components/Logo';
-import { FlagOfTheDayPill } from '@/components/flag-of-the-day-pill';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { PostFlagButton } from '@/components/post-flag-button';
 import { AuthHeader } from '@/components/auth-header';
@@ -53,7 +52,7 @@ export function SiteHeader() {
             );
           })}
         </nav>
-        <FlagOfTheDayPill className='ml-auto' />
+        <div className='flex-1' />
         <div className='hidden items-center gap-2 md:flex'>
           <ThemeToggle />
           <PostFlagButton />
