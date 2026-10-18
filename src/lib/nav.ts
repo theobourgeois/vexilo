@@ -1,5 +1,6 @@
 export const NAV_LINKS = [
   { href: '/', label: 'Browse' },
+  { href: '/create', label: 'Create' },
   { href: '/quiz', label: 'Quiz' },
   { href: '/leaderboard', label: 'Leaderboard' },
 ];

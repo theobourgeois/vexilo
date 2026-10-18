@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const LINKS = [
   { href: 'https://buymeacoffee.com/theobourgeois', label: 'Donate', external: true },
@@ -9,6 +12,9 @@ const LINKS = [
 ];
 
 export function Footer() {
+  const pathname = usePathname();
+  // The flag maker fills the window.
+  if (pathname.startsWith('/create')) return null;
   return (
     <footer className='mt-18 border-t border-line'>
       <div className='mx-auto flex max-w-[1312px] flex-col gap-3 px-4 py-6 text-[13px] text-muted-foreground sm:h-[72px] sm:flex-row sm:items-center sm:gap-5 sm:py-0 md:px-8'>

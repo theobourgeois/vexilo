@@ -1,4 +1,5 @@
 import { Flag } from '@/lib/types';
+import type { EmblemPlacement, StudioDesign } from '@/lib/studio-design';
 import { relations, sql } from 'drizzle-orm';
 import {
   date,
@@ -12,7 +13,9 @@ import {
   varchar,
   boolean,
   jsonb,
+  real,
   uniqueIndex,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { type AdapterAccount } from 'next-auth/adapters';
 
@@ -240,6 +243,9 @@ export const flags = createTable(
       .$type<string[]>()
       .notNull()
       .default([]),
+    // Flags made in the flag maker: the flag it remixed (if any) and the editable design.
+    remixOf: uuid('remix_of').references((): AnyPgColumn => flags.id, { onDelete: 'set null' }),
+    design: jsonb('design').$type<StudioDesign>(),
   },
   (table) => ({
     indexUnique: uniqueIndex('index_unique').on(table.index),
@@ -288,6 +294,42 @@ export const flagColors = createTable(
   },
   (table) => ({
     familiesIdx: index('flag_color_families_idx').using('gin', table.families),
+  }),
+);
+
+/**
+ * Emblems cut out of flag images for the flag editor, one row per distinct emblem.
+ * Each is cut from its best source flag (`flagId`); `appearsOn` lists every flag the same
+ * shape was found on. `sourceKey` (catalogue index + position) lets re-imports update rows in place.
+ * `box` is where the emblem sat on its source flag, as fractions of the flag's width and height;
+ * `placements` has the same for every flag it appears on, so the flag maker can rebuild remixes.
+ */
+export const flagEmblems = createTable(
+  'flag_emblem',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sourceKey: varchar('source_key', { length: 64 }).notNull(),
+    flagId: uuid('flag_id')
+      .notNull()
+      .references(() => flags.id, { onDelete: 'cascade' }),
+    image: varchar('image', { length: 1000 }).notNull(),
+    svg: varchar('svg', { length: 1000 }),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    colors: text('colors').array().notNull().default([]),
+    copies: integer('copies').notNull().default(1),
+    share: real('share').notNull(),
+    box: jsonb('box').$type<[number, number, number, number]>().notNull(),
+    collection: varchar('collection', { length: 40 }).notNull(),
+    appearsOn: uuid('appears_on').array().notNull().default([]),
+    fingerprint: jsonb('fingerprint').$type<number[]>().notNull(),
+    placements: jsonb('placements').$type<EmblemPlacement[]>().notNull().default([]),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sourceKeyIdx: uniqueIndex('flag_emblem_source_key_idx').on(table.sourceKey),
+    flagIdx: index('flag_emblem_flag_idx').on(table.flagId),
   }),
 );
 

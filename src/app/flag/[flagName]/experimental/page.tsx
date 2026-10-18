@@ -12,6 +12,7 @@ import { getFlagAiMetadata } from '@/actions/flag-ai-metadata';
 import FlagCard from '@/components/FlagCard';
 import { ensureFlagImageSelfHosted } from '@/lib/storage/flag-image-mirror';
 import SourceBadge from '@/components/SourceBadge';
+import { getFlagColors } from '@/lib/flag-palette';
 import {
   Tooltip,
   TooltipContent,
@@ -234,7 +235,7 @@ export default async function ConsumerFlagPage({ params }: Props) {
       </nav>
 
       <div className='grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]'>
-        <FlagViewer image={flag.image} name={flag.name} />
+        <FlagViewer image={flag.image} name={flag.name} palette={getFlagColors(flag)} />
 
         <section className='vx-tile flex flex-col p-6 sm:p-[26px]'>
           <span className='vx-label'>{catalogue} · Experimental</span>

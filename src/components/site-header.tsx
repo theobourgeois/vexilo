@@ -32,7 +32,13 @@ export function SiteHeader() {
   }, [pathname, router]);
 
   return (
-    <header className='sticky top-0 z-40 border-b border-line bg-background/80 backdrop-blur-xl backdrop-saturate-150'>
+    <header
+      className={cn(
+        'sticky top-0 z-40 border-b border-line bg-background/80 backdrop-blur-xl backdrop-saturate-150',
+        // The flag maker is full-screen on phones, with its own top bar.
+        pathname.startsWith('/create') && 'max-md:hidden',
+      )}
+    >
       <div className='mx-auto flex h-16 max-w-[1312px] items-center gap-3 px-4 md:gap-7 md:px-8'>
         <Logo />
         <nav className='hidden items-center gap-0.5 md:flex'>

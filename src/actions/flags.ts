@@ -626,6 +626,7 @@ async function getFlagDetailFromNameQuery(flagName: string, userId?: string) {
       views: flags.views,
       createdAt: flags.createdAt,
       relatedFlags: flags.relatedFlags,
+      remixOf: flags.remixOf,
       isFavorite: userId
         ? sql<boolean>`EXISTS (
 				SELECT 1 FROM vexilo_favorite
@@ -687,6 +688,7 @@ export async function getFlagDetailFromName(flagName: string) {
     views: row.views,
     createdAt: row.createdAt,
     relatedFlags: row.relatedFlags,
+    remixOf: row.remixOf,
     isFavorite: row.isFavorite,
     metadata,
     displayDescription,

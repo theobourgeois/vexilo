@@ -15,7 +15,8 @@
     "ai:backfill-flag-metadata": "tsx scripts/ai/backfill-flag-metadata.ts",
     "images:self-host-flags": "tsx scripts/storage/self-host-flag-images.ts",
     "views:backfill": "tsx scripts/views/backfill-flag-views.ts",
-    "colors:backfill": "tsx scripts/colors/backfill-flag-colors.ts"
+    "colors:backfill": "tsx scripts/colors/backfill-flag-colors.ts",
+    "emblems:import": "tsx scripts/emblems/import-emblems.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.58",
