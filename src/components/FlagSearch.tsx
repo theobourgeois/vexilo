@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import FlagCard from './FlagCard';
+import { FlagOfTheDayLink } from './flag-of-the-day-link';
 import Tag from './Tag';
 import {
   getFavoriteFlagsCount,
@@ -313,9 +314,10 @@ export default function FlagSearch() {
           {flagsCount !== undefined
             ? isSearching
               ? `${flagsCount.toLocaleString()} ${flagsCount === 1 ? 'flag matches' : 'flags match'}`
-              : `${flagsCount.toLocaleString()} flags, from countries to cities to fiction`
+              : `${flagsCount.toLocaleString()} flags`
             : ''}
         </p>
+        {!isFavorites && <FlagOfTheDayLink className='-ml-1.5 mt-2 max-w-full sm:-my-2.5 sm:-mr-2.5 sm:ml-auto sm:max-w-[420px] sm:self-center' />}
       </div>
 
       <form
