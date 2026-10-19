@@ -2,11 +2,14 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { signIn, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { openSignIn } from '@/lib/sign-in';
 import { toast } from 'sonner';
 import { postFlagDesign } from '@/actions/studio';
 import WavingFlag from '@/components/WavingFlag';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import TagInput from '@/components/TagInput';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -28,7 +31,6 @@ import {
   History,
   Link as LinkIcon,
   Loader2,
-  Lock,
   Redo,
   Send,
   Shuffle,
@@ -36,7 +38,6 @@ import {
   Undo,
   WandSparkles,
   Wind,
-  X,
   ZoomIn,
   ZoomOut,
   BringForward,
@@ -186,26 +187,24 @@ export function ExportMenu({ studio, children, side = 'bottom' }: { studio: Stud
 
 export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Studio; remix: Remix; open: boolean; onOpenChange: (open: boolean) => void }) {
   const session = useSession();
+  const [title, setTitle] = React.useState(studio.doc.name);
   const [description, setDescription] = React.useState('');
   const [tags, setTags] = React.useState<string[]>([]);
-  const [tagDraft, setTagDraft] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [done, setDone] = React.useState<null | { published: boolean }>(null);
   const makerTag = remix ? REMIX_TAG : CUSTOM_TAG;
 
-  const addTag = (raw: string) => {
-    const tag = raw.trim().replace(/,$/, '');
-    if (!tag || MAKER_TAGS.includes(tag.toLowerCase()) || tags.includes(tag) || tags.length >= 8) return;
-    setTags([...tags, tag]);
-    setTagDraft('');
-  };
+  React.useEffect(() => { if (open) setTitle(studio.doc.name); }, [open, studio.doc.name]);
 
   async function submit() {
+    const name = title.trim();
+    if (!name) { toast.error('Give your flag a title.'); return; }
+    studio.actions.setName(name);
     setBusy(true);
     try {
       const image = await blobToDataUrl(await designToPng(studio.design, 1800));
       const result = await postFlagDesign({
-        name: studio.doc.name,
+        name,
         description,
         tags,
         image,
@@ -223,7 +222,7 @@ export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Stud
 
   return (
     <Dialog open={open} onOpenChange={(next) => (onOpenChange(next), !next && setDone(null))}>
-      <DialogContent className='max-w-[460px] gap-5'>
+      <DialogContent className='w-[calc(100%-2rem)] max-w-[460px] sm:max-w-[460px] max-h-[calc(100dvh-2rem)] overflow-y-auto gap-5'>
         {done ? (
           <div className='flex flex-col items-center gap-3 py-4 text-center'>
             <FlagArt design={studio.design} className='studio-flag h-24 w-auto' style={{ aspectRatio: `${studio.design.ratio[1]} / ${studio.design.ratio[0]}` }} />
@@ -239,57 +238,36 @@ export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Stud
           <>
             <div className='flex items-center gap-4'>
               <FlagArt design={studio.design} className='studio-flag h-14 w-auto shrink-0' style={{ aspectRatio: `${studio.design.ratio[1]} / ${studio.design.ratio[0]}` }} />
-              <div className='min-w-0'>
-                <DialogTitle className='truncate text-[19px]'>{studio.doc.name}</DialogTitle>
+              <div className='min-w-0 flex-1'>
+                <DialogTitle className='sr-only'>Post your flag</DialogTitle>
+                <label htmlFor='post-flag-title' className='mb-1 block text-xs font-medium text-muted-foreground'>Title</label>
+                <Input id='post-flag-title' value={title} maxLength={120} required disabled={busy} onChange={(event) => setTitle(event.target.value)} onBlur={() => { if (title.trim()) studio.actions.setName(title.trim()); }} className='text-[17px] font-semibold' />
                 <DialogDescription className='sr-only'>Post this flag to Vexilo</DialogDescription>
                 {remix && <p className='mt-0.5 truncate text-[13px] text-muted-foreground'>Remix of {remix.name}</p>}
               </div>
             </div>
             {session.status === 'authenticated' ? (
               <>
+                <div className='space-y-1.5'>
+                <label htmlFor='post-flag-description' className='text-[13px] font-medium'>Description</label>
                 <textarea
+                  id='post-flag-description'
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder='What is it?'
+                  placeholder='Describe your flag…'
                   rows={3}
                   maxLength={2000}
                   className='vx-well w-full resize-none rounded-[12px] px-3.5 py-3 text-[14px] outline-none focus:ring-2 focus:ring-ring'
                 />
-                <div className='vx-well flex flex-wrap items-center gap-1.5 rounded-[12px] p-2 focus-within:ring-2 focus-within:ring-ring'>
-                  <span className='inline-flex h-7 items-center gap-1 rounded-full bg-[rgb(225_120_50/0.13)] px-2.5 text-[12.5px] font-semibold text-[#b4541d] dark:bg-[rgb(240_163_107/0.14)] dark:text-[#f0a36b]'>
-                    <Lock className='size-3' />
-                    {makerTag}
-                  </span>
-                  {tags.map((tag) => (
-                    <span key={tag} className='inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[12.5px] text-subtle shadow-[inset_0_0_0_1px_var(--border)]'>
-                      {tag}
-                      <button type='button' aria-label={`Remove ${tag}`} className='cursor-pointer hover:text-foreground' onClick={() => setTags(tags.filter((t) => t !== tag))}>
-                        <X className='size-3' />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    value={tagDraft}
-                    onChange={(e) => (e.target.value.endsWith(',') ? addTag(e.target.value) : setTagDraft(e.target.value))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addTag(tagDraft);
-                      }
-                      if (e.key === 'Backspace' && !tagDraft && tags.length) setTags(tags.slice(0, -1));
-                    }}
-                    onBlur={() => addTag(tagDraft)}
-                    placeholder={tags.length ? '' : 'Add tags'}
-                    className='h-7 min-w-24 flex-1 bg-transparent px-1 text-[13.5px] outline-none placeholder:text-muted-foreground'
-                  />
                 </div>
-                <Button onClick={submit} disabled={busy} className='h-11'>
+                <TagInput tags={tags} onTagsChange={(next) => setTags(next.filter((tag) => !MAKER_TAGS.includes(tag.toLowerCase())))} lockedTags={[makerTag]} maxTags={8} placeholder='Search or add tags…' />
+                <Button onClick={submit} disabled={busy || !title.trim()} className='h-11'>
                   {busy ? <Loader2 className='animate-spin' /> : <Send />}
                   Post {remix ? 'remix' : 'flag'}
                 </Button>
               </>
             ) : (
-              <Button variant='neutral' className='h-11' onClick={() => signIn('google', { callbackUrl: window.location.href })}>
+              <Button variant='neutral' className='h-11' onClick={() => openSignIn()}>
                 <GoogleLogo />
                 Sign in to post
               </Button>

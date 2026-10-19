@@ -151,12 +151,25 @@ export const users = createTable('user', {
   favoriteFlagId: uuid('favorite_flag_id').references(() => flags.id, {
     onDelete: 'set null',
   }),
-});
+}, (table) => [uniqueIndex('user_email_unique').on(sql`lower(${table.email})`)]);
 
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   sessions: many(sessions),
 }));
+
+/** Pending email signups. Passwords are hashed; codes are HMACs, never plaintext. */
+export const emailChallenges = createTable('email_challenge', {
+  email: varchar('email', { length: 255 }).primaryKey(),
+  id: uuid('id').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  hashedPassword: text('hashed_password').notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  codeHash: varchar('code_hash', { length: 64 }).notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
+  sentAt: timestamp('sent_at', { mode: 'date' }).notNull(),
+}, (table) => [index('email_challenge_expires_idx').on(table.expiresAt)]);
 
 export const accounts = createTable(
   'account',

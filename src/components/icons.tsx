@@ -54,7 +54,10 @@ export const FlagBanner = bold(Ph.FlagBanner, 'FlagBanner');
 export const FolderOpen = bold(Ph.FolderOpen, 'FolderOpen');
 export const Gamepad2 = bold(Ph.GameController, 'Gamepad2');
 export const Globe = bold(Ph.Globe, 'Globe');
-export const GoogleLogo = bold(Ph.GoogleLogo, 'GoogleLogo');
+// Use Google's supplied artwork rather than a monochrome icon approximation.
+export const GoogleLogo = forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>(function GoogleLogo(props, ref) {
+  return <svg ref={ref} viewBox='0 0 48 48' width='18' height='18' aria-hidden='true' {...props}><image href='/google-g.png' width='48' height='48' /></svg>;
+});
 export const Hash = bold(Ph.Hash, 'Hash');
 export const Heart = bold(Ph.Heart, 'Heart');
 export const History = bold(Ph.ClockCounterClockwise, 'History');

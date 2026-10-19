@@ -54,7 +54,7 @@ function loadImage(src: string) {
 export async function createFlagRecolorer(
   src: string,
   palette: string[],
-  options: { snapPalette?: boolean } = {},
+  options: { snapPalette?: boolean; cleanEdges?: boolean } = {},
 ): Promise<FlagRecolorer> {
   const img = await loadImage(src);
   const scale = Math.min(1, MAX_SIZE / Math.max(img.naturalWidth, img.naturalHeight));
@@ -128,7 +128,7 @@ export async function createFlagRecolorer(
         const lengthSq = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
         if (lengthSq === 0) return;
         const s = Math.min(1, ((rgb[0] - start[0]) * ab[0] + (rgb[1] - start[1]) * ab[1] + (rgb[2] - start[2]) * ab[2]) / lengthSq);
-        if (s <= 0.05) return;
+        if (s <= (options.cleanEdges ? 0 : 0.05)) return;
         const d = Math.hypot(rgb[0] - (start[0] + s * ab[0]), rgb[1] - (start[1] + s * ab[1]), rgb[2] - (start[2] + s * ab[2]));
         if (d < BLEND_DISTANCE && d < blendDistance) [b, t, blendDistance] = [index, s, d];
       });
@@ -161,7 +161,14 @@ export async function createFlagRecolorer(
         const sb = shift[to[e]];
         const t = along[e];
         const w = weight[e];
-        for (let c = 0; c < 3; c++) table[e * 3 + c] = base[e * 3 + c] + w * (sa[c] + t * (sb[c] - sa[c]));
+        for (let c = 0; c < 3; c++) {
+          // Raster edges contain mixtures of the old palette, sometimes with a small
+          // rounding/compression error. Rebuild confident matches from the new palette
+          // so that error doesn't survive as a coloured fringe after a remix.
+          const original = oldRgb[from[e]][c] + t * (oldRgb[to[e]][c] - oldRgb[from[e]][c]);
+          const color = options.cleanEdges && w === 1 ? original : base[e * 3 + c];
+          table[e * 3 + c] = color + w * (sa[c] + t * (sb[c] - sa[c]));
+        }
       }
       const output = new ImageData(width, height);
       const out = output.data;

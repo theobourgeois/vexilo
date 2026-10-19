@@ -1,11 +1,12 @@
 'use client';
 
-import { useSession, signOut, signIn } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
+import { openSignIn } from '@/lib/sign-in';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from './ui/button';
-import { GoogleLogo, LogOut, Moon, Settings, Shield, Sun, User } from '@/components/icons';
+import { LogOut, Moon, Settings, Shield, Sun, User } from '@/components/icons';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import {
   DropdownMenu,
@@ -33,8 +34,7 @@ export function AuthHeader() {
 
   if (!session) {
     return (
-      <Button variant='neutral' onClick={() => signIn('google', { callbackUrl: '/' })}>
-        <GoogleLogo />
+      <Button variant='neutral' onClick={() => openSignIn()}>
         Sign in
       </Button>
     );

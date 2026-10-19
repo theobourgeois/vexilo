@@ -35,6 +35,19 @@ function createLocalRedis() {
     async del(...keys: string[]) {
       return keys.filter((key) => store.delete(key)).length;
     },
+    async incr(key: string) {
+      const entry = store.get(key);
+      const current = entry && (entry.expiresAt === null || entry.expiresAt >= Date.now()) ? entry : undefined;
+      const value = Number(current?.value ?? 0) + 1;
+      store.set(key, { value, expiresAt: current?.expiresAt ?? null });
+      return value;
+    },
+    async expire(key: string, seconds: number) {
+      const entry = store.get(key);
+      if (!entry) return 0;
+      entry.expiresAt = Date.now() + seconds * 1000;
+      return 1;
+    },
   };
 }
 

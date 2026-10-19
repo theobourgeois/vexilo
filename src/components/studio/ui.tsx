@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Eyedropper, Plus } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { FLAG_COLORS, normalizeHex, sameColor } from './colors';
+import { ReferencePalette } from './ReferencePalette';
 
 export function Swatch({
   color,
@@ -113,6 +114,7 @@ export function ColorPicker({
   onCommit: () => void;
 }) {
   const [draft, setDraft] = React.useState(value.toUpperCase());
+  const [tab, setTab] = React.useState<'swatches' | 'flag'>('swatches');
   React.useEffect(() => setDraft(value.toUpperCase()), [value]);
   const pick = (color: string) => {
     onChange(color);
@@ -121,7 +123,7 @@ export function ColorPicker({
   const EyeDropper = typeof window !== 'undefined' ? (window as unknown as { EyeDropper?: EyeDropperCtor }).EyeDropper : undefined;
 
   return (
-    <div className='flex w-[236px] flex-col gap-3'>
+    <div className='-m-1.5 flex max-h-[min(520px,var(--radix-popover-content-available-height,70dvh))] w-[248px] flex-col gap-3 overflow-y-auto p-1.5'>
       <div className='flex items-center gap-2'>
         <label className='relative size-9 shrink-0 cursor-pointer overflow-hidden rounded-[10px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.16)]' style={{ background: value }}>
           <input
@@ -172,11 +174,14 @@ export function ColorPicker({
           ))}
         </div>
       )}
-      <div className='grid grid-cols-6 gap-1.5'>
+      <div className='flex gap-1 rounded-[9px] bg-well p-1' role='group' aria-label='Colour source'>
+        {(['swatches', 'flag'] as const).map((source) => <button key={source} type='button' aria-pressed={tab === source} onClick={() => setTab(source)} className={cn('flex-1 cursor-pointer rounded-[6px] px-2 py-1.5 text-xs font-medium', tab === source ? 'bg-popover shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground')}>{source === 'swatches' ? 'Swatches' : 'From a flag'}</button>)}
+      </div>
+      {tab === 'flag' ? <ReferencePalette value={value} onPick={pick} /> : <div className='grid grid-cols-6 gap-1.5'>
         {FLAG_COLORS.map((color) => (
           <Swatch key={color} color={color} size={34} active={sameColor(color, value)} aria-label={color} onClick={() => pick(color)} />
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

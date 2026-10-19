@@ -1,4 +1,4 @@
-import { signIn } from 'next-auth/react';
+import { openSignIn } from '@/lib/sign-in';
 import { toast } from 'sonner';
 
 const AUTH_REQUIRED_MESSAGE_PATTERN = /^You must be logged in to\b/i;
@@ -11,7 +11,7 @@ export const toastErrorWithLogin = (message: string) => {
     toast.error(message, {
       action: {
         label: 'Log in',
-        onClick: () => void signIn('google'),
+        onClick: () => void openSignIn(),
       },
     });
     return;

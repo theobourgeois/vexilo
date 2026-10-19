@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
-import { X, Search, Plus, Loader2 } from '@/components/icons';
+import { X, Search, Plus, Loader2, Lock } from '@/components/icons';
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { getTopFlagTags, getAllFlagTags } from "@/actions/flags";
@@ -11,6 +11,8 @@ type TagInputProps = {
 	onTagsChange: (tags: string[]) => void;
 	placeholder?: string;
 	label?: string;
+	lockedTags?: string[];
+	maxTags?: number;
 };
 
 export default function TagInput({
@@ -18,6 +20,8 @@ export default function TagInput({
 	onTagsChange,
 	placeholder = "Add a tag...",
 	label = "Tags",
+	lockedTags = [],
+	maxTags,
 }: TagInputProps) {
 	const [inputValue, setInputValue] = useState("");
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -67,7 +71,7 @@ export default function TagInput({
 	};
 
 	const handleTagSelect = (selectedTag: string) => {
-		if (!tags.includes(selectedTag)) {
+		if (!isTagSelected(selectedTag) && (maxTags === undefined || tags.length < maxTags)) {
 			onTagsChange([...tags, selectedTag]);
 		}
 		setInputValue("");
@@ -78,16 +82,12 @@ export default function TagInput({
 		if (e.key === "Enter") {
 			e.preventDefault();
 			const trimmedValue = inputValue.trim();
-			if (trimmedValue && !tags.includes(trimmedValue)) {
-				onTagsChange([...tags, trimmedValue]);
-				setInputValue("");
-				setIsDropdownOpen(false);
-			}
+			if (trimmedValue) handleTagSelect(trimmedValue);
 		}
 	};
 
 	const isTagSelected = (tag: string) => {
-		return tags.includes(tag);
+		return [...tags, ...lockedTags].some((value) => value.toLowerCase() === tag.toLowerCase());
 	};
 
 	// Get suggestions to show (filtered tags if searching, top tags otherwise)
@@ -102,6 +102,8 @@ export default function TagInput({
 				<Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 				<Input
 					id="tags"
+					maxLength={40}
+					disabled={maxTags !== undefined && tags.length >= maxTags}
 					placeholder={placeholder}
 					value={inputValue}
 					onChange={handleInputChange}
@@ -146,7 +148,7 @@ export default function TagInput({
 											s.tag.toLowerCase() ===
 											inputValue.trim().toLowerCase(),
 									) &&
-									!tags.includes(inputValue.trim()) && (
+									!isTagSelected(inputValue.trim()) && (
 										<button
 											type="button"
 											className="mt-1 flex w-full cursor-pointer items-center gap-2 rounded-[9px] border-t border-line px-2.5 py-2 text-left text-[13px] font-medium transition-colors hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.06] focus-visible:outline-none"
@@ -167,8 +169,9 @@ export default function TagInput({
 					</div>
 				)}
 			</div>
-			{tags.length > 0 && (
+			{(tags.length > 0 || lockedTags.length > 0) && (
 				<div className="flex flex-wrap gap-1.5 pt-1">
+					{lockedTags.map((tag) => <span key={tag} className='inline-flex h-[26px] items-center gap-1 rounded-full bg-[rgb(225_120_50/0.13)] px-2.5 text-[12.5px] font-semibold text-[#b4541d] dark:bg-[rgb(240_163_107/0.14)] dark:text-[#f0a36b]' title='Automatically added to flags made in the editor'><Lock className='size-3' />{tag}</span>)}
 					{tags.map((tag) => (
 						<RemovablePill key={tag} onRemove={() => removeTag(tag)} removeLabel={`Remove tag ${tag}`}>
 							{tag}

@@ -1,6 +1,7 @@
 'use client';
 
-import { signIn, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { openSignIn } from '@/lib/sign-in';
 import { toast } from 'sonner';
 import { uploadStudioImage } from '@/actions/studio';
 import { loadImage } from './cutout';
@@ -118,7 +119,7 @@ export function useImageImport(studio: Studio) {
     const images = [...files].filter((file) => file.type.startsWith('image/')).slice(0, 4);
     if (images.length === 0) return false;
     if (!session?.user) {
-      toast('Sign in to use your own images', { action: { label: 'Sign in', onClick: () => signIn('google') } });
+      toast('Sign in to use your own images', { action: { label: 'Sign in', onClick: () => openSignIn() } });
       return true;
     }
     for (const [i, file] of images.entries()) {

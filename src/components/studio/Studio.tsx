@@ -80,7 +80,7 @@ export default function Studio({ emblems, remix }: { emblems: StudioEmblem[]; re
       const draft = loadDraft(key);
       const start = await getOriginal();
       if (!live) return;
-      if (draft && JSON.stringify(draft.design) !== JSON.stringify(start.design)) {
+      if (draft && (draft.name !== start.name || JSON.stringify(draft.design) !== JSON.stringify(start.design))) {
         reset(draft);
         // Coming back to an edited remix should never feel like a trap.
         toast('Picked up where you left off', {
@@ -101,14 +101,19 @@ export default function Studio({ emblems, remix }: { emblems: StudioEmblem[]; re
 
   React.useEffect(() => {
     if (!ready) return;
-    const timer = setTimeout(() => {
+    const save = () => {
       try {
         localStorage.setItem(key, JSON.stringify(studio.doc));
       } catch {
         // Storage full or blocked; the design just isn't kept.
       }
-    }, 400);
-    return () => clearTimeout(timer);
+    };
+    const timer = setTimeout(save, 400);
+    window.addEventListener('pagehide', save);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('pagehide', save);
+    };
   }, [studio.doc, ready, key]);
 
   const remixLink = remix ? { id: remix.id, name: remix.name } : null;

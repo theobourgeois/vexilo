@@ -40,7 +40,7 @@ function getRecolorer(src: string, palette: string[]) {
   let recolorer = recolorers.get(key);
   if (!recolorer) {
     recolorer = Promise.all([import('@/lib/flag-recolor'), baseUrl(src)]).then(([{ createFlagRecolorer }, url]) =>
-      createFlagRecolorer(url, palette, { snapPalette: true }),
+      createFlagRecolorer(url, palette, { snapPalette: true, cleanEdges: true }),
     );
     recolorer.catch(() => recolorers.delete(key));
     recolorers.set(key, recolorer);
