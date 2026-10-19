@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { and, eq, ilike, isNull, sql } from 'drizzle-orm';
@@ -22,29 +22,36 @@ import { studioDesignSchema } from '../../src/lib/studio-design-schema';
  *   npm run parts:backfill -- --only 221,1180 --force
  *   npm run parts:backfill -- --failed   # retry flags that failed last time
  *   npm run parts:backfill -- --limit 50 --dry-run
+ *   npm run parts:backfill -- --limit 200 --preview /tmp/parts   # writes parts and manifest.json, nothing else
  */
 
 /** Bump when the extractor changes, to cut every flag again. */
-const VERSION = 1;
+const VERSION = 2;
 const TIMEOUT_MS = 60_000;
 const MAX_LAYERS = 80;
+/** A layout field is dropped for the SVG's own when it rebuilds the flag worse than this. */
+const FIT_SLACK = 0.002;
+/** Designs that rebuild the flag worse than this aren't used: the live remix takes over. */
+const MAX_MISMATCH = 0.015;
 
 type Part = { kind: 'shapes' | 'hole'; svg: string; box: [number, number, number, number]; palette: string[]; share: number };
 type Extracted = { aspect: number; leaves: number; field: { svg: string; palette: string[] }; objects: Part[] };
 type Fit = { layout: LayoutId; params: Record<string, number>; medians: number[][]; unexplained: number };
 type Flag = { id: string; index: number; name: string; image: string };
 type Candidate = ReturnType<typeof layoutCandidates>[number];
+type CheckField = { shapes: { slot: number; d: string }[]; colors: string[] } | { svg: string };
 
 /** What extract-parts.js puts on the page's window. */
 declare global {
   interface Window {
     extractParts: (svg: string) => Promise<Extracted>;
     fitLayout: (svg: string, aspect: number, candidates: Candidate[]) => Promise<Fit | null>;
+    compareDesign: (svg: string, aspect: number, field: CheckField, parts: { svg: string; box: Part['box'] }[]) => Promise<number>;
   }
 }
 
 function parseArgs(argv: string[]) {
-  const args = { only: [] as number[], limit: 0, force: false, failed: false, dryRun: false, concurrency: 6 };
+  const args = { only: [] as number[], limit: 0, force: false, failed: false, dryRun: false, preview: '', concurrency: 6 };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--only') args.only = argv[++i].split(',').map(Number);
@@ -52,9 +59,11 @@ function parseArgs(argv: string[]) {
     else if (arg === '--force') args.force = true;
     else if (arg === '--failed') args.failed = true;
     else if (arg === '--dry-run') args.dryRun = true;
+    else if (arg === '--preview') args.preview = argv[++i];
     else if (arg === '--concurrency') args.concurrency = Number(argv[++i]);
     else throw new Error(`Unknown argument: ${arg}`);
   }
+  if (args.preview) args.dryRun = true;
   return args;
 }
 
@@ -91,6 +100,12 @@ function layoutCandidates(aspect: number) {
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+/** A fitted layout's colours: the SVG's own where the sampled ones are close. */
+const fitColors = (result: Extracted, fit: Fit) =>
+  fit.medians.map((m) => result.field.palette.find((c) => distance(toRgb(c), m) < 30) ?? hex(m));
+
+const fitShapes = (aspect: number, fit: Fit) => LAYOUTS[fit.layout].shapes(aspect, { ...defaultParams(fit.layout), ...fit.params });
+
 function buildDesign(result: Extracted, fit: Fit | null, urls: { field: string | null; parts: string[] }): StudioDesign {
   const aspect = result.aspect;
   const ratio: [number, number] = [1, Math.round(aspect * 1000) / 1000];
@@ -99,11 +114,7 @@ function buildDesign(result: Extracted, fit: Fit | null, urls: { field: string |
         kind: 'layout',
         layout: fit.layout,
         params: fit.params,
-        // The SVG's own colours where the sampled ones are close.
-        colors: fit.medians.map((m) => {
-          const match = result.field.palette.find((c) => distance(toRgb(c), m) < 30);
-          return match ?? hex(m);
-        }),
+        colors: fitColors(result, fit),
       }
     : { kind: 'image', src: urls.field!, palette: result.field.palette.slice(0, 8), colors: result.field.palette.slice(0, 8) };
   const layers = result.objects.map((part, i): StudioLayer => {
@@ -191,7 +202,8 @@ async function main() {
       .onConflictDoUpdate({ target: flagParts.flagId, set: { ...row, updatedAt: new Date() } });
   };
 
-  const counts = { ok: 0, empty: 0, failed: 0 };
+  const counts = { ok: 0, failed: 0 };
+  const manifest: Record<string, unknown>[] = [];
   let done = 0;
   const queue = [...rows];
   const worker = async () => {
@@ -207,47 +219,91 @@ async function main() {
 
         const result = await withTimeout(page.evaluate((text) => window.extractParts(text), svg));
         if (result.objects.length > MAX_LAYERS) throw new Error(`Too many objects (${result.objects.length})`);
-        const fit = await withTimeout(
+        let fit = await withTimeout(
           page.evaluate(
             ([text, aspect, candidates]) => window.fitLayout(text, aspect, candidates),
             [result.field.svg, result.aspect, layoutCandidates(result.aspect)] as const,
           ),
         );
-        if (result.objects.length === 0 && !fit) {
-          await save(flag, { sourceHash, status: 'empty', error: null, design: null });
-          counts.empty++;
-        } else {
-          const base = `flags/parts/${flag.index}-${slugify(flag.name) || 'flag'}/${sourceHash.slice(0, 12)}`;
-          const urls = {
-            field: fit ? null : await upload(`${base}/field.svg`, result.field.svg),
-            parts: await Promise.all(result.objects.map((part, i) => upload(`${base}/part-${i + 1}.svg`, part.svg))),
-          };
-          const design = studioDesignSchema.parse(buildDesign(result, fit, urls));
-          await save(flag, { sourceHash, status: 'ok', error: null, design });
-          counts.ok++;
+
+        // Rebuild the flag from the parts and compare it with the original, so nothing is lost.
+        const parts = result.objects.map(({ svg, box }) => ({ svg, box }));
+        const check = (f: Fit | null) => {
+          const field: CheckField = f ? { shapes: fitShapes(result.aspect, f), colors: fitColors(result, f) } : { svg: result.field.svg };
+          return withTimeout(
+            page.evaluate(([text, aspect, field, parts]) => window.compareDesign(text, aspect, field, parts), [svg, result.aspect, field, parts] as const),
+          );
+        };
+        let mismatch = await check(fit);
+        if (fit && mismatch > FIT_SLACK) {
+          const own = await check(null);
+          if (own < mismatch) [fit, mismatch] = [null, own];
         }
+        if (mismatch > MAX_MISMATCH) throw new Error(`Rebuilt flag differs from the original by ${(mismatch * 100).toFixed(1)}%`);
+
+        // The version is in the key: parts are cached as immutable, so a re-cut needs new URLs.
+        const base = `flags/parts/${flag.index}-${slugify(flag.name) || 'flag'}/${sourceHash.slice(0, 12)}-v${VERSION}`;
+        const urls = {
+          field: fit ? null : await upload(`${base}/field.svg`, result.field.svg),
+          parts: await Promise.all(result.objects.map((part, i) => upload(`${base}/part-${i + 1}.svg`, part.svg))),
+        };
+        const design = studioDesignSchema.parse(buildDesign(result, fit, urls));
+        await save(flag, { sourceHash, status: 'ok', error: null, design, mismatch });
+        counts.ok++;
+        if (args.preview) await writePreview(args.preview, flag, svg, result, fit, mismatch, manifest);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.warn(`[parts] #${flag.index} ${flag.name}: ${message.split('\n')[0]}`);
-        await save(flag, { sourceHash: sourceHash || '-', status: 'failed', error: message.slice(0, 2000), design: null });
+        await save(flag, { sourceHash: sourceHash || '-', status: 'failed', error: message.slice(0, 2000), design: null, mismatch: null });
+        if (args.preview) manifest.push({ index: flag.index, name: flag.name, image: flag.image, error: message.split('\n')[0] });
         counts.failed++;
         // A hung or crashed page is replaced rather than reused.
         await page.close().catch(() => undefined);
         page = await newPage();
       }
-      if (++done % 100 === 0) console.log(`[parts] ${done}/${rows.length} (${counts.ok} ok, ${counts.empty} empty, ${counts.failed} failed)`);
+      if (++done % 100 === 0) console.log(`[parts] ${done}/${rows.length} (${counts.ok} ok, ${counts.failed} failed)`);
     }
     await page.close().catch(() => undefined);
   };
   await Promise.all(Array.from({ length: Math.max(1, args.concurrency) }, worker));
   await browser.close();
+  if (args.preview) {
+    const order = new Map(rows.map((f, i) => [f.index, i]));
+    manifest.sort((a, b) => order.get(a.index as number)! - order.get(b.index as number)!);
+    await writeFile(path.join(args.preview, 'manifest.json'), JSON.stringify(manifest, null, 1));
+  }
 
   const [{ count }] = args.dryRun
     ? [{ count: 0 }]
     : await db.select({ count: sql<number>`count(*)::int` }).from(flagParts).where(eq(flagParts.status, 'ok'));
   console.log(
-    `[parts] done: ${counts.ok} ok, ${counts.empty} empty, ${counts.failed} failed${args.dryRun ? '' : ` (${count} flags with parts in vexilo_flag_parts)`}`,
+    `[parts] done: ${counts.ok} ok, ${counts.failed} failed${args.dryRun ? '' : ` (${count} flags with parts in vexilo_flag_parts)`}`,
   );
+}
+
+/** Writes a flag's parts for the review page (/tmp/vexilo-parts/out/index.html reads manifest.json). */
+async function writePreview(dir: string, flag: Flag, svg: string, result: Extracted, fit: Fit | null, mismatch: number, manifest: Record<string, unknown>[]) {
+  const out = path.join(dir, 'flags', String(flag.index));
+  await mkdir(out, { recursive: true });
+  await writeFile(path.join(out, 'original.svg'), svg);
+  const field = fit
+    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${result.aspect} 1" width="${Math.round(1000 * result.aspect)}" height="1000" preserveAspectRatio="none">${fitShapes(result.aspect, fit)
+        .map((shape) => `<path d="${shape.d}" fill="${fitColors(result, fit)[shape.slot]}"/>`)
+        .join('')}</svg>`
+    : result.field.svg;
+  await writeFile(path.join(out, 'field.svg'), field);
+  await Promise.all(result.objects.map((part, i) => writeFile(path.join(out, `part-${i + 1}.svg`), part.svg)));
+  manifest.push({
+    index: flag.index,
+    name: flag.name,
+    image: flag.image,
+    aspect: result.aspect,
+    leaves: result.leaves,
+    mismatch,
+    layout: fit?.layout ?? null,
+    field: { palette: fit ? fitColors(result, fit) : result.field.palette, leaves: 0 },
+    objects: result.objects.map((part) => ({ kind: part.kind, box: part.box, palette: part.palette, share: part.share })),
+  });
 }
 
 main().then(

@@ -211,7 +211,7 @@ window.extractParts = async function extractParts(svgText, opts = {}) {
     if (id >= 0 && id < leaves.length) owner[p] = id;
   }
 
-  // Per leaf: visible pixels, bounds, and whether it reaches the flag's edge.
+  // Per leaf: visible pixels, bounds, and which of the flag's edges it reaches (a bit per side).
   const n = leaves.length;
   const area = new Int32Array(n);
   const box = Array.from({ length: n }, () => [Infinity, Infinity, -Infinity, -Infinity]);
@@ -226,12 +226,26 @@ window.extractParts = async function extractParts(svgText, opts = {}) {
       if (y < b[1]) b[1] = y;
       if (x > b[2]) b[2] = x;
       if (y > b[3]) b[3] = y;
-      if (x <= 1 || y <= 1 || x >= W - 2 || y >= H - 2) edge[o] = 1;
+      if (x <= 1) edge[o] |= 1;
+      if (x >= W - 2) edge[o] |= 2;
+      if (y <= 1) edge[o] |= 4;
+      if (y >= H - 2) edge[o] |= 8;
     }
 
-  // Field: what reaches the edge. Everything else visible is part of an object.
+  // Field: shapes that span the flag, reaching two or more of its edges (stripes, a canton, a
+  // cross), or that reach one and either cover a good part of it or are drawn the flag's full size
+  // under others (a trim showing as a thin line). A small shape touching one edge (a laser beam
+  // fired off the side) is part of an object. A shape covering much of the flag is field too, even
+  // inset in a border (a panel).
+  const sides = (bits) => (bits & 1) + ((bits >> 1) & 1) + ((bits >> 2) & 1) + ((bits >> 3) & 1);
+  const rootRect = root.getBoundingClientRect();
+  const fullSize = (i) => {
+    const r = leaves[i].getBoundingClientRect();
+    return r.width >= rootRect.width * 0.95 && r.height >= rootRect.height * 0.95;
+  };
   const isField = new Uint8Array(n);
-  for (let i = 0; i < n; i++) if (edge[i]) isField[i] = 1;
+  for (let i = 0; i < n; i++)
+    if (sides(edge[i]) >= 2 || (edge[i] && (area[i] >= W * H * 0.08 || fullSize(i))) || area[i] >= W * H * 0.3) isField[i] = 1;
 
   // Group object shapes that touch (within ~1% of the flag's height) into one object.
   const parent = Int32Array.from({ length: n }, (_, i) => i);
@@ -288,16 +302,66 @@ window.extractParts = async function extractParts(svgText, opts = {}) {
   const specks = objects.filter((o) => o.area < minArea);
   objects = objects.filter((o) => o.area >= minArea);
 
-  // Shapes whose boxes mostly overlap are one object even with gaps between them (petals of a
-  // flower, lettering around a seal).
+  // Shapes that mostly sit inside another object's box are part of it even with gaps between
+  // them (petals of a flower, lettering around a seal). Measured on their pixels, not their
+  // boxes, so a long diagonal (a laser beam) doesn't swallow everything its box crosses.
   const boxArea = (b) => Math.max(0, b[2] - b[0] + 1) * Math.max(0, b[3] - b[1] + 1);
+  const mark = new Uint8Array(n);
+  const shareInside = (o, b) => {
+    for (const i of o.members) mark[i] = 1;
+    let inside = 0;
+    let total = 0;
+    for (let y = o.box[1]; y <= o.box[3]; y++)
+      for (let x = o.box[0]; x <= o.box[2]; x++) {
+        const k = owner[y * W + x];
+        if (k < 0 || !mark[k]) continue;
+        total++;
+        if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]) inside++;
+      }
+    for (const i of o.members) mark[i] = 0;
+    return total ? inside / total : 0;
+  };
+  // Small pieces close to a bigger one join it (rays around a sun, the halves of a character).
+  const reach = Math.max(3, Math.round(H * 0.025));
+  for (let changed = true; changed; ) {
+    changed = false;
+    const objOf = new Int32Array(n).fill(-1);
+    objects.forEach((o, k) => o.members.forEach((i) => (objOf[i] = k)));
+    const order = objects.map((_, k) => k).sort((a, b) => objects[a].area - objects[b].area);
+    for (const k of order) {
+      const o = objects[k];
+      if (o.area > W * H * 0.01) break;
+      let best = -1;
+      let bestD = Infinity;
+      for (let y = o.box[1]; y <= o.box[3]; y++)
+        for (let x = o.box[0]; x <= o.box[2]; x++) {
+          const at = owner[y * W + x];
+          if (at < 0 || objOf[at] !== k) continue;
+          for (let dy = -reach; dy <= reach; dy++)
+            for (let dx = -reach; dx <= reach; dx++) {
+              const d = dx * dx + dy * dy;
+              if (d >= bestD || d > reach * reach) continue;
+              const [nx, ny] = [x + dx, y + dy];
+              if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+              const j = objOf[owner[ny * W + nx]] ?? -1;
+              if (j >= 0 && j !== k && objects[j].area >= o.area) [best, bestD] = [j, d];
+            }
+        }
+      if (best < 0) continue;
+      objects[best] = summarize([...objects[best].members, ...o.members]);
+      objects.splice(k, 1);
+      changed = true;
+      break;
+    }
+  }
+
   for (let merged = true; merged; ) {
     merged = false;
     outer: for (let a = 0; a < objects.length; a++)
       for (let b = a + 1; b < objects.length; b++) {
         const [p, q] = [objects[a].box, objects[b].box];
-        const overlap = boxArea([Math.max(p[0], q[0]), Math.max(p[1], q[1]), Math.min(p[2], q[2]), Math.min(p[3], q[3])]);
-        if (overlap >= 0.3 * Math.min(boxArea(p), boxArea(q))) {
+        if (p[0] > q[2] || q[0] > p[2] || p[1] > q[3] || q[1] > p[3]) continue;
+        if (Math.max(shareInside(objects[a], q), shareInside(objects[b], p)) >= 0.6) {
           objects[a] = summarize([...objects[a].members, ...objects[b].members]);
           objects.splice(b, 1);
           merged = true;
@@ -351,6 +415,36 @@ window.extractParts = async function extractParts(svgText, opts = {}) {
   const rootUser = (el) => root.getScreenCTM().inverse().multiply(el.getScreenCTM());
   const userToPx = new DOMMatrix().scale(W / vb[2], H / vb[3]).translate(-vb[0], -vb[1]);
   const clampPx = (q) => Math.min(H - 1, Math.max(0, Math.round(q.y))) * W + Math.min(W - 1, Math.max(0, Math.round(q.x)));
+
+  // Shapes of an object drawn under field shapes (a disc behind the stripes crossing it, a
+  // banner's trim under its cloth) can't be lifted out without them: layers sit over the field,
+  // so those shapes stay part of it, and the rest of the object stays an object.
+  const underField = (i) => {
+    const el = leaves[i];
+    if (typeof el.isPointInFill !== 'function') return false;
+    const toPx = userToPx.multiply(rootUser(el));
+    const b = el.getBBox();
+    let filled = 0;
+    let covered = 0;
+    for (let sy = 0; sy < 8; sy++)
+      for (let sx = 0; sx < 8; sx++) {
+        const pt = new DOMPoint(b.x + ((sx + 0.5) / 8) * b.width, b.y + ((sy + 0.5) / 8) * b.height);
+        if (!el.isPointInFill(pt)) continue;
+        filled++;
+        const top = owner[clampPx(pt.matrixTransform(toPx))];
+        if (top > i && isField[top]) covered++;
+      }
+    return filled >= 4 && covered > filled * 0.05;
+  };
+  objects = objects.flatMap((o) => {
+    const under = new Set([...o.members].sort((a, b) => area[b] - area[a]).slice(0, 60).filter(underField));
+    if (under.size === 0) return [o];
+    for (const i of under) isField[i] = 1;
+    const rest = o.members.filter((i) => !under.has(i) && area[i] > 0);
+    return rest.length ? [summarize(o.members.filter((i) => !under.has(i)))] : [];
+  });
+  assigned.fill(-1);
+  objects.forEach((o, k) => o.members.forEach((i) => (assigned[i] = k)));
   const fieldD = new Map();
   const holes = [];
   for (let i = 0; i < n; i++) {
@@ -396,9 +490,13 @@ window.extractParts = async function extractParts(svgText, opts = {}) {
         const c = o >= 0 ? (original[o].fillHex ?? original[o].strokeHex) : null;
         if (c) colors.set(c, (colors.get(c) ?? 0) + count);
       }
-      // Something already sits in the hole (a coat of arms in a frame): just fill the field in.
-      if (underObject > hole / 2) return;
-      holes.push({ d, matrix: rootUser(el), box: pb, palette: [...colors.entries()].sort((x, y) => y[1] - x[1]).map(([c]) => c) });
+      // Objects showing through the hole (waves seen through a round window, which run on under
+      // the field around it) go with it: what's seen through the hole is the object.
+      const absorb = underObject > 0
+        ? objects.flatMap((o, k) => (o.box[0] >= pb[0] - 2 && o.box[1] >= pb[1] - 2 && o.box[2] <= pb[2] + 2 && o.box[3] <= pb[3] + 2 ? [k] : []))
+        : [];
+      if (underObject > hole / 2 && absorb.length === 0) return;
+      holes.push({ d, matrix: rootUser(el), box: pb, absorb, palette: [...colors.entries()].sort((x, y) => y[1] - x[1]).map(([c]) => c) });
     });
     if (removed.size) fieldD.set(i, subs.filter((_, k) => !removed.has(k)).join(''));
   }
@@ -445,15 +543,17 @@ window.extractParts = async function extractParts(svgText, opts = {}) {
   };
   const fieldKeep = new Set();
   for (let i = 0; i < n; i++) if (isField[i] || assigned[i] < 0) fieldKeep.add(i);
+  const absorbed = new Set(holes.flatMap((h) => h.absorb));
   const fieldPalette = summarize([...fieldKeep].filter((i) => area[i] > 0)).palette;
   const parts = [
-    ...objects.map((o) => {
+    ...objects.filter((_, k) => !absorbed.has(k)).map((o) => {
       const { frac, viewBox } = cropTo(o.box);
       return { kind: 'shapes', svg: serialize(new Set(o.members), viewBox, PART_SIZE), box: frac, palette: o.palette.slice(0, 12), leaves: o.members.length, share: o.area / (W * H) };
     }),
     ...holes.map((h) => {
       const { frac, viewBox } = cropTo(h.box);
-      return { kind: 'hole', svg: serialize(fieldKeep, viewBox, PART_SIZE, { clip: h }), box: frac, palette: h.palette.slice(0, 12), leaves: 1, share: boxArea(h.box) / (W * H) };
+      const keep = new Set([...fieldKeep, ...h.absorb.flatMap((k) => objects[k].members)]);
+      return { kind: 'hole', svg: serialize(keep, viewBox, PART_SIZE, { clip: h }), box: frac, palette: h.palette.slice(0, 12), leaves: 1, share: boxArea(h.box) / (W * H) };
     }),
   ].sort((a, b) => b.share - a.share);
   return {
@@ -467,9 +567,10 @@ window.extractParts = async function extractParts(svgText, opts = {}) {
 /**
  * Whether a field SVG is exactly one of the flag maker's layouts, so it can stay editable as one.
  * `candidates` hold each layout variant's shapes in flag units (the flag is `aspect` wide, 1 tall).
- * Returns the best match whose colours explain all but `tolerance` of the field, or null.
+ * Returns the best match whose colours explain all but `tolerance` of the field, or null. Only the
+ * seams between the layout's colours are forgiven, so no real detail (a thin beam) can go missing.
  */
-window.fitLayout = async function fitLayout(svgText, aspect, candidates, tolerance = 0.015) {
+window.fitLayout = async function fitLayout(svgText, aspect, candidates, tolerance = 0.003) {
   const w = 240;
   const h = Math.max(8, Math.round(w / aspect));
   const img = new Image();
@@ -509,12 +610,26 @@ window.fitLayout = async function fitLayout(svgText, aspect, candidates, toleran
       const slot = Math.round((data[p * 4] - 10) / 30);
       slots[p] = data[p * 4 + 3] < 255 || Math.abs(data[p * 4] - (slot * 30 + 10)) > 3 ? -1 : slot;
     }
+    // Within a pixel of a seam the SVG and the layout may blend at slightly different places.
+    const seam = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const s = slots[y * w + x];
+        for (let dy = -1; dy <= 1 && !seam[y * w + x]; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const [nx, ny] = [x + dx, y + dy];
+            if (nx >= 0 && ny >= 0 && nx < w && ny < h && slots[ny * w + nx] !== s) {
+              seam[y * w + x] = 1;
+              break;
+            }
+          }
+      }
     const hist = Array.from({ length: candidate.slots }, () => [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)]);
     const counts = new Uint32Array(candidate.slots);
     let total = 0;
     for (let p = 0; p < w * h; p++) {
       const slot = slots[p];
-      if (slot < 0 || slot >= candidate.slots || pixels[p * 4 + 3] < 200) continue;
+      if (slot < 0 || slot >= candidate.slots || seam[p] || pixels[p * 4 + 3] < 200) continue;
       for (let c = 0; c < 3; c++) hist[slot][c][pixels[p * 4 + c]]++;
       counts[slot]++;
       total++;
@@ -530,7 +645,7 @@ window.fitLayout = async function fitLayout(svgText, aspect, candidates, toleran
     let off = 0;
     for (let p = 0; p < w * h; p++) {
       const slot = slots[p];
-      if (slot < 0 || slot >= candidate.slots || pixels[p * 4 + 3] < 200) continue;
+      if (slot < 0 || slot >= candidate.slots || seam[p] || pixels[p * 4 + 3] < 200) continue;
       const m = medians[slot];
       if (Math.hypot(pixels[p * 4] - m[0], pixels[p * 4 + 1] - m[1], pixels[p * 4 + 2] - m[2]) > 48) off++;
     }
@@ -540,6 +655,87 @@ window.fitLayout = async function fitLayout(svgText, aspect, candidates, toleran
       best = { layout: candidate.layout, params: candidate.params, medians, unexplained: share, score };
   }
   return best;
+};
+
+/**
+ * How much of a flag a design fails to reproduce. Renders the original and the design rebuilt
+ * from its parts (the field, then each part in its box) and returns the share of the flag's
+ * pixels that differ, allowing a pixel's worth of shift for antialiasing.
+ * `field` is { shapes, colors } for a layout or { svg } for an image.
+ */
+window.compareDesign = async function compareDesign(originalSvg, aspect, field, parts, debug = false) {
+  const w = 300;
+  const h = Math.max(8, Math.round(w / aspect));
+  const load = async (text) => {
+    const img = new Image();
+    const url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }));
+    try {
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error('Could not render part'));
+        img.src = url;
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    return img;
+  };
+  const canvas = () => {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    return c.getContext('2d', { willReadFrequently: true });
+  };
+
+  // The original stretched over its viewBox, the way the parts were cut from it.
+  const doc = new DOMParser().parseFromString(originalSvg, 'image/svg+xml');
+  const root = doc.documentElement;
+  doc.querySelectorAll('script, foreignObject').forEach((el) => el.remove());
+  if (!root.getAttribute('viewBox')) {
+    const size = (v, d) => (Number.isFinite(parseFloat(v)) && !String(v).endsWith('%') ? parseFloat(v) : d);
+    root.setAttribute('viewBox', `0 0 ${size(root.getAttribute('width'), 300)} ${size(root.getAttribute('height'), 200)}`);
+  }
+  root.setAttribute('width', w);
+  root.setAttribute('height', h);
+  root.setAttribute('preserveAspectRatio', 'none');
+  const a = canvas();
+  a.drawImage(await load(new XMLSerializer().serializeToString(root)), 0, 0, w, h);
+
+  const b = canvas();
+  if (field.shapes) {
+    b.setTransform(w / aspect, 0, 0, h, 0, 0);
+    for (const shape of field.shapes) {
+      b.fillStyle = field.colors[shape.slot] ?? '#000000';
+      b.fill(new Path2D(shape.d));
+    }
+    b.setTransform(1, 0, 0, 1, 0, 0);
+  } else b.drawImage(await load(field.svg), 0, 0, w, h);
+  for (const part of parts) {
+    const [x0, y0, x1, y1] = part.box;
+    b.drawImage(await load(part.svg), x0 * w, y0 * h, (x1 - x0) * w, (y1 - y0) * h);
+  }
+
+  const pa = a.getImageData(0, 0, w, h).data;
+  const pb = b.getImageData(0, 0, w, h).data;
+  let counted = 0;
+  let differ = 0;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (pa[i + 3] < 200) continue;
+      counted++;
+      let close = false;
+      for (let dy = -1; dy <= 1 && !close; dy++)
+        for (let dx = -1; dx <= 1 && !close; dx++) {
+          const [nx, ny] = [x + dx, y + dy];
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = (ny * w + nx) * 4;
+          close = Math.hypot(pa[i] - pb[j], pa[i + 1] - pb[j + 1], pa[i + 2] - pb[j + 2]) <= 64;
+        }
+      if (!close) differ++;
+    }
+  const share = counted ? differ / counted : 0;
+  return debug ? { share, original: a.canvas.toDataURL(), rebuilt: b.canvas.toDataURL() } : share;
 };
 
 /** A path's subpaths, each rewritten with absolute coordinates so it stands on its own. */
