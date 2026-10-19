@@ -35,6 +35,15 @@
   .badge { font-size: 10px; padding: 0 5px; border-radius: 4px; background: #eceae4; color: var(--muted); }
   .badge.new { background: #dfeaf8; color: var(--main); }
   .more { grid-column: 1 / -1; text-align: center; padding: 20px; }
+  @media (max-width: 640px) {
+    header { position: static; padding: 10px 12px; gap: 8px; }
+    h1 { width: 100%; }
+    input[type=search] { width: 100%; }
+    .stats { margin-left: 0; font-size: 12px; }
+    #cats { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+    .chip { white-space: nowrap; }
+    main { padding: 10px 12px 60px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  }
 </style>
 </head>
 <body>
