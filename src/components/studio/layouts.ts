@@ -403,6 +403,41 @@ export const LAYOUTS: Record<LayoutId, LayoutDef> = {
   },
 };
 
+/** Parameter variants tried for each layout, covering the common real-world proportions. */
+export const LAYOUT_VARIANTS: Partial<Record<LayoutId, Record<string, number>[]>> = {
+  'bicolor-h': [{ split: 0.5 }, { split: 2 / 3 }, { split: 1 / 3 }],
+  'bicolor-v': [{ split: 0.5 }, { split: 1 / 3 }],
+  'triband-h': [{ middle: 1 / 3 }, { middle: 0.5 }, { middle: 0.6 }],
+  'triband-v': [{ middle: 1 / 3 }, { middle: 0.5 }],
+  'stripes-h': [5, 7, 9, 11, 13].map((count) => ({ count })),
+  cross: [0.14, 0.2, 0.26, 0.32].map((width) => ({ width })),
+  nordic: [0.12, 0.16, 0.2, 0.25].flatMap((width) => [0.33, 0.36, 0.4].map((offset) => ({ width, offset }))),
+  'nordic-fimbriated': [
+    { width: 0.12, border: 0.06, offset: 0.36 },
+    { width: 0.14, border: 0.04, offset: 0.36 },
+    { width: 0.1, border: 0.05, offset: 0.33 },
+  ],
+  saltire: [0.1, 0.15, 0.2, 0.26].map((width) => ({ width })),
+  canton: [0.4, 0.5, 0.54, 0.6].map((size) => ({ size })),
+  border: [0.04, 0.06, 0.08, 0.12].map((width) => ({ width })),
+  'hoist-triangle': [0.33, 0.4, 0.5].map((depth) => ({ depth })),
+  'triband-triangle': [0.33, 0.4, 0.5].map((depth) => ({ depth })),
+  'diagonal-band': [0.2, 0.3, 0.4].map((width) => ({ width })),
+  'stripes-v': [3, 5, 7, 9].map((count) => ({ count })),
+  'stars-stripes': [
+    { count: 13, width: 0.4, height: 7 / 13 },
+    { count: 11, width: 0.5, height: 7 / 11 },
+    { count: 7, width: 0.5, height: 4 / 7 },
+    { count: 5, width: 0.4, height: 3 / 5 },
+  ],
+  'hoist-band': [0.25, 0.3].map((width) => ({ width })),
+  disc: [
+    { size: 0.6, offset: 0.5 },
+    { size: 0.6, offset: 0.45 },
+    { size: 0.5, offset: 0.5 },
+  ],
+};
+
 export type LayoutPreset = { layout: LayoutId; params?: Record<string, number> };
 
 /** The layout picker, in order. Variants are the same layout with classic proportions. */
