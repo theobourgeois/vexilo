@@ -4,7 +4,7 @@ import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dice, Eye, EyeSlash, Lock, Search, Unlock, Upload, X } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import { EMBLEM_CATEGORIES, emblemSearchScore } from '@/lib/emblem-search';
+import { EMBLEM_CATEGORIES, emblemSearchScore, mixEmblemCategories } from '@/lib/emblem-search';
 import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
 import { luminance, PALETTE_GROUPS, PALETTES } from './colors';
 import { FlagArt } from './FlagArt';
@@ -53,14 +53,36 @@ export function EmblemsPanel({
   const [query, setQuery] = React.useState('');
   const [category, setCategory] = React.useState('all');
   const [visible, setVisible] = React.useState(EMBLEMS_PER_PAGE);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const moreRef = React.useRef<HTMLDivElement>(null);
   const q = query.trim().toLowerCase();
-  const matches = React.useMemo(() => emblems
-    .filter((e) => category === 'all' || e.category === category)
-    .map((e) => ({ emblem: e, score: emblemSearchScore(e, q) }))
-    .filter((e) => e.score > 0)
-    .sort((a, b) => b.score - a.score || (b.emblem.rank ?? 0) - (a.emblem.rank ?? 0) || b.emblem.copies - a.emblem.copies)
-    .map((e) => e.emblem), [emblems, category, q]);
+  const matches = React.useMemo(() => {
+    const ranked = emblems
+      .filter((e) => category === 'all' || e.category === category)
+      .map((e) => ({ emblem: e, score: emblemSearchScore(e, q) }))
+      .filter((e) => e.score > 0)
+      .sort((a, b) => b.score - a.score || (b.emblem.rank ?? 0) - (a.emblem.rank ?? 0) || b.emblem.copies - a.emblem.copies)
+      .map((e) => e.emblem);
+    return category === 'all' && !q ? mixEmblemCategories(ranked) : ranked;
+  }, [emblems, category, q]);
   const shown = matches.slice(0, visible);
+  const hasMore = matches.length > shown.length;
+
+  React.useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = moreRef.current;
+    if (!hasMore || !root || !sentinel) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setVisible((n) => Math.min(n + EMBLEMS_PER_PAGE, matches.length));
+    }, { root, rootMargin: '0px 0px 600px 0px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, matches.length, visible]);
+
+  const resetResults = () => {
+    setVisible(EMBLEMS_PER_PAGE);
+    scrollRef.current?.scrollTo({ top: 0 });
+  };
 
   return (
     <div className='flex min-h-0 flex-1 flex-col gap-3'>
@@ -68,12 +90,12 @@ export function EmblemsPanel({
         <Search className='size-4 shrink-0' />
         <input
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setVisible(EMBLEMS_PER_PAGE); }}
+          onChange={(e) => { setQuery(e.target.value); resetResults(); }}
           placeholder={`Search ${emblems.length} emblems`}
           className='min-w-0 flex-1 bg-transparent text-[13.5px] text-foreground outline-none placeholder:text-muted-foreground'
         />
         {query && (
-          <button type='button' aria-label='Clear' onClick={() => { setQuery(''); setVisible(EMBLEMS_PER_PAGE); }} className='cursor-pointer hover:text-foreground'>
+          <button type='button' aria-label='Clear' onClick={() => { setQuery(''); resetResults(); }} className='cursor-pointer hover:text-foreground'>
             <X className='size-3.5' />
           </button>
         )}
@@ -83,7 +105,7 @@ export function EmblemsPanel({
           <button
             key={key}
             type='button'
-            onClick={() => { setCategory(key); setVisible(EMBLEMS_PER_PAGE); }}
+            onClick={() => { setCategory(key); resetResults(); }}
             aria-pressed={category === key}
             className={cn(
               'h-7 shrink-0 cursor-pointer rounded-full px-3 text-[12.5px] shadow-[inset_0_0_0_1px_var(--border)] transition-colors',
@@ -94,7 +116,7 @@ export function EmblemsPanel({
           </button>
         ))}
       </div>
-      <div className='-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-2'>
+      <div ref={scrollRef} className='-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-2'>
         <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
           {onUpload && !q && category === 'all' && (
             <label
@@ -135,11 +157,8 @@ export function EmblemsPanel({
             </button>
           ))}
         </div>
-        {matches.length > shown.length && (
-          <button type='button' onClick={() => setVisible((n) => n + EMBLEMS_PER_PAGE)} className='mt-3 w-full cursor-pointer rounded-lg border border-border py-2 text-[13px] text-muted-foreground hover:text-foreground'>
-            Show more ({matches.length - shown.length} remaining)
-          </button>
-        )}
+        {hasMore && <div ref={moreRef} className='h-px' aria-hidden='true' />}
+        <span role='status' className='sr-only'>{shown.length} of {matches.length} emblems</span>
         {matches.length === 0 && <p className='py-10 text-center text-[13px] text-muted-foreground'>No emblems found</p>}
       </div>
     </div>

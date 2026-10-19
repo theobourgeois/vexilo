@@ -6,6 +6,25 @@ export const EMBLEM_CATEGORIES = [
 ] as const;
 
 type SearchableEmblem = { name: string; names: string[]; tags?: string[] };
+
+/** Browse a mix of subjects while keeping the best-ranked drawings first within each category. */
+export function mixEmblemCategories<T extends { category?: string }>(emblems: T[]): T[] {
+  const categories = new Map<string, T[]>();
+  for (const emblem of emblems) {
+    const key = emblem.category ?? 'unsorted';
+    const group = categories.get(key);
+    if (group) group.push(emblem);
+    else categories.set(key, [emblem]);
+  }
+  const mixed: T[] = [];
+  for (let offset = 0; mixed.length < emblems.length; offset++) {
+    for (const group of categories.values()) {
+      if (offset < group.length) mixed.push(group[offset]);
+    }
+  }
+  return mixed;
+}
+
 const normalize = (value: string) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   .replace(/[^a-z0-9]+/g, ' ').trim().replace(/\bfleurs\b/g, 'fleur').replace(/\blys\b/g, 'lis');
 

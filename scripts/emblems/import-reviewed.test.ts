@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { emblemSearchScore } from '../../src/lib/emblem-search';
+import { emblemSearchScore, mixEmblemCategories } from '../../src/lib/emblem-search';
 import { emblemSourceKey, partBox, selectReviewed, type ReviewedEmblem } from './review-selection';
 
 const entry = (id: string, extra: Partial<ReviewedEmblem> = {}): ReviewedEmblem => ({ id, tab: 'library', name: 'Maple leaf', category: 'plants', tags: ['maple', 'leaf'], rank: 43, ...extra });
@@ -47,4 +47,20 @@ test('fleur-de-lis spellings, punctuation and diacritics remain searchable', () 
   const fleur = { name: 'Fleur-de-lis', tags: ['lily'], names: ['Québec'] };
   for (const query of ['fleur de lis', 'fleurs-de-lys', 'quebec']) assert.ok(emblemSearchScore(fleur, query) > 0, query);
   assert.doesNotThrow(() => emblemSearchScore(fleur, '[.*+?'));
+});
+
+test('All browsing separates repeated subjects and preserves every drawing and its category ranking', () => {
+  const entries = [
+    { id: 'star-1', category: 'stars' }, { id: 'star-2', category: 'stars' }, { id: 'star-3', category: 'stars' },
+    { id: 'lily-1', category: 'plants' }, { id: 'lily-2', category: 'plants' },
+    { id: 'eagle', category: 'birds' }, { id: 'lion', category: 'animals' },
+  ];
+  const original = [...entries];
+  const mixed = mixEmblemCategories(entries);
+  assert.equal(new Set(mixed.slice(0, 4).map((e) => e.category)).size, 4);
+  assert.deepEqual(mixed.filter((e) => e.category === 'stars').map((e) => e.id), ['star-1', 'star-2', 'star-3']);
+  assert.deepEqual(new Set(mixed.map((e) => e.id)), new Set(entries.map((e) => e.id)));
+  assert.equal(mixed.length, entries.length);
+  assert.deepEqual(entries, original, 'ranking input remains unchanged');
+  assert.deepEqual(mixEmblemCategories(entries), mixed, 'browsing order stays stable');
 });
