@@ -1,13 +1,10 @@
 'use client';
 
 import { useEffect, useState, ReactNode } from 'react';
-import { useSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { getUserData } from '@/actions/users';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { X, Flag, Icon } from '@/components/icons';
+import { X, Shuffle, Icon } from '@/components/icons';
 
 // ============================================
 // Generic Alert Banner Component
@@ -147,55 +144,25 @@ export function AlertBannerContainer({
 }
 
 // ============================================
-// Profile Flag Alert (specific implementation)
+// Flag Maker Alert (specific implementation)
 // ============================================
 
-export function ProfileFlagAlert() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-
-  const { data: userData, isLoading: userDataLoading } = useQuery({
-    queryKey: ['userData'],
-    queryFn: getUserData,
-    enabled: !!session?.user,
-  });
-
-  const isLoading =
-    status === 'loading' || (!!session?.user && userDataLoading);
-
-  // Determine if we should show the alert
-  const shouldShow = () => {
-    // Don't show if user already has a favorite flag
-    if (session?.user && userData?.user?.favoriteFlag) {
-      return false;
-    }
-    return true;
-  };
-
-  const handleAction = () => {
-    if (session?.user) {
-      router.push('/settings');
-    } else {
-      signIn('google');
-    }
-  };
-
+export function FlagMakerAlert() {
   const config: AlertBannerConfig = {
-    id: 'profile-flag',
-    icon: Flag,
+    id: 'flag-maker',
+    icon: Shuffle,
     message: (
       <>
-        <strong>Pick a profile flag.</strong> It shows next to your name across Vexilo.
+        <strong>You can now remix flags.</strong> Hit Remix on any flag, or make your own from scratch.
       </>
     ),
-    actionText: session?.user ? 'Choose flag' : 'Sign in',
-    onAction: handleAction,
-    shouldShow,
+    actionText: 'Make a flag',
+    href: '/create',
   };
 
   return (
     <div className='pt-6 empty:hidden'>
-      <AlertBanner config={config} isLoading={isLoading} />
+      <AlertBanner config={config} />
     </div>
   );
 }

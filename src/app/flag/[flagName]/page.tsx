@@ -23,8 +23,11 @@ import { Suspense } from 'react';
 import FlagFieldsForm from '@/components/FlagFieldsForm';
 import SourceBadge from '@/components/SourceBadge';
 import { describeEdit } from '@/lib/edit-changes';
-import { getFlagColors } from '@/lib/flag-palette';
+import { getFlagColors, type PaletteColor } from '@/lib/flag-palette';
 import { ensureFlagImageSelfHosted } from '@/lib/storage/flag-image-mirror';
+import { getFlagNameById } from '@/lib/studio-data';
+import { MakerBadge } from '@/components/MakerBadge';
+import { MAKER_TAGS } from '@/lib/studio-design';
 
 export type RelatedFlag = {
   name: string;
@@ -131,8 +134,8 @@ function SpecRows({ rows }: { rows: [string, React.ReactNode][] }) {
 }
 
 // Colours are read from the image itself (cached), so they stream in after the page.
-async function ColoursPanel({ flag }: { flag: { id: string; image: string } }) {
-  const palette = await getFlagColors(flag);
+async function ColoursPanel({ colors }: { colors: Promise<PaletteColor[]> }) {
+  const palette = await colors;
   if (palette.length === 0) return null;
   const total = palette.reduce((sum, color) => sum + color.share, 0);
   return (
@@ -368,6 +371,10 @@ export default async function FlagPage({
     );
   }
 
+  // Shared by the colours panel and the custom colour view, so the image is only read once.
+  const colors = getFlagColors(flag);
+  const madeInMaker = flag.tags.some((tag) => MAKER_TAGS.includes(tag));
+  const original = flag.remixOf ? await getFlagNameById(flag.remixOf) : null;
   const structured = flag.metadata?.structuredData ?? null;
   const history = flag.metadata?.historicalContext ?? '';
   const sources = collectSources(flag.sources ?? [], flag.metadata?.researchSources ?? []);
@@ -413,17 +420,36 @@ export default async function FlagPage({
 
       <div className='grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-10'>
         <div className='min-w-0'>
-          <FlagViewer image={flag.image} name={flag.name} />
+          <FlagViewer image={flag.image} name={flag.name} palette={colors} />
         </div>
 
         <div className='min-w-0 lg:pt-1'>
-          <p className='text-[13px] text-muted-foreground'>
-            #{String(flag.index).padStart(4, '0')}
-            {firstTag ? ` · ${firstTag}` : ''}
+          <p className='flex items-center gap-2 text-[13px] text-muted-foreground'>
+            <MakerBadge tags={flag.tags} />
+            <span>
+              #{String(flag.index).padStart(4, '0')}
+              {firstTag ? ` · ${firstTag}` : ''}
+            </span>
           </p>
           <h1 className='mt-1.5 text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[38px]'>
             {flag.name}
           </h1>
+          {madeInMaker && (
+            <p className='mt-4 rounded-[12px] bg-[rgb(225_120_50/0.08)] px-3.5 py-2.5 text-[13px] text-subtle shadow-[inset_0_0_0_1px_rgb(225_120_50/0.22)]'>
+              <span className='font-semibold text-foreground'>Not an official flag.</span>{' '}
+              {original ? (
+                <>
+                  A remix of{' '}
+                  <Link href={`/flag/${encodeURIComponent(original.name)}`} className='font-medium text-main hover:underline'>
+                    {original.name}
+                  </Link>
+                  , made in the flag maker.
+                </>
+              ) : (
+                'Made in the flag maker.'
+              )}
+            </p>
+          )}
           {flag.displayDescription && (
             <div className='mt-4'>
               <ExpandableDescription description={flag.displayDescription} />
@@ -447,7 +473,7 @@ export default async function FlagPage({
 
       <div className={`mt-5 grid gap-4 md:grid-cols-2 ${structured ? 'lg:grid-cols-3' : ''}`}>
         <Suspense fallback={<PanelSkeleton />}>
-          <ColoursPanel flag={flag} />
+          <ColoursPanel colors={colors} />
         </Suspense>
         {structured && <TraitsPanel data={structured} />}
         <Panel title='Details'>

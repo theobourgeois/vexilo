@@ -12,6 +12,7 @@ import { relatedFlagsCacheKey } from '@/lib/cache-keys';
 import { saveFlagColorsLater } from '@/lib/flag-palette';
 import { upsertFlagMetadataMirror } from './flag-ai-metadata';
 import { findExistingFlags } from './batch-flags';
+import { MAKER_TAGS } from '@/lib/studio-design';
 
 // Helper function to update tag counts when tags are added or removed
 async function updateTagCounts(oldTags: string[], newTags: string[]) {
@@ -273,6 +274,8 @@ async function publishNewFlagRequest(flagRequest: FlagRequestRow) {
       index: index,
       description: flagRequest.flag.description,
       tags: flagRequest.flag.tags,
+      remixOf: flagRequest.flag.remixOf ?? null,
+      design: flagRequest.flag.design ?? null,
     })
     .returning({ id: flags.id })
     .then((res) => res[0]);
@@ -353,7 +356,9 @@ async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
     flagRequest.flag.description === flagRequest.oldFlag?.description
       ? flag.description
       : flagRequest.flag.description;
-  const newTags = tagsChanged ? flagRequest.flag.tags : flag.tags;
+  // Flag maker tags (remix, custom) stay on for good, whatever the edit says.
+  const requestedTags = tagsChanged ? flagRequest.flag.tags : flag.tags;
+  const newTags = [...requestedTags, ...flag.tags.filter((tag) => MAKER_TAGS.includes(tag) && !requestedTags.includes(tag))];
 
   await db
     .update(flags)

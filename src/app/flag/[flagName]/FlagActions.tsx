@@ -1,6 +1,7 @@
 'use client';
 
-import { Heart, Edit, Trash2, AlertTriangle, UserCircle, Check } from '@/components/icons';
+import { Heart, Edit, Trash2, AlertTriangle, UserCircle, Check, Shuffle } from '@/components/icons';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { toggleFavoriteFlag, deleteFlag } from '@/actions/flags';
 import { changeFavoriteFlag, getUserData } from '@/actions/users';
@@ -132,6 +133,12 @@ export default function FlagActions({ flag }: FlagActionsProps) {
       <Button variant='neutral' onClick={handleEditClick}>
         <Edit />
         Suggest edit
+      </Button>
+      <Button variant='neutral' asChild>
+        <Link href={`/create?remix=${flag.id}`}>
+          <Shuffle />
+          Remix
+        </Link>
       </Button>
       <span className='flex-1' />
       {session.data?.user && (
