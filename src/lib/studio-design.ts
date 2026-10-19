@@ -58,13 +58,48 @@ export type StudioCutout = {
 
 export type StudioOutline = { color: string; /** fraction of flag height */ width: number };
 
+export type ShapeKind =
+  | 'rect'
+  | 'ellipse'
+  | 'triangle'
+  | 'diamond'
+  | 'star'
+  | 'polygon'
+  | 'cross'
+  | 'crescent'
+  | 'heart'
+  | 'line'
+  | 'arrow'
+  | 'brush';
+
+/**
+ * A shape or brush stroke drawn in the editor, filling the layer's box. It's painted in the
+ * layer's colours: colors[0] fills it, colors[1] strokes it. A brush stroke is only a stroke.
+ */
+export type StudioShape = {
+  kind: ShapeKind;
+  fill: boolean;
+  /** Stroke width as a fraction of flag height; 0 for none. */
+  stroke: number;
+  /** A star's points or a polygon's sides. */
+  points?: number;
+  /** A star's inner radius, as a fraction of its outer one. */
+  inner?: number;
+  /** A rectangle's corner rounding, 0 (square) to 1 (fully round). */
+  corner?: number;
+  /** A brush stroke's points, as fractions of the box inside its stroke. */
+  path?: [number, number][];
+};
+
 export type StudioLayer = {
   id: string;
   emblemId: string;
   name: string;
-  /** Emblem PNG on the CDN, or the flag image a cutout comes from. */
+  /** Emblem PNG on the CDN, or the flag image a cutout comes from; empty for shapes. */
   src: string;
   cutout?: StudioCutout;
+  /** Drawn in the editor instead of loaded from `src`. */
+  shape?: StudioShape;
   /** Width / height of the emblem image. */
   aspect: number;
   /** The emblem's own colours, and what each is currently painted as. */

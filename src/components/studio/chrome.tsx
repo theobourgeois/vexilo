@@ -49,7 +49,7 @@ import { cn } from '@/lib/utils';
 import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@/lib/studio-design';
 import { blobToDataUrl, designToPng, designToSvg, download, encodeDoc, fileName } from './export';
 import { FlagArt } from './FlagArt';
-import { RATIOS, type StudioDoc } from './model';
+import { EXPORT_WIDTH, RATIOS, type StudioDoc } from './model';
 import type { View } from './StudioCanvas';
 import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
@@ -129,7 +129,7 @@ export function useExport(studio: Studio) {
     async png() {
       const id = toast.loading('Rendering…');
       try {
-        download(await designToPng(doc.design, 2400), `${fileName(doc.name)}.png`);
+        download(await designToPng(doc.design, EXPORT_WIDTH), `${fileName(doc.name)}.png`);
         toast.dismiss(id);
       } catch {
         toast.error('Could not export the flag', { id });

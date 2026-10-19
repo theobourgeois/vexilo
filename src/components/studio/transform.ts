@@ -48,7 +48,7 @@ export const handlePoint = (frame: Frame, [sx, sy]: [number, number]) => fromLoc
 /** Whether the frame lines up with the flag, so its edges can snap to straight guides. */
 export const upright = (frame: Frame) => Math.abs(normAngle(frame.rotation)) < 0.01;
 
-export type LayerPose = Pick<StudioLayer, 'id' | 'x' | 'y' | 'size' | 'stretch' | 'aspect' | 'rotation' | 'repeat'>;
+export type LayerPose = Pick<StudioLayer, 'id' | 'x' | 'y' | 'size' | 'stretch' | 'aspect' | 'rotation' | 'repeat' | 'shape'>;
 
 export const poseOf = (layer: StudioLayer): LayerPose => ({
   id: layer.id,
@@ -59,6 +59,7 @@ export const poseOf = (layer: StudioLayer): LayerPose => ({
   aspect: layer.aspect,
   rotation: layer.rotation,
   repeat: layer.repeat,
+  shape: layer.shape,
 });
 
 const MIN_SIZE = 0.012;
@@ -80,7 +81,9 @@ export function scalePoses(poses: LayerPose[], frame: Frame, about: [number, num
       pose.repeat && (pose.repeat.mode === 'ring' || pose.repeat.mode === 'arc')
         ? { ...pose.repeat, spacing: pose.repeat.spacing * Math.sqrt(fx * fy) }
         : pose.repeat;
-    return { ...pose, x: u / W, y: v, size: height, stretch: Math.abs(stretch - 1) < 1e-3 ? undefined : stretch, repeat };
+    // A stroke grows with the shape, but a stretch along one side alone leaves it be.
+    const shape = pose.shape?.stroke ? { ...pose.shape, stroke: pose.shape.stroke * Math.min(height / pose.size, width / layerWidth(pose)) } : pose.shape;
+    return { ...pose, x: u / W, y: v, size: height, stretch: Math.abs(stretch - 1) < 1e-3 ? undefined : stretch, repeat, shape };
   });
 }
 
@@ -106,6 +109,7 @@ export function applyPoses(layers: StudioLayer[], poses: LayerPose[]): StudioLay
     if (!pose) return layer;
     const next = { ...layer, ...pose };
     if (next.stretch === undefined) delete next.stretch;
+    if (next.shape === undefined) delete next.shape;
     return next;
   });
 }

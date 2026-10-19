@@ -156,3 +156,7 @@ export const DistributeHorizontal = bold(Ph.ArrowsOutLineHorizontal, 'Distribute
 export const DistributeVertical = bold(Ph.ArrowsOutLineVertical, 'DistributeVertical');
 export const FitInto = bold(Ph.FrameCorners, 'FitInto');
 export const Proportions = bold(Ph.Resize, 'Proportions');
+export const Cursor = bold(Ph.Cursor, 'Cursor');
+export const Shapes = bold(Ph.Shapes, 'Shapes');
+export const PaintBrush = bold(Ph.PaintBrush, 'PaintBrush');
+export const Dice = bold(Ph.DiceFive, 'Dice');
