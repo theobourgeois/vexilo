@@ -1,8 +1,8 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
 import { db } from '@/db';
-import { flagEmblems, flags } from '@/db/schema';
+import { flagEmblems, flagParts, flags } from '@/db/schema';
 import { getFlagColors } from '@/lib/flag-palette';
 import type { RemixSource, StudioEmblem } from '@/components/studio/model';
 
@@ -46,7 +46,10 @@ export const getStudioEmblems = unstable_cache(
   { revalidate: 60 * 60 },
 );
 
-/** What the flag maker needs to remix a flag: its image and colours, or its design if it was made here. */
+/**
+ * What the flag maker needs to remix a flag: its image and colours, and a design to start from —
+ * its own if it was made here, else its parts cut from its SVG (scripts/parts) if they're current.
+ */
 export async function getRemixSource(flagId: string): Promise<RemixSource | null> {
   if (!z.string().uuid().safeParse(flagId).success) return null;
   const [flag] = await db
@@ -56,7 +59,7 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
     .limit(1);
   if (!flag) return null;
 
-  const [palette, placed] = await Promise.all([
+  const [palette, placed, [parts]] = await Promise.all([
     getFlagColors(flag),
     db
       .select({
@@ -71,6 +74,11 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
       })
       .from(flagEmblems)
       .where(sql`${flagEmblems.placements} @> ${JSON.stringify([{ flagId }])}::jsonb`),
+    db
+      .select({ design: flagParts.design })
+      .from(flagParts)
+      .where(and(eq(flagParts.flagId, flagId), eq(flagParts.image, flag.image), eq(flagParts.status, 'ok')))
+      .limit(1),
   ]);
 
   return {
@@ -78,7 +86,7 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
     name: flag.name,
     image: flag.image,
     palette: palette.map((color) => color.hex),
-    design: flag.design ?? null,
+    design: flag.design ?? parts?.design ?? null,
     placements: placed.flatMap((emblem) => {
       const placement = emblem.placements.find((p) => p.flagId === flagId);
       if (!placement) return [];
