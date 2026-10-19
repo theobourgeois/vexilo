@@ -18,7 +18,8 @@ window.extractParts = async function extractParts(svgText, opts = {}) {
   const host = document.createElement('div');
   document.body.replaceChildren(host);
   const root = document.importNode(parsed.documentElement, true);
-  root.querySelectorAll('script').forEach((s) => s.remove());
+  // Scripts never run, and HTML in a foreignObject would taint the canvas the shapes are read from.
+  root.querySelectorAll('script, foreignObject').forEach((s) => s.remove());
   host.appendChild(root);
 
   // The flag's own coordinate box.

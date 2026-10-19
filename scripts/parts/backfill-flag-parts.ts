@@ -20,6 +20,7 @@ import { studioDesignSchema } from '../../src/lib/studio-design-schema';
  * image and extractor version haven't changed are skipped. Apply drizzle/0013_add_flag_parts.sql first.
  *   npm run parts:backfill
  *   npm run parts:backfill -- --only 221,1180 --force
+ *   npm run parts:backfill -- --failed   # retry flags that failed last time
  *   npm run parts:backfill -- --limit 50 --dry-run
  */
 
@@ -43,12 +44,13 @@ declare global {
 }
 
 function parseArgs(argv: string[]) {
-  const args = { only: [] as number[], limit: 0, force: false, dryRun: false, concurrency: 6 };
+  const args = { only: [] as number[], limit: 0, force: false, failed: false, dryRun: false, concurrency: 6 };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--only') args.only = argv[++i].split(',').map(Number);
     else if (arg === '--limit') args.limit = Number(argv[++i]);
     else if (arg === '--force') args.force = true;
+    else if (arg === '--failed') args.failed = true;
     else if (arg === '--dry-run') args.dryRun = true;
     else if (arg === '--concurrency') args.concurrency = Number(argv[++i]);
     else throw new Error(`Unknown argument: ${arg}`);
@@ -160,9 +162,11 @@ async function main() {
   if (args.only.length) rows = rows.filter((f) => args.only.includes(f.index));
   if (!args.force) {
     const done = await db
-      .select({ flagId: flagParts.flagId, image: flagParts.image, version: flagParts.version })
+      .select({ flagId: flagParts.flagId, image: flagParts.image, version: flagParts.version, status: flagParts.status })
       .from(flagParts);
-    const current = new Set(done.filter((d) => d.version === VERSION).map((d) => `${d.flagId}|${d.image}`));
+    const current = new Set(
+      done.filter((d) => d.version === VERSION && !(args.failed && d.status === 'failed')).map((d) => `${d.flagId}|${d.image}`),
+    );
     rows = rows.filter((f) => !current.has(`${f.id}|${f.image}`));
   }
   if (args.limit) rows = rows.slice(0, args.limit);
