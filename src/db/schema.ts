@@ -273,6 +273,43 @@ export const flagViewDaily = createTable(
   }),
 );
 
+/** One dated step in a flag's design history. See src/lib/ai/flag-timeline-pipeline.ts. */
+export type FlagTimelineEvent = {
+  year: number;
+  endYear: number | null;
+  kind: 'designed' | 'adopted' | 'modified' | 'readopted' | 'standardized' | 'replaced' | 'abolished' | 'other' | 'version';
+  title: string;
+  detail: string;
+  sources: string[];
+  /** The catalogue page for the version this event introduced, when there is one. */
+  versionFlagId: string | null;
+  /** Where the event came from: web research, an older version in the catalogue, or both. */
+  origin: 'research' | 'catalogue' | 'both';
+};
+
+/**
+ * A flag's design history, one row per flag. `status` is 'insufficient' when research found too little,
+ * so the flag isn't researched again. `research` keeps what was dropped and why, the pages searched, and cost.
+ */
+export const flagTimelines = createTable(
+  'flag_timeline',
+  {
+    flagId: uuid('flag_id')
+      .primaryKey()
+      .references(() => flags.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 20 }).notNull(),
+    events: jsonb('events').$type<FlagTimelineEvent[]>().notNull().default([]),
+    model: varchar('model', { length: 100 }).notNull(),
+    pipelineVersion: varchar('pipeline_version', { length: 50 }).notNull(),
+    research: jsonb('research').$type<Record<string, unknown>>().notNull().default({}),
+    generatedAt: timestamp('generated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // Finds the timeline a historical version belongs to: events @> '[{"versionFlagId": "…"}]'.
+    eventsIdx: index('flag_timeline_events_idx').using('gin', table.events.op('jsonb_path_ops')),
+  }),
+);
+
 /** A colour read from a flag's image, with the share of the flag it covers (0–1). */
 export type FlagImageColor = { hex: string; name: string; share: number };
 
