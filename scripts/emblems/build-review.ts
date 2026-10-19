@@ -75,6 +75,26 @@ async function main() {
   }
   const picked = new Set([...library, ...chosen].map((c) => c.id));
 
+  // A suggested duplicate names the closest pick that stays, so it's clear what it duplicates.
+  const kept = clusters.filter((c) => picked.has(c.id) && !curation[c.id]);
+  const explain = (c: Cluster) => {
+    const reason = curation[c.id];
+    if (!reason?.startsWith('duplicate')) return reason;
+    const f = shape(c);
+    const words = (k: Cluster) => new Set((tags.get(k.id)?.name ?? '').toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2));
+    const mine = words(c);
+    const likeness = (k: Cluster) => {
+      const theirs = words(k);
+      const shared = [...mine].filter((w) => theirs.has(w)).length;
+      return (shared / Math.max(1, new Set([...mine, ...theirs]).size)) * 2 + maskIou(f.mask, shape(k).mask);
+    };
+    const category = tags.get(c.id)?.category;
+    const twin = kept
+      .filter((k) => tags.get(k.id)?.category === category)
+      .reduce<Cluster | null>((best, k) => (!best || likeness(k) > likeness(best) ? k : best), null);
+    return twin ? `duplicate of “${tags.get(twin.id)?.name ?? candidates.get(twin.rep)!.flag}” (${candidates.get(twin.rep)!.flag})` : reason;
+  };
+
   const entries = clusters.flatMap((c) => {
     const rep = candidates.get(c.rep)!;
     const t = tags.get(c.id);
@@ -100,7 +120,7 @@ async function main() {
           c.reject ??
           (t?.reject ? t.note : t?.dup ? `dup of tile ${t.dup}` : crowded.has(c.id) ? 'name taken' : shadowed.has(c.id) ? `looks like ${shadowed.get(c.id)}` : tri?.score === 0 ? tri.note : undefined),
         svg: rep.svg,
-        suggest: picked.has(c.id) ? curation[c.id] : undefined,
+        suggest: picked.has(c.id) ? explain(c) : undefined,
       },
     ];
   });
