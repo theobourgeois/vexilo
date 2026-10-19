@@ -20,6 +20,8 @@ export type StudioDoc = { name: string; design: StudioDesign };
 
 /** What a remix starts from. */
 export type RemixSource = {
+  /** Cached segmentation was held for review; retain the original image field. */
+  partsNeedReview?: boolean;
   id: string;
   name: string;
   image: string;

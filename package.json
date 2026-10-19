@@ -17,7 +17,9 @@
     "views:backfill": "tsx scripts/views/backfill-flag-views.ts",
     "colors:backfill": "tsx scripts/colors/backfill-flag-colors.ts",
     "emblems:import": "tsx scripts/emblems/import-emblems.ts",
-    "parts:backfill": "tsx scripts/parts/backfill-flag-parts.ts"
+    "parts:backfill": "tsx scripts/parts/backfill-flag-parts.ts",
+    "parts:raster": "tsx scripts/parts/backfill-raster-parts.ts",
+    "parts:raster:test": "tsx --test scripts/parts/raster-extractor.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.58",

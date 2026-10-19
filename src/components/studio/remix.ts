@@ -38,7 +38,7 @@ export async function buildRemixDesign(source: RemixSource): Promise<StudioDesig
     layers: [],
   };
   // Only emblems found once can be put back exactly; repeats would need every position.
-  if (source.palette.length === 0 || source.placements.some((p) => p.copies > 1)) return fallback;
+  if (source.partsNeedReview || source.palette.length === 0 || source.placements.some((p) => p.copies > 1)) return fallback;
 
   const w = SAMPLE;
   const h = Math.max(8, Math.round(SAMPLE / aspect));
