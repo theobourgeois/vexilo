@@ -2,9 +2,22 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import type { DrawSettings } from './draw';
 import { FlagArt } from './FlagArt';
 import { snapAnchors, type Anchor } from './layouts';
-import { clamp, fieldSlotAt, hitsLayer, layerBounds, unionBox, type Box } from './model';
+import { clamp, fieldSlotAt, hitsLayer, layerBounds, pixelSize, unionBox, type Box } from './model';
+import {
+  isLinear,
+  LINE_WEIGHT,
+  naturalAspect,
+  newBrushLayer,
+  newShapeLayer,
+  SHAPE_PRESETS,
+  simplify,
+  smoothPath,
+  type ShapeBox,
+  type ShapePreset,
+} from './shapes';
 import { fieldGuides, type Region } from './regions';
 import {
   applyPoses,
@@ -29,6 +42,13 @@ export type Insets = { top: number; right: number; bottom: number; left: number 
 
 export const EMBLEM_MIME = 'application/x-vexilo-emblem';
 
+/** Close enough to see single export pixels. */
+export const MAX_ZOOM = 64;
+
+/** Screen size an export pixel needs before its grid starts to show, and is fully shown. */
+const GRID_FROM = 6;
+const GRID_FULL = 12;
+
 /** Something to snap to along one axis. Centre-only targets don't catch edges; gap targets sit midway between two emblems. */
 type Target = { at: number; centreOnly?: boolean; gap?: [number, number] };
 type Targets = { x: Target[]; y: Target[] };
@@ -39,7 +59,9 @@ type Gesture =
   | { kind: 'rotate'; poses: LayerPose[]; centre: [number, number]; centreScreen: [number, number]; startAngle: number; rotation: number }
   | { kind: 'pan'; start: [number, number]; origin: View }
   | { kind: 'marquee'; start: [number, number]; current: [number, number]; additive: boolean; onFlag: boolean }
-  | { kind: 'pinch'; poses: LayerPose[]; centre: [number, number]; startDist: number; startAngle: number; startMid: [number, number]; origin: View };
+  | { kind: 'pinch'; poses: LayerPose[]; centre: [number, number]; startDist: number; startAngle: number; startMid: [number, number]; origin: View }
+  | { kind: 'shape'; preset: ShapePreset; start: [number, number]; id: string | null }
+  | { kind: 'brush'; points: [number, number][] };
 
 /** A guide line at `at`; for an equal-gap snap, the two gaps (from, to, from, to) drawn across at `across`. */
 type Guide = { at: number; gaps?: [number, number, number, number]; across?: number };
@@ -58,6 +80,41 @@ function snapAxis(features: [number, number, number], targets: Target[], tol: nu
     }
   });
   return best as { delta: number; target: Target } | null;
+}
+
+/**
+ * The box a shape fills when dragged from `start` to `end` (flag units). Lines run end to end,
+ * and shift snaps their angle; shift frees proportional shapes and keeps the rest in proportion.
+ * Alt draws from the centre out.
+ */
+function dragBox(preset: ShapePreset, start: [number, number], end: [number, number], { shift, fromCentre }: { shift: boolean; fromCentre: boolean }): ShapeBox {
+  const [dx, dy] = [end[0] - start[0], end[1] - start[1]];
+  const kind = preset.shape.kind;
+  if (isLinear(kind)) {
+    let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    if (shift) angle = Math.round(angle / 45) * 45;
+    const length = Math.hypot(dx, dy);
+    const a = (angle * Math.PI) / 180;
+    const half: [number, number] = [(Math.cos(a) * length) / 2, (Math.sin(a) * length) / 2];
+    const centre = fromCentre ? start : [start[0] + half[0], start[1] + half[1]];
+    return { cx: centre[0], cy: centre[1], w: fromCentre ? length * 2 : length, h: LINE_WEIGHT[kind as 'line'], rotation: angle };
+  }
+  let [w, h] = [Math.abs(dx), Math.abs(dy)];
+  if (preset.proportional ? !shift : shift) {
+    const aspect = naturalAspect(preset.shape);
+    if (w / aspect > h) h = w / aspect;
+    else w = h * aspect;
+  }
+  if (fromCentre) return { cx: start[0], cy: start[1], w: w * 2, h: h * 2, rotation: 0 };
+  return { cx: start[0] + (Math.sign(dx) * w) / 2, cy: start[1] + (Math.sign(dy) * h) / 2, w, h, rotation: 0 };
+}
+
+/** A shape dropped with a click rather than dragged out. */
+function clickBox(preset: ShapePreset, at: [number, number]): ShapeBox {
+  const kind = preset.shape.kind;
+  if (isLinear(kind)) return { cx: at[0], cy: at[1], w: 0.36, h: LINE_WEIGHT[kind as 'line'], rotation: 0 };
+  const h = 0.24;
+  return { cx: at[0], cy: at[1], w: h * (kind === 'rect' ? 1.5 : naturalAspect(preset.shape)), h, rotation: 0 };
 }
 
 /** Resize cursor for a handle, turned with the frame. */
@@ -79,6 +136,9 @@ export function StudioCanvas({
   onDropEmblem,
   onDropFiles,
   renderOverlay,
+  draw,
+  onShapeDrawn,
+  scaleRef,
 }: {
   studio: Studio;
   view: View;
@@ -91,6 +151,12 @@ export function StudioCanvas({
   onDropEmblem?: (emblemId: string, at: { x: number; y: number }) => void;
   onDropFiles?: (files: File[], at: { x: number; y: number }) => void;
   renderOverlay?: (rects: { selection: Rect | null; flag: Rect; container: { w: number; h: number }; busy: boolean }) => React.ReactNode;
+  /** The drawing tool in hand; without one, the canvas only selects and moves. */
+  draw?: DrawSettings;
+  /** A shape was just drawn, and is selected. */
+  onShapeDrawn?: () => void;
+  /** Kept up to date with screen pixels per flag unit. */
+  scaleRef?: React.MutableRefObject<number>;
 }) {
   const { design, W, selection, selectedLayers, fieldSelected, setSelection, update, history } = studio;
   const ref = React.useRef<HTMLDivElement>(null);
@@ -103,6 +169,9 @@ export function StudioCanvas({
   const [angleReadout, setAngleReadout] = React.useState<{ x: number; y: number; angle: number } | null>(null);
   const space = React.useRef(false);
   const pointers = React.useRef(new Map<number, [number, number]>());
+  const brushCursor = React.useRef<HTMLDivElement>(null);
+  const tool = draw?.tool ?? 'select';
+  const selecting = tool === 'select';
 
   React.useLayoutEffect(() => {
     const el = ref.current;
@@ -127,6 +196,16 @@ export function StudioCanvas({
   };
   const toUnits = ([sx, sy]: [number, number]): [number, number] => [(sx - ox) / scale, (sy - oy) / scale];
 
+  // Up close, a grid of export pixels shows and drawing and dragging land on whole pixels.
+  const px = pixelSize(W);
+  const gridAlpha = clamp((px * scale - GRID_FROM) / (GRID_FULL - GRID_FROM), 0, 1);
+  const onPixel = (n: number) => (gridAlpha > 0 ? Math.round(n / px) * px : n);
+  const toPixel = ([u, v]: [number, number]): [number, number] => [onPixel(u), onPixel(v)];
+
+  React.useEffect(() => {
+    if (scaleRef) scaleRef.current = scale;
+  }, [scaleRef, scale]);
+
   const anchors = React.useMemo(
     () => snapAnchors(design.field.kind === 'layout' ? design.field.layout : null, W, design.field.kind === 'layout' ? design.field.params : {}),
     [design.field, W],
@@ -135,7 +214,7 @@ export function StudioCanvas({
   const hitTest = (u: number, v: number) => {
     for (let i = design.layers.length - 1; i >= 0; i--) {
       const layer = design.layers[i];
-      if (!layer.hidden && !layer.locked && hitsLayer(layer, W, u, v)) return layer;
+      if (!layer.hidden && !layer.locked && hitsLayer(layer, W, u, v, 5 / scale)) return layer;
     }
     return null;
   };
@@ -200,7 +279,7 @@ export function StudioCanvas({
       const [sx, sy] = local(e);
       if (e.ctrlKey || e.metaKey) {
         setView((v) => {
-          const zoom = clamp(v.zoom * Math.exp(-e.deltaY * 0.01), 0.2, 12);
+          const zoom = clamp(v.zoom * Math.exp(-e.deltaY * 0.01), 0.2, MAX_ZOOM);
           const k = zoom / v.zoom;
           // Keep the point under the cursor still.
           return { zoom, panX: sx - (sx - v.panX - centreX()) * k - centreX(), panY: sy - (sy - v.panY - centreY()) * k - centreY() };
@@ -220,8 +299,8 @@ export function StudioCanvas({
     setGesture(g);
   };
 
-  // Handles act on every selected emblem that can move.
-  const transformable = selectedLayers.filter((l) => !l.locked && !l.hidden);
+  // Handles act on every selected emblem that can move, while selecting.
+  const transformable = selecting ? selectedLayers.filter((l) => !l.locked && !l.hidden) : [];
   const frame = selectionFrame(transformable, W);
 
   function onPointerDown(e: React.PointerEvent) {
@@ -249,6 +328,16 @@ export function StudioCanvas({
 
     if (e.button === 1 || space.current) {
       begin({ kind: 'pan', start: point, origin: view });
+      return;
+    }
+
+    if (draw && tool === 'shape') {
+      const preset = SHAPE_PRESETS.find((p) => p.id === draw.preset) ?? SHAPE_PRESETS[0];
+      begin({ kind: 'shape', preset, start: toPixel(toUnits(point)), id: null });
+      return;
+    }
+    if (draw && tool === 'brush') {
+      begin({ kind: 'brush', points: [toUnits(point)] });
       return;
     }
 
@@ -302,8 +391,13 @@ export function StudioCanvas({
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, point);
     const g = gestureRef.current;
 
+    if (brushCursor.current) {
+      brushCursor.current.style.translate = `${point[0]}px ${point[1]}px`;
+      brushCursor.current.style.visibility = 'visible';
+    }
+
     if (!g) {
-      if (e.pointerType === 'mouse') {
+      if (e.pointerType === 'mouse' && selecting) {
         const [u, v] = toUnits(point);
         setHover(hitTest(u, v)?.id ?? null);
       }
@@ -335,6 +429,9 @@ export function StudioCanvas({
           const sy = lock === 'x' ? null : snapAxis([b.y0 + dv, (b.y0 + b.y1) / 2 + dv, b.y1 + dv], g.targets.y, tol);
           if (sx) du += sx.delta;
           if (sy) dv += sy.delta;
+          // Otherwise up close, the selection's corner lands on a whole pixel.
+          if (!sx && lock !== 'y') du = onPixel(b.x0 + du) - b.x0;
+          if (!sy && lock !== 'x') dv = onPixel(b.y0 + dv) - b.y0;
           const box = { x0: b.x0 + du, x1: b.x1 + du, y0: b.y0 + dv, y1: b.y1 + dv };
           if (sx) {
             const gap = sx.target.gap;
@@ -452,9 +549,36 @@ export function StudioCanvas({
           const moved = turned.map((pose) => ({ ...pose, x: pose.x + du / W, y: pose.y + dv }));
           update((d) => ({ ...d, layers: applyPoses(d.layers, moved) }), { transient: true });
         } else {
-          const zoom = clamp(g.origin.zoom * k, 0.3, 8);
+          const zoom = clamp(g.origin.zoom * k, 0.3, MAX_ZOOM);
           setView({ zoom, panX: g.origin.panX + mid[0] - g.startMid[0], panY: g.origin.panY + mid[1] - g.startMid[1] });
         }
+        return;
+      }
+      case 'shape': {
+        const end = toPixel(toUnits(point));
+        const start = toScreen(...g.start);
+        if (!g.id && Math.hypot(point[0] - start[0], point[1] - start[1]) < 3) return;
+        const box = dragBox(g.preset, g.start, end, { shift: e.shiftKey, fromCentre: e.altKey });
+        const layer = newShapeLayer(g.preset, box, draw!, W);
+        if (g.id) {
+          const id = g.id;
+          update((d) => ({ ...d, layers: d.layers.map((l) => (l.id === id ? { ...layer, id } : l)) }), { transient: true });
+        } else {
+          studio.actions.addLayer(layer, { transient: true, select: false });
+          gestureRef.current = { ...g, id: layer.id };
+        }
+        return;
+      }
+      case 'brush': {
+        // Every point the pointer passed through, not just the ones the frame caught.
+        const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
+        const points = [...g.points];
+        for (const event of events.length ? events : [e.nativeEvent]) {
+          const next = toUnits(local(event));
+          const last = points[points.length - 1];
+          if (Math.hypot(next[0] - last[0], next[1] - last[1]) * scale >= 1.5) points.push(next);
+        }
+        if (points.length !== g.points.length) begin({ ...g, points });
         return;
       }
     }
@@ -487,13 +611,24 @@ export function StudioCanvas({
         setSelection(g.additive ? [...new Set([...selection.filter((id) => id !== FIELD), ...inside])] : inside);
       }
     }
-    if (g && g.kind !== 'pan' && g.kind !== 'marquee') history.commit();
+    if (g?.kind === 'shape') {
+      if (g.id) {
+        history.commit();
+        setSelection([g.id]);
+      } else {
+        studio.actions.addLayer(newShapeLayer(g.preset, clickBox(g.preset, g.start), draw!, W));
+      }
+      onShapeDrawn?.();
+    } else if (g?.kind === 'brush' && draw) {
+      studio.actions.addLayer(newBrushLayer(simplify(g.points, 0.4 / scale), draw.brushColor, draw.brushSize, W), { select: false });
+    } else if (g && g.kind !== 'pan' && g.kind !== 'marquee') history.commit();
     setGuides({});
     setAngleReadout(null);
     begin(null);
   }
 
   function onDoubleClick(e: React.MouseEvent) {
+    if (!selecting) return;
     const point = local(e);
     const [u, v] = toUnits(point);
     const hit = hitTest(u, v);
@@ -541,7 +676,7 @@ export function StudioCanvas({
 
   // ---- overlay geometry (screen space) ----
   const busy = gesture !== null && gesture.kind !== 'marquee' && gesture.kind !== 'pan';
-  const visibleSelected = selectedLayers.filter((l) => !l.hidden);
+  const visibleSelected = selecting ? selectedLayers.filter((l) => !l.hidden) : [];
   const selBox: Box | null = visibleSelected.length ? unionBox(visibleSelected.map((l) => layerBounds(l, W))) : null;
   const selectionRect: Rect | null = selBox
     ? (() => {
@@ -549,7 +684,7 @@ export function StudioCanvas({
         const [x1, y1] = toScreen(selBox.x1, selBox.y1);
         return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
       })()
-    : fieldSelected
+    : fieldSelected && selecting
       ? { x: ox, y: oy, w: W * scale, h: scale }
       : null;
   const flagRect = { x: ox, y: oy, w: W * scale, h: scale };
@@ -570,16 +705,29 @@ export function StudioCanvas({
     const out = touch ? 34 : 24;
     return { from: mid, to: [mid[0] + Math.sin(a) * out, mid[1] - Math.cos(a) * out] };
   })();
-  const hovered = hover && !selection.includes(hover) ? design.layers.find((l) => l.id === hover) : null;
+  const hovered = selecting && hover && !selection.includes(hover) ? design.layers.find((l) => l.id === hover) : null;
   const marquee = gesture?.kind === 'marquee' ? gesture : null;
   const cursor =
     gesture?.kind === 'pan' || space.current
       ? 'grabbing'
-      : gesture?.kind === 'move'
-        ? 'move'
-        : hovered || (hover && selection.includes(hover))
-          ? 'move'
-          : 'default';
+      : tool === 'brush'
+        ? 'none'
+        : tool === 'shape'
+          ? 'crosshair'
+          : gesture?.kind === 'move'
+            ? 'move'
+            : hovered || (hover && selection.includes(hover))
+              ? 'move'
+              : 'default';
+  const brushSize = Math.max(3, (draw?.brushSize ?? 0) * scale);
+  const strokePreview = gesture?.kind === 'brush' && draw ? gesture.points.map((p) => toScreen(...p)) : null;
+  // The grid only needs drawing where the flag is on screen.
+  const gridRect = {
+    x0: Math.max(ox, 0),
+    y0: Math.max(oy, 0),
+    x1: Math.min(ox + W * scale, size.w),
+    y1: Math.min(oy + scale, size.h),
+  };
 
   return (
     <div
@@ -590,19 +738,54 @@ export function StudioCanvas({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      onPointerLeave={() => setHover(null)}
+      onPointerLeave={() => {
+        setHover(null);
+        if (brushCursor.current) brushCursor.current.style.visibility = 'hidden';
+      }}
       onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
       onDragOver={onDragOver}
       onDragLeave={() => setDropAnchor(null)}
       onDrop={onDrop}
     >
-      <div className='pointer-events-none absolute' style={{ left: ox, top: oy, width: W * scale, height: scale, visibility: size.w ? 'visible' : 'hidden' }}>
-        <FlagArt design={design} className='studio-flag block size-full' />
-      </div>
+      {size.w > 0 && (
+        // Only the part of the flag that's on screen, however close the zoom.
+        <FlagArt
+          design={design}
+          view={{ x: -ox / scale, y: -oy / scale, w: size.w / scale, h: size.h / scale }}
+          className='studio-flag pointer-events-none absolute inset-0 block size-full'
+        />
+      )}
 
       <svg className='pointer-events-none absolute inset-0 size-full overflow-visible'>
-        {fieldSelected && selectedLayers.length === 0 && (
+        {gridAlpha > 0 && gridRect.x1 > gridRect.x0 && gridRect.y1 > gridRect.y0 && (
+          <>
+            <defs>
+              <pattern id='studio-pixel-grid' patternUnits='userSpaceOnUse' x={ox} y={oy} width={px * scale} height={px * scale}>
+                <path d={`M${px * scale - 0.5} 0V${px * scale}M0 ${px * scale - 0.5}H${px * scale}`} fill='none' stroke='rgb(128 128 128 / 0.42)' strokeWidth={1} />
+              </pattern>
+            </defs>
+            <rect
+              x={gridRect.x0}
+              y={gridRect.y0}
+              width={gridRect.x1 - gridRect.x0}
+              height={gridRect.y1 - gridRect.y0}
+              fill='url(#studio-pixel-grid)'
+              opacity={gridAlpha}
+            />
+          </>
+        )}
+        {strokePreview && draw && (
+          <path
+            d={smoothPath(strokePreview)}
+            fill='none'
+            stroke={draw.brushColor}
+            strokeWidth={draw.brushSize * scale}
+            strokeLinecap='round'
+            strokeLinejoin='round'
+          />
+        )}
+        {fieldSelected && selecting && selectedLayers.length === 0 && (
           <rect x={ox - 1} y={oy - 1} width={W * scale + 2} height={scale + 2} fill='none' stroke='var(--main)' strokeWidth={2} rx={1} />
         )}
         {hovered && (() => {
@@ -721,6 +904,21 @@ export function StudioCanvas({
         >
           {Math.round(angleReadout.angle)}°
         </span>
+      )}
+
+      {tool === 'brush' && draw && (
+        <div
+          ref={brushCursor}
+          className='pointer-events-none absolute left-0 top-0 rounded-full shadow-[0_0_0_1px_rgb(0_0_0/0.55),inset_0_0_0_1px_rgb(0_0_0/0.55)]'
+          style={{
+            width: brushSize,
+            height: brushSize,
+            marginLeft: -brushSize / 2,
+            marginTop: -brushSize / 2,
+            border: '1px solid #fff',
+            visibility: 'hidden',
+          }}
+        />
       )}
 
       {renderOverlay?.({ selection: selectionRect, flag: flagRect, container: size, busy })}

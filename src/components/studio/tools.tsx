@@ -38,6 +38,7 @@ import {
   RotateQuarter,
   RowsIcon,
   SendBackward,
+  SlidersHorizontal,
   SquaresFour,
   SwapColors,
   Trash2,
@@ -48,8 +49,10 @@ import {
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import type { StudioLayer, StudioRepeat } from '@/lib/studio-design';
-import { documentColors } from './model';
+import { PaintButton, WidthSlider } from './draw';
+import { documentColors, layerWidth } from './model';
 import { alignScopes, type AlignScope } from './regions';
+import { defaultStroke, isLinear, naturalAspect } from './shapes';
 import { ColorPicker, Slider, Swatch, ToolButton, ToolDivider } from './ui';
 import type { Rect } from './StudioCanvas';
 import type { AlignEdge, Studio } from './use-studio';
@@ -223,6 +226,110 @@ export function OutlineControls({ studio, layer }: { studio: Studio; layer: Stud
         onCommit={studio.history.commit}
       />
     </div>
+  );
+}
+
+/** Fill, stroke and the shape's own settings, for selected shapes and brush strokes. */
+export function ShapeControls({ studio, layers, side = 'top' }: { studio: Studio; layers: StudioLayer[]; side?: 'top' | 'bottom' }) {
+  const { actions } = studio;
+  const first = layers[0];
+  const shape = first.shape!;
+  const brushes = layers.every((l) => l.shape?.kind === 'brush');
+  const stroked = shape.stroke > 0;
+  const strokeOn = () => defaultStroke(layerWidth(first), first.size);
+  return (
+    <>
+      {!brushes && (
+        <PaintButton
+          studio={studio}
+          side={side}
+          label='Fill'
+          color={first.colors[0]}
+          on={shape.fill}
+          // Something always shows: losing the fill brings in a stroke, and the other way round.
+          onToggle={(fill) => actions.setShape({ fill, ...(!fill && !stroked && { stroke: strokeOn() }) })}
+          onColor={(color, transient) => {
+            actions.setShapeColor(0, color, { transient });
+            if (!shape.fill) actions.setShape({ fill: true }, { transient });
+          }}
+        />
+      )}
+      <PaintButton
+        studio={studio}
+        side={side}
+        label={brushes ? 'Colour' : 'Stroke'}
+        ring={!brushes}
+        color={first.colors[1] ?? first.colors[0]}
+        on={stroked}
+        onToggle={brushes ? undefined : (on) => actions.setShape({ stroke: on ? strokeOn() : 0, ...(!on && !shape.fill && { fill: true }) })}
+        onColor={(color, transient) => {
+          actions.setShapeColor(1, color, { transient });
+          if (!stroked) actions.setShape({ stroke: strokeOn() }, { transient });
+        }}
+      >
+        {stroked && (
+          <WidthSlider
+            studio={studio}
+            label={brushes ? 'Size' : 'Width'}
+            value={shape.stroke}
+            max={brushes ? 0.08 : 0.06}
+            onChange={(stroke) => actions.setShape({ stroke }, { transient: true })}
+          />
+        )}
+      </PaintButton>
+      {layers.length === 1 && <ShapeSettings studio={studio} layer={first} />}
+    </>
+  );
+}
+
+/** Points, sides, corners or weight, for the shapes that have them. */
+function ShapeSettings({ studio, layer }: { studio: Studio; layer: StudioLayer }) {
+  const shape = layer.shape!;
+  const { kind } = shape;
+  if (kind !== 'star' && kind !== 'polygon' && kind !== 'rect' && !isLinear(kind)) return null;
+  const { history } = studio;
+  // A shape at its own proportions stays there as its points change; a stretched one stays stretched.
+  const reshape = (patch: Partial<NonNullable<StudioLayer['shape']>>) =>
+    studio.updateLayers(
+      [layer.id],
+      (l) => {
+        const next = { ...l.shape!, ...patch };
+        const regular = Math.abs(layerWidth(l) / l.size - naturalAspect(l.shape!)) < 0.01;
+        return { ...l, shape: next, ...(regular && { aspect: naturalAspect(next), stretch: undefined }) };
+      },
+      { transient: true },
+    );
+  return (
+    <ToolPopover label='Shape' icon={<SlidersHorizontal />} iconOnly>
+      <div className='flex w-[220px] flex-col gap-3.5'>
+        {(kind === 'star' || kind === 'polygon') && (
+          <Field label={kind === 'star' ? 'Points' : 'Sides'} value={shape.points}>
+            <Slider
+              label={kind === 'star' ? 'Points' : 'Sides'}
+              min={3}
+              max={kind === 'star' ? 24 : 12}
+              step={1}
+              value={shape.points ?? (kind === 'star' ? 5 : 6)}
+              onChange={(points) => reshape({ points })}
+              onCommit={history.commit}
+            />
+          </Field>
+        )}
+        {kind === 'star' && (
+          <Field label='Thickness'>
+            <Slider label='Thickness' min={0.15} max={0.95} step={0.01} value={shape.inner ?? 0.382} onChange={(inner) => reshape({ inner })} onCommit={history.commit} />
+          </Field>
+        )}
+        {kind === 'rect' && (
+          <Field label='Corners'>
+            <Slider label='Corners' min={0} max={1} step={0.01} value={shape.corner ?? 0} onChange={(corner) => reshape({ corner })} onCommit={history.commit} />
+          </Field>
+        )}
+        {isLinear(kind) && (
+          <WidthSlider studio={studio} label='Weight' min={0.003} max={0.25} value={layer.size} onChange={(size) => studio.actions.setWeight(size, { transient: true })} />
+        )}
+      </div>
+    </ToolPopover>
   );
 }
 
@@ -402,6 +509,8 @@ export function ContextToolbar({
   const { selectedLayers, fieldSelected, actions } = studio;
   const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
   const anyOutline = selectedLayers.some((l) => l.outline);
+  const allShapes = selectedLayers.length > 0 && selectedLayers.every((l) => l.shape);
+  const anyShape = selectedLayers.some((l) => l.shape);
 
   // Clear the rotate handle above the selection.
   const lift = 58 + (selectedLayers.some((l) => !l.locked && !l.hidden) ? 30 : 0);
@@ -413,15 +522,21 @@ export function ContextToolbar({
   if (selectedLayers.length > 0) {
     content = (
       <>
-        {single && (
-          <div className='flex items-center gap-1.5 px-1.5'>
-            <LayerSwatches studio={studio} layer={single} />
-          </div>
+        {allShapes ? (
+          <ShapeControls studio={studio} layers={selectedLayers} />
+        ) : (
+          <>
+            {single && (
+              <div className='flex items-center gap-1.5 px-1.5'>
+                <LayerSwatches studio={studio} layer={single} />
+              </div>
+            )}
+            <ToolButton label='Match palette' onClick={actions.matchPalette}>
+              <WandSparkles />
+              <span>Match palette</span>
+            </ToolButton>
+          </>
         )}
-        <ToolButton label='Match palette' onClick={actions.matchPalette}>
-          <WandSparkles />
-          <span>Match palette</span>
-        </ToolButton>
         <ToolDivider />
         <ToolButton label='Flip' onClick={() => actions.flip('x')}>
           <FlipHorizontal />
@@ -438,7 +553,8 @@ export function ContextToolbar({
             <RepeatControls studio={studio} layer={single} />
           </ToolPopover>
         ) : null}
-        <OutlineButton studio={studio} active={anyOutline} />
+        {/* Shapes have their own stroke. */}
+        {!anyShape && <OutlineButton studio={studio} active={anyOutline} />}
         <ToolDivider />
         <ToolButton label='Duplicate' onClick={() => actions.duplicateSelected()}>
           <Copy />

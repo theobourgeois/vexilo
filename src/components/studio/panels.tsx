@@ -2,16 +2,17 @@
 
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Eye, EyeSlash, Lock, Search, Unlock, Upload, X } from '@/components/icons';
+import { Dice, Eye, EyeSlash, Lock, Search, Unlock, Upload, X } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { EMBLEM_CATEGORIES, emblemSearchScore } from '@/lib/emblem-search';
 import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
-import { luminance, PALETTES } from './colors';
+import { luminance, PALETTE_GROUPS, PALETTES } from './colors';
 import { FlagArt } from './FlagArt';
 import { layerImage } from './cutout';
 import { useRecolored } from './images';
 import { defaultParams, LAYOUT_PRESETS, LAYOUTS, type LayoutPreset } from './layouts';
-import { documentColors, type StudioEmblem } from './model';
+import { documentColors, layerColors, layerWidth, type StudioEmblem } from './model';
+import { shapePath } from './shapes';
 import { EMBLEM_MIME } from './StudioCanvas';
 import { ColorPicker, Slider, Swatch } from './ui';
 import { FIELD, type Studio } from './use-studio';
@@ -260,33 +261,73 @@ export function ColoursPanel({ studio }: { studio: Studio }) {
           ))}
         </div>
       </div>
-      <div>
-        <SectionLabel>Palettes</SectionLabel>
-        <div className='flex flex-col gap-1'>
-          {PALETTES.map((palette) => (
-            <button
-              key={palette.name}
-              type='button'
-              onClick={() => studio.actions.applyPalette(palette.colors)}
-              className='flex cursor-pointer items-center gap-3 rounded-[10px] p-1.5 text-left text-[13px] outline-none hover:bg-foreground/[0.05] focus-visible:ring-2 focus-visible:ring-ring'
-            >
-              <span className='flex h-6 w-24 shrink-0 overflow-hidden rounded-[6px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.12)]'>
-                {palette.colors.map((c) => (
-                  <span key={c} className='flex-1' style={{ background: c }} />
-                ))}
-              </span>
-              <span className='text-subtle'>{palette.name}</span>
-            </button>
-          ))}
+      <button
+        type='button'
+        onClick={() => studio.actions.applyPalette(PALETTES[Math.floor(Math.random() * PALETTES.length)].colors)}
+        className='flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[10px] text-[13px] font-medium text-subtle shadow-[inset_0_0_0_1px_var(--border)] transition-colors hover:bg-foreground/[0.05] hover:text-foreground [&_svg]:size-4'
+      >
+        <Dice />
+        Surprise me
+      </button>
+      {PALETTE_GROUPS.map((group) => (
+        <div key={group.name}>
+          <SectionLabel>{group.name}</SectionLabel>
+          <div className='flex flex-col gap-0.5'>
+            {group.palettes.map((palette) => (
+              <button
+                key={palette.name}
+                type='button'
+                onClick={() => studio.actions.applyPalette(palette.colors)}
+                className='flex cursor-pointer items-center gap-3 rounded-[10px] p-1.5 text-left text-[13px] outline-none hover:bg-foreground/[0.05] focus-visible:ring-2 focus-visible:ring-ring'
+              >
+                {/* The edge sits over the colours, so white and pale ones still read against the panel. */}
+                <span className='relative flex h-6 w-24 shrink-0 overflow-hidden rounded-[6px] after:absolute after:inset-0 after:rounded-[6px] after:shadow-[inset_0_0_0_1px_rgb(0_0_0/0.14)]'>
+                  {palette.colors.map((c, i) => (
+                    <span key={i} className='flex-1' style={{ background: c }} />
+                  ))}
+                </span>
+                <span className='min-w-0 truncate text-subtle'>{palette.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }
 
 // ───────────────────────── Layers ─────────────────────────
 
+function ShapeThumb({ layer }: { layer: StudioLayer }) {
+  const shape = layer.shape!;
+  const [w, h] = [layerWidth(layer), layer.size];
+  const k = Math.max(w, h);
+  // Thin strokes would vanish at this size.
+  const stroke = shape.stroke > 0 ? Math.max(shape.stroke, k * (shape.kind === 'brush' ? 0.1 : 0.05)) : 0;
+  const drawn = { ...shape, stroke };
+  return (
+    <span className={cn('relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[7px]', tileTone(layerColors(layer)))}>
+      <svg viewBox={`${-k / 2} ${-k / 2} ${k} ${k}`} className='size-[72%]' style={{ transform: `rotate(${layer.rotation}deg)` }}>
+        <path
+          d={shapePath(drawn, w, h)}
+          fill={shape.fill ? layer.colors[0] : 'none'}
+          stroke={stroke ? (layer.colors[1] ?? layer.colors[0]) : 'none'}
+          strokeWidth={stroke}
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          transform={`scale(${layer.flipX ? -1 : 1} ${layer.flipY ? -1 : 1})`}
+        />
+      </svg>
+    </span>
+  );
+}
+
 function LayerThumb({ layer }: { layer: StudioLayer }) {
+  if (layer.shape) return <ShapeThumb layer={layer} />;
+  return <ImageThumb layer={layer} />;
+}
+
+function ImageThumb({ layer }: { layer: StudioLayer }) {
   const url = useRecolored(layerImage(layer), layer.palette, layer.colors);
   return (
     <span className={cn('relative size-8 shrink-0 overflow-hidden rounded-[7px]', tileTone(layer.colors))}>

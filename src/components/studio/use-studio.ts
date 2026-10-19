@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { StudioDesign, StudioLayer, StudioOutline, StudioRepeat } from '@/lib/studio-design';
+import type { StudioDesign, StudioLayer, StudioOutline, StudioRepeat, StudioShape } from '@/lib/studio-design';
 import { contrastRatio, luminance, matchToPalette } from './colors';
 import { useHistory } from './history';
 import { defaultParams, LAYOUTS, snapAnchors, type LayoutPreset } from './layouts';
@@ -18,6 +18,7 @@ import {
   uid,
   unionBox,
   type Box,
+  layerWidth,
   type StudioDoc,
   type StudioEmblem,
 } from './model';
@@ -99,6 +100,30 @@ export function useStudio(initial: StudioDoc) {
       setSelectionState([layer.id]);
       return layer.id;
     },
+
+    /** Adds a drawn shape or stroke on top. */
+    addLayer(layer: StudioLayer, opts?: Opts & { select?: boolean }) {
+      update((d) => ({ ...d, layers: [...d.layers, layer] }), opts);
+      if (opts?.select !== false) setSelectionState([layer.id]);
+    },
+
+    /** Changes the selected shapes; a brush stroke is never filled. */
+    setShape: (patch: Partial<StudioShape>, opts?: Opts) =>
+      updateLayers(
+        editable,
+        (l) => (l.shape ? { ...l, shape: { ...l.shape, ...patch, fill: l.shape.kind === 'brush' ? false : (patch.fill ?? l.shape.fill) } } : l),
+        opts,
+      ),
+    /** Paints the selected shapes' fill (0) or stroke (1). A brush's one colour is both. */
+    setShapeColor: (index: 0 | 1, color: string, opts?: Opts) =>
+      updateLayers(
+        editable,
+        (l) => (l.shape ? { ...l, colors: l.shape.kind === 'brush' ? [color, color] : l.colors.map((c, i) => (i === index ? color : c)) } : l),
+        opts,
+      ),
+    /** How thick the selected lines and arrows are, keeping their length. */
+    setWeight: (size: number, opts?: Opts) =>
+      updateLayers(editable, (l) => (l.shape ? { ...l, size, aspect: layerWidth(l) / size, stretch: undefined } : l), opts),
 
     deleteSelected() {
       const targets = editable;
@@ -206,6 +231,7 @@ export function useStudio(initial: StudioDoc) {
         ...l,
         size: clamp(l.size * factor, 0.015, 3),
         repeat: l.repeat && (l.repeat.mode === 'ring' || l.repeat.mode === 'arc') ? { ...l.repeat, spacing: l.repeat.spacing * factor } : l.repeat,
+        ...(l.shape && { shape: { ...l.shape, stroke: l.shape.stroke * factor } }),
       })),
 
     /**

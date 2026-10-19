@@ -1,6 +1,7 @@
 import type { StudioDesign, StudioLayer, StudioRepeat } from '@/lib/studio-design';
 import { uniqueColors } from './colors';
 import { defaultParams, LAYOUTS, type Anchor } from './layouts';
+import { hitsBrush, shapeColors } from './shapes';
 
 /** An emblem from the library, as the editor gets it. */
 export type StudioEmblem = {
@@ -36,6 +37,12 @@ export type RemixSource = {
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
 export const flagWidth = (design: Pick<StudioDesign, 'ratio'>) => design.ratio[1] / design.ratio[0];
+
+/** How wide a PNG export is; one of its pixels is the finest step the editor works in. */
+export const EXPORT_WIDTH = 2400;
+
+/** One export pixel, in flag units. */
+export const pixelSize = (W: number) => W / EXPORT_WIDTH;
 
 export const RATIOS: [number, number][] = [
   [2, 3],
@@ -173,8 +180,11 @@ export const unionBox = (boxes: Box[]): Box => ({
   y1: Math.max(...boxes.map((b) => b.y1)),
 });
 
-/** Whether a point (flag units) is on any copy of the layer. */
-export function hitsLayer(layer: StudioLayer, W: number, px: number, py: number) {
+/**
+ * Whether a point (flag units) is on any copy of the layer. `reach` is how near counts, so thin
+ * lines and brush strokes can still be picked up.
+ */
+export function hitsLayer(layer: StudioLayer, W: number, px: number, py: number, reach = 0) {
   const w = layerWidth(layer);
   const h = layer.size;
   return layerCopies(layer, W).some((copy) => {
@@ -182,7 +192,8 @@ export function hitsLayer(layer: StudioLayer, W: number, px: number, py: number)
     const [dx, dy] = [px - copy.cx, py - copy.cy];
     const lx = dx * Math.cos(a) - dy * Math.sin(a);
     const ly = dx * Math.sin(a) + dy * Math.cos(a);
-    return Math.abs(lx) <= w / 2 && Math.abs(ly) <= h / 2;
+    if (layer.shape?.kind === 'brush') return hitsBrush(layer.shape, w, h, [layer.flipX ? -lx : lx, layer.flipY ? -ly : ly], reach);
+    return Math.abs(lx) <= Math.max(w / 2, reach) && Math.abs(ly) <= Math.max(h / 2, reach);
   });
 }
 
@@ -212,9 +223,12 @@ export function fieldColors(design: StudioDesign) {
   return design.field.colors;
 }
 
+/** The colours a layer shows. */
+export const layerColors = (layer: StudioLayer) => (layer.shape ? shapeColors(layer) : layer.colors);
+
 /** Every colour in the flag, field first. */
 export function documentColors(design: StudioDesign) {
-  return uniqueColors([...design.field.colors, ...design.layers.filter((l) => !l.hidden).flatMap((layer) => layer.colors)]);
+  return uniqueColors([...design.field.colors, ...design.layers.filter((l) => !l.hidden).flatMap(layerColors)]);
 }
 
 /** Swaps one colour for another everywhere it's used. */
