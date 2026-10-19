@@ -38,7 +38,8 @@ export default function FlagImage({
   eager,
   className,
 }: FlagImageProps) {
-  const [ratio, setRatio] = React.useState<number | null>(() => ratioCache.get(src) ?? null);
+  // Match the server during hydration; restore any cached dimensions in the effect.
+  const [ratio, setRatio] = React.useState<number | null>(null);
   const [failed, setFailed] = React.useState(false);
   const imgRef = React.useRef<HTMLImageElement>(null);
 

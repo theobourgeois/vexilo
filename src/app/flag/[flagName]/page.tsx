@@ -13,6 +13,8 @@ import FlagActions from './FlagActions';
 import ExpandableDescription from './ExpandableDescription';
 import FlagViewer from './FlagViewer';
 import FlagViewTracker from './FlagViewTracker';
+import FlagTimeline from './FlagTimeline';
+import { getFlagTimeline } from '@/actions/flag-timeline';
 import type { FlagAiResearchSource, FlagAiStructuredData } from '@/db/schema';
 import FlagCard from '@/components/FlagCard';
 import { Metadata } from 'next';
@@ -270,10 +272,21 @@ function collectSources(own: string[], researched: FlagAiResearchSource[]) {
   });
 }
 
+// Streams in after the page; most flags have no timeline yet.
+async function TimelineSection({ flagId, beside }: { flagId: string; beside: boolean }) {
+  const timeline = await getFlagTimeline(flagId);
+  if (!timeline) return null;
+  return (
+    <div className={beside ? 'lg:col-start-2 lg:row-start-1' : undefined}>
+      <FlagTimeline timeline={timeline} />
+    </div>
+  );
+}
+
 function HistoryAndSources({ history, sources }: { history: string; sources: string[] }) {
   if (!history && sources.length === 0) return null;
   return (
-    <section className='mt-12 max-w-[780px]'>
+    <section className='max-w-[780px]'>
       {history && (
         <>
           <h2 className='flex items-center gap-2 text-[17px] font-semibold tracking-[-0.02em]'>
@@ -363,6 +376,8 @@ export default async function FlagPage({
   const madeInMaker = flag.tags.some((tag) => MAKER_TAGS.includes(tag));
   const original = flag.remixOf ? await getFlagNameById(flag.remixOf) : null;
   const structured = flag.metadata?.structuredData ?? null;
+  const history = flag.metadata?.historicalContext ?? '';
+  const sources = collectSources(flag.sources ?? [], flag.metadata?.researchSources ?? []);
   const firstTag = flag.displayTags.find((t) => t.toLowerCase() !== flag.name.toLowerCase());
   const details: [string, React.ReactNode][] = [
     ['Catalogue', <span key='i' className='tabular-nums'>#{String(flag.index).padStart(4, '0')}</span>],
@@ -466,10 +481,13 @@ export default async function FlagPage({
         </Panel>
       </div>
 
-      <HistoryAndSources
-        history={flag.metadata?.historicalContext ?? ''}
-        sources={collectSources(flag.sources ?? [], flag.metadata?.researchSources ?? [])}
-      />
+      {/* History on the left, the timeline beside it on wide screens. */}
+      <div className='mt-12 grid gap-x-16 gap-y-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]'>
+        <HistoryAndSources history={history} sources={sources} />
+        <Suspense fallback={null}>
+          <TimelineSection flagId={flag.id} beside={Boolean(history || sources.length)} />
+        </Suspense>
+      </div>
 
       <Suspense
         fallback={
