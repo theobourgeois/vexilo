@@ -17,6 +17,7 @@
     "views:backfill": "tsx scripts/views/backfill-flag-views.ts",
     "colors:backfill": "tsx scripts/colors/backfill-flag-colors.ts",
     "emblems:import": "tsx scripts/emblems/import-emblems.ts",
+    "emblems:import-reviewed": "tsx scripts/emblems/import-reviewed-emblems.ts",
     "emblems:harvest": "tsx scripts/emblems/harvest-candidates.ts",
     "emblems:cluster": "tsx scripts/emblems/cluster-candidates.ts",
     "emblems:tag-sheets": "tsx scripts/emblems/tag-sheets.ts",

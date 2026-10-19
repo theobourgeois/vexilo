@@ -162,3 +162,19 @@ export function maskIou(a: number[], b: number[]) {
   }
   return union ? inter / union : 0;
 }
+
+/** Share of cells painted in both where the colour layout agrees, trying both orders for two colours. */
+export function segAgreement(a: number[], b: number[], colours: number) {
+  const score = (map: (k: number) => number) => {
+    let both = 0;
+    let same = 0;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] < 0 || b[i] < 0) continue;
+      both++;
+      if (map(a[i]) === b[i]) same++;
+    }
+    return both ? same / both : 0;
+  };
+  const straight = score((k) => k);
+  return colours === 2 ? Math.max(straight, score((k) => 1 - k)) : straight;
+}

@@ -359,6 +359,12 @@ export const flagEmblems = createTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     sourceKey: varchar('source_key', { length: 64 }).notNull(),
+    name: varchar('name', { length: 160 }).notNull().default(''),
+    tags: text('tags').array().notNull().default([]),
+    category: varchar('category', { length: 32 }).notNull().default('unsorted'),
+    rank: integer('rank').notNull().default(0),
+    // Retired drawings remain available to existing designs and remix placements.
+    isActive: boolean('is_active').notNull().default(true),
     flagId: uuid('flag_id')
       .notNull()
       .references(() => flags.id, { onDelete: 'cascade' }),

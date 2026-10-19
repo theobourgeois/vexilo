@@ -4,7 +4,7 @@ import { getRemixSource, getStudioEmblems } from '@/lib/studio-data';
 
 export const metadata: Metadata = {
   title: 'Flag maker - Vexilo',
-  description: 'Design your own flag or remix any flag on Vexilo, with hundreds of emblems from real flags.',
+  description: 'Design your own flag or remix any flag on Vexilo, with thousands of searchable emblems from real flags.',
 };
 
 export default async function CreatePage({ searchParams }: { searchParams: Promise<{ remix?: string }> }) {

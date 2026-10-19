@@ -4,6 +4,7 @@ import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Eye, EyeSlash, Lock, Search, Unlock, Upload, X } from '@/components/icons';
 import { cn } from '@/lib/utils';
+import { EMBLEM_CATEGORIES, emblemSearchScore } from '@/lib/emblem-search';
 import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
 import { luminance, PALETTES } from './colors';
 import { FlagArt } from './FlagArt';
@@ -25,18 +26,8 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 
 // ───────────────────────── Emblems ─────────────────────────
 
-const COLLECTIONS: [string, string][] = [
-  ['all', 'All'],
-  ['country', 'Countries'],
-  ['us', 'US'],
-  ['canada', 'Canada'],
-  ['europe-regions', 'Europe'],
-  ['british-isles', 'British Isles'],
-  ['historical', 'Historical'],
-  ['japan', 'Japan'],
-  ['other', 'More'],
-];
-const MAIN = new Set(COLLECTIONS.map(([key]) => key));
+const CATEGORIES = [['all', 'All'], ...EMBLEM_CATEGORIES] as const;
+const EMBLEMS_PER_PAGE = 120;
 
 /** Dark emblems sit on a light tile and light ones on a dark tile, so every shape reads. */
 function tileTone(colors: string[]) {
@@ -59,13 +50,16 @@ export function EmblemsPanel({
   columns?: number;
 }) {
   const [query, setQuery] = React.useState('');
-  const [collection, setCollection] = React.useState('all');
+  const [category, setCategory] = React.useState('all');
+  const [visible, setVisible] = React.useState(EMBLEMS_PER_PAGE);
   const q = query.trim().toLowerCase();
-  const shown = emblems.filter(
-    (e) =>
-      (collection === 'all' || e.collection === collection || (collection === 'other' && !MAIN.has(e.collection))) &&
-      (!q || e.names.some((name) => name.toLowerCase().includes(q))),
-  );
+  const matches = React.useMemo(() => emblems
+    .filter((e) => category === 'all' || e.category === category)
+    .map((e) => ({ emblem: e, score: emblemSearchScore(e, q) }))
+    .filter((e) => e.score > 0)
+    .sort((a, b) => b.score - a.score || (b.emblem.rank ?? 0) - (a.emblem.rank ?? 0) || b.emblem.copies - a.emblem.copies)
+    .map((e) => e.emblem), [emblems, category, q]);
+  const shown = matches.slice(0, visible);
 
   return (
     <div className='flex min-h-0 flex-1 flex-col gap-3'>
@@ -73,25 +67,26 @@ export function EmblemsPanel({
         <Search className='size-4 shrink-0' />
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setVisible(EMBLEMS_PER_PAGE); }}
           placeholder={`Search ${emblems.length} emblems`}
           className='min-w-0 flex-1 bg-transparent text-[13.5px] text-foreground outline-none placeholder:text-muted-foreground'
         />
         {query && (
-          <button type='button' aria-label='Clear' onClick={() => setQuery('')} className='cursor-pointer hover:text-foreground'>
+          <button type='button' aria-label='Clear' onClick={() => { setQuery(''); setVisible(EMBLEMS_PER_PAGE); }} className='cursor-pointer hover:text-foreground'>
             <X className='size-3.5' />
           </button>
         )}
       </label>
       <div className='-mx-1 flex shrink-0 gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]'>
-        {COLLECTIONS.map(([key, label]) => (
+        {CATEGORIES.map(([key, label]) => (
           <button
             key={key}
             type='button'
-            onClick={() => setCollection(key)}
+            onClick={() => { setCategory(key); setVisible(EMBLEMS_PER_PAGE); }}
+            aria-pressed={category === key}
             className={cn(
               'h-7 shrink-0 cursor-pointer rounded-full px-3 text-[12.5px] shadow-[inset_0_0_0_1px_var(--border)] transition-colors',
-              collection === key ? 'bg-foreground text-background shadow-none' : 'text-subtle hover:text-foreground',
+              category === key ? 'bg-foreground text-background shadow-none' : 'text-subtle hover:text-foreground',
             )}
           >
             {label}
@@ -100,7 +95,7 @@ export function EmblemsPanel({
       </div>
       <div className='-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-2'>
         <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-          {onUpload && !q && collection === 'all' && (
+          {onUpload && !q && category === 'all' && (
             <label
               title='Your own image'
               className='grid aspect-square min-w-0 cursor-pointer place-items-center rounded-[12px] text-muted-foreground shadow-[inset_0_0_0_1.5px_var(--border)] transition-colors focus-within:ring-2 focus-within:ring-ring hover:text-foreground hover:shadow-[inset_0_0_0_2px_var(--main)] [&_svg]:size-6'
@@ -139,7 +134,12 @@ export function EmblemsPanel({
             </button>
           ))}
         </div>
-        {shown.length === 0 && <p className='py-10 text-center text-[13px] text-muted-foreground'>No emblems found</p>}
+        {matches.length > shown.length && (
+          <button type='button' onClick={() => setVisible((n) => n + EMBLEMS_PER_PAGE)} className='mt-3 w-full cursor-pointer rounded-lg border border-border py-2 text-[13px] text-muted-foreground hover:text-foreground'>
+            Show more ({matches.length - shown.length} remaining)
+          </button>
+        )}
+        {matches.length === 0 && <p className='py-10 text-center text-[13px] text-muted-foreground'>No emblems found</p>}
       </div>
     </div>
   );

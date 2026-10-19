@@ -31,7 +31,8 @@
   .edited { box-shadow: inset 2px 0 0 #e6a700; }
   .sub { color: var(--muted); font-size: 11px; display: flex; gap: 6px; justify-content: space-between; }
   .sub select { font: inherit; font-size: 11px; border: none; background: none; color: var(--muted); padding: 0; max-width: 60%; }
-  .suggest { color: var(--bad); }
+  .suggest { color: var(--bad); justify-content: flex-start; align-items: center; }
+  .twin { width: 34px; height: 34px; object-fit: contain; flex: none; background: #b9bcc0; border-radius: 6px; padding: 2px; }
   .badge { font-size: 10px; padding: 0 5px; border-radius: 4px; background: #eceae4; color: var(--muted); }
   .badge.new { background: #dfeaf8; color: var(--main); }
   .more { grid-column: 1 / -1; text-align: center; padding: 20px; }
@@ -57,19 +58,43 @@
   </div>
   <div class="row" id="cats"></div>
   <div class="help" id="help"></div>
+  <div class="help" id="migration" hidden>Recommendations updated: distinct variants previously marked by default are restored. Additions, edits and other cuts are carried forward. <button id="previous">Download previous decisions</button></div>
 </header>
 <main id="grid"></main>
 <script src="data.js"></script>
 <script>
-const KEY = 'vexilo-emblem-review-v2';
+const KEY = 'vexilo-emblem-review-v3';
+const LEGACY_KEY = 'vexilo-emblem-review-v2';
 const state = { tab: 'library', cat: 'all', q: '', shown: 240 };
-const saved = JSON.parse(localStorage.getItem(KEY) || 'null') || { reject: window.EMBLEMS.filter((e) => e.suggest).map((e) => e.id) };
-const decisions = { reject: new Set(saved.reject || []), add: new Set(saved.add || []), edits: saved.edits || {} };
-const save = () => localStorage.setItem(KEY, JSON.stringify({ reject: [...decisions.reject], add: [...decisions.add], edits: decisions.edits }));
+const suggestions = new Set(window.EMBLEMS.filter((e) => e.suggest).map((e) => e.id));
+const legacyRaw = localStorage.getItem(LEGACY_KEY);
+let saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+if (!saved && legacyRaw) {
+  const legacy = JSON.parse(legacyRaw);
+  const previousDefaults = new Set(window.LEGACY_SUGGESTIONS || []);
+  const previousRejects = new Set(legacy.reject || []);
+  // v2 mixed automatic marks with user clicks. Move known old defaults back into recommendations;
+  // retain other rejects, explicit restores, additions and edits. Keep the original v2 file intact.
+  saved = {
+    reject: [...previousRejects].filter((id) => !previousDefaults.has(id)),
+    keep: [...previousDefaults].filter((id) => !previousRejects.has(id)),
+    add: legacy.add || [], edits: legacy.edits || {},
+  };
+}
+saved ||= {};
+const decisions = { reject: new Set(saved.reject || []), keep: new Set(saved.keep || []), add: new Set(saved.add || []), edits: saved.edits || {} };
+const rejected = (e) => decisions.reject.has(e.id) || (suggestions.has(e.id) && !decisions.keep.has(e.id));
+const save = () => localStorage.setItem(KEY, JSON.stringify({ reject: [...decisions.reject], keep: [...decisions.keep], add: [...decisions.add], edits: decisions.edits }));
+if (legacyRaw) { document.getElementById('migration').hidden = false; save(); }
+function download(value, filename) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 1)], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 const TABS = [
-  ['library', 'Picked', 'Click an emblem to reject or restore it. Ones marked “Claude:” start rejected; click to keep them. Click the name or tags to fix them (comma-separated). Category is the dropdown.'],
-  ['bench', 'Runners-up', 'Fine but not picked: too obscure, messy at small sizes, or near-duplicates. Click to add one to the library.'],
+  ['library', 'Picked', 'Distinct variants are welcome: several fleurs-de-lis, maple leaves or sun faces can stay. Suggested cuts start with an ✕; click the art to keep or reject it. Names and tags are editable.'],
+  ['bench', 'Runners-up', 'Outside the revised shortlist: lower-ranked candidates and duplicates flagged during tagging. A similar subject can still be a useful variant. Click the art to add one.'],
   ['rejected', 'Junk', 'Thrown out in triage (fragments, lettering, cantons, stripe offcuts, low quality). Click to rescue one.'],
 ];
 const all = window.EMBLEMS;
@@ -118,11 +143,13 @@ function render() {
     .filter(([, s]) => s > 0)
     .sort((a, b) => b[1] - a[1] || (b[0].rank ?? 0) - (a[0].rank ?? 0))
     .map(([e]) => e);
-  const kept = all.filter((e) => (e.tab === 'library' && !decisions.reject.has(e.id)) || (e.tab !== 'library' && decisions.add.has(e.id))).length;
-  document.getElementById('stats').textContent = `${list.length} shown · library would have ${kept} · ${decisions.reject.size} rejected, ${decisions.add.size} added, ${Object.keys(decisions.edits).length} edited`;
+  const cuts = all.filter((e) => e.tab === 'library' && rejected(e)).length;
+  const additions = all.filter((e) => e.tab !== 'library' && decisions.add.has(e.id)).length;
+  const kept = byTab('library').length - cuts + additions;
+  document.getElementById('stats').textContent = `${list.length} matches · library would have ${kept} · ${cuts} rejected, ${additions} added, ${Object.keys(decisions.edits).length} edited`;
   const categories = window.CATEGORIES;
   document.getElementById('grid').innerHTML = list.slice(0, state.shown).map((e) => {
-    const cls = state.tab === 'library' ? (decisions.reject.has(e.id) ? 'out' : '') : (decisions.add.has(e.id) ? 'in' : '');
+    const cls = state.tab === 'library' ? (rejected(e) ? 'out' : '') : (decisions.add.has(e.id) ? 'in' : '');
     const edited = decisions.edits[e.id] ? 'edited' : '';
     return `<div class="card ${cls} ${edited}" data-id="${e.id}">
       <div class="art ${tone(e.colors)}" title="${esc((e.flags || []).join(' · '))}"><img loading="lazy" src="${e.thumb}" alt=""></div>
@@ -132,25 +159,30 @@ function render() {
         <div class="sub"><select data-edit="category">${categories.map((c) => `<option ${c === field(e, 'category') ? 'selected' : ''}>${c}</option>`).join('')}</select>
           <span>${e.origin === 'library' ? '<span class="badge">current</span>' : '<span class="badge new">new</span>'} ${e.count > 1 ? `×${e.count}` : ''}</span></div>
         <div class="sub"><span>${esc(e.flag)}</span>${e.reason ? `<span>${esc(e.reason)}</span>` : ''}</div>
-        ${e.suggest ? `<div class="sub suggest">Claude: ${esc(e.suggest)}</div>` : ''}
+        ${e.suggest ? `<div class="sub suggest">${e.twin ? `<img class="twin" src="${e.twin}" alt="">` : ''}<span>Suggested cut: ${esc(e.suggest)}</span></div>` : ''}
       </div></div>`;
   }).join('') + (list.length > state.shown ? `<div class="more"><button id="more">Show more (${list.length - state.shown} left)</button></div>` : '');
 }
 
 document.addEventListener('click', (ev) => {
-  const t = ev.target.closest('[data-tab],[data-cat],.art,#more,#export');
+  const t = ev.target.closest('[data-tab],[data-cat],.art,#more,#export,#previous');
   if (!t) return;
   if (t.dataset.tab) { state.tab = t.dataset.tab; state.cat = 'all'; state.shown = 240; }
   else if (t.dataset.cat) { state.cat = t.dataset.cat; state.shown = 240; }
   else if (t.id === 'more') { state.shown += 480; }
+  else if (t.id === 'previous') { download(JSON.parse(legacyRaw), 'emblem-decisions-before-revision.json'); return; }
   else if (t.id === 'export') {
-    const blob = new Blob([JSON.stringify({ reject: [...decisions.reject], add: [...decisions.add], edits: decisions.edits }, null, 1)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'emblem-decisions.json'; a.click();
+    download({ reject: byTab('library').filter(rejected).map((e) => e.id), add: all.filter((e) => e.tab !== 'library' && decisions.add.has(e.id)).map((e) => e.id), edits: decisions.edits }, 'emblem-decisions.json');
     return;
   } else {
     const id = t.closest('.card').dataset.id;
-    const set = state.tab === 'library' ? decisions.reject : decisions.add;
-    set.has(id) ? set.delete(id) : set.add(id);
+    if (state.tab === 'library') {
+      const e = all.find((e) => e.id === id);
+      if (rejected(e)) { decisions.reject.delete(id); decisions.keep.add(id); }
+      else { decisions.keep.delete(id); decisions.reject.add(id); }
+    } else {
+      decisions.add.has(id) ? decisions.add.delete(id) : decisions.add.add(id);
+    }
     save();
   }
   render();

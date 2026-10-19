@@ -5,10 +5,13 @@ import { defaultParams, LAYOUTS, type Anchor } from './layouts';
 /** An emblem from the library, as the editor gets it. */
 export type StudioEmblem = {
   id: string;
-  /** The flag it was cut from. */
+  /** The drawing's descriptive name. */
   name: string;
   /** Every flag it appears on, for search. */
   names: string[];
+  tags?: string[];
+  category?: string;
+  rank?: number;
   collection: string;
   src: string;
   aspect: number;

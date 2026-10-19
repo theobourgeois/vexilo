@@ -19,10 +19,15 @@ export const getStudioEmblems = unstable_cache(
         copies: flagEmblems.copies,
         collection: flagEmblems.collection,
         appearsOn: flagEmblems.appearsOn,
-        name: flags.name,
+        name: flagEmblems.name,
+        tags: flagEmblems.tags,
+        category: flagEmblems.category,
+        rank: flagEmblems.rank,
+        flagName: flags.name,
       })
       .from(flagEmblems)
-      .innerJoin(flags, eq(flags.id, flagEmblems.flagId));
+      .innerJoin(flags, eq(flags.id, flagEmblems.flagId))
+      .where(eq(flagEmblems.isActive, true));
     const ids = [...new Set(rows.flatMap((row) => row.appearsOn))];
     const names = new Map(
       ids.length
@@ -32,18 +37,21 @@ export const getStudioEmblems = unstable_cache(
     return rows
       .map((row) => ({
         id: row.id,
-        name: row.name,
-        names: [...new Set([row.name, ...row.appearsOn.map((id) => names.get(id) ?? '').filter(Boolean)])],
+        name: row.name || row.flagName,
+        names: [...new Set([row.flagName, ...row.appearsOn.map((id) => names.get(id) ?? '').filter(Boolean)])],
+        tags: row.tags,
+        category: row.category,
+        rank: row.rank,
         collection: row.collection === 'country-extra' ? 'country' : row.collection,
         src: row.image,
         aspect: row.width / row.height,
         colors: row.colors,
         copies: row.copies,
       }))
-      .sort((a, b) => b.copies - a.copies || a.name.localeCompare(b.name));
+      .sort((a, b) => b.rank - a.rank || b.copies - a.copies || a.name.localeCompare(b.name));
   },
-  ['studio-emblems-v1'],
-  { revalidate: 60 * 60 },
+  ['studio-emblems-v2'],
+  { revalidate: 60 * 60, tags: ['studio-emblems'] },
 );
 
 /**
@@ -71,6 +79,10 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
         copies: flagEmblems.copies,
         collection: flagEmblems.collection,
         placements: flagEmblems.placements,
+        name: flagEmblems.name,
+        tags: flagEmblems.tags,
+        category: flagEmblems.category,
+        rank: flagEmblems.rank,
       })
       .from(flagEmblems)
       .where(sql`${flagEmblems.placements} @> ${JSON.stringify([{ flagId }])}::jsonb`),
@@ -95,8 +107,11 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
         {
           emblem: {
             id: emblem.id,
-            name: flag.name,
+            name: emblem.name || flag.name,
             names: [flag.name],
+            tags: emblem.tags,
+            category: emblem.category,
+            rank: emblem.rank,
             collection: emblem.collection,
             src: emblem.image,
             aspect: emblem.width / emblem.height,
