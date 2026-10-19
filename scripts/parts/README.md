@@ -14,6 +14,9 @@ npm run parts:raster -- --only "$(cat scripts/parts/raster-pilot-indices.txt)" -
 # Persist validated parts and review failures for that same bounded pilot.
 npm run parts:raster -- --only "$(cat scripts/parts/raster-pilot-indices.txt)" --force --write --report /tmp/raster-review
 
+# Everything not yet current, in 8 low-priority worker processes.
+npm run parts:raster -- --limit 100000 --write --concurrency 8 --report /tmp/raster-full
+
 npm run parts:raster:test
 ```
 

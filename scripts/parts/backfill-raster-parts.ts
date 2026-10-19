@@ -1,8 +1,11 @@
 import 'dotenv/config';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { cpus, setPriority } from 'node:os';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import sharp from 'sharp';
 import { and, isNull, sql } from 'drizzle-orm';
 import { db } from '../../src/db';
 import { flags, flagParts } from '../../src/db/schema';
@@ -25,6 +28,8 @@ function parseArgs(argv: string[]) {
     write: false,
     report: '/tmp/vexilo-raster',
     sources: '',
+    concurrency: 1,
+    shard: -1,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -35,15 +40,22 @@ function parseArgs(argv: string[]) {
     else if (arg === '--sources') args.sources = argv[++i];
     else if (arg === '--force') args.force = true;
     else if (arg === '--write') args.write = true;
+    else if (arg === '--concurrency') args.concurrency = Number(argv[++i]);
+    else if (arg === '--shard') args.shard = Number(argv[++i]);
     else throw new Error(`Unknown argument: ${arg}`);
   }
   if (
     !Number.isSafeInteger(args.limit) ||
     args.limit <= 0 ||
     !Number.isSafeInteger(args.seed) ||
-    args.only.some((n) => !Number.isSafeInteger(n) || n <= 0)
+    args.only.some((n) => !Number.isSafeInteger(n) || n <= 0) ||
+    !Number.isSafeInteger(args.concurrency) ||
+    args.concurrency < 1 ||
+    args.concurrency > cpus().length
   )
-    throw new Error('Use a positive integer --limit/--only and integer --seed');
+    throw new Error(
+      'Use a positive integer --limit/--only, integer --seed, and --concurrency up to the CPU count',
+    );
   if (!args.report || (args.sources && args.write))
     throw new Error(
       '--sources is for local experiments only; publishing always fetches the current source',
@@ -137,8 +149,18 @@ async function main() {
     ? rows.slice(0, args.limit)
     : sample(rows, args.seed, args.limit);
   await mkdir(args.report, { recursive: true });
-  console.log(
-    `[raster] ${rows.length} sources, version ${RASTER_VERSION}, seed ${args.seed}, ${args.write ? 'publishing validated parts' : 'local review only'}`,
+  if (args.concurrency > 1 && rows.length > 1) return runWorkers(args, rows);
+  if (args.shard >= 0) sharp.concurrency(1);
+  const manifestFile = path.join(
+    args.report,
+    args.shard >= 0 ? `manifest-${args.shard}.json` : 'manifest.json',
+  );
+  const log = (line: string) =>
+    console.log(
+      args.shard >= 0 ? `[raster ${args.shard}] ${line}` : `[raster] ${line}`,
+    );
+  log(
+    `${rows.length} sources, version ${RASTER_VERSION}, seed ${args.seed}, ${args.write ? 'publishing validated parts' : 'local review only'}`,
   );
   const required = (name: string) => {
     const v = process.env[name]?.trim();
@@ -293,25 +315,20 @@ async function main() {
       }
     }
     manifest.push(entry);
-    await writeFile(
-      path.join(args.report, 'manifest.json'),
-      JSON.stringify(
-        {
-          version: RASTER_VERSION,
-          seed: args.seed,
-          published: args.write,
-          flags: manifest,
-        },
-        null,
-        2,
-      ),
-    );
-    console.log(
-      `[raster] ${manifest.length}/${rows.length} #${flag.index} ${flag.name}: ${entry.error ?? `${entry.parts} objects; ${entry.layout}; ${(entry.mismatch! * 100).toFixed(3)}% mismatch`}`,
+    await writeManifest(manifestFile, args, manifest);
+    log(
+      `${manifest.length}/${rows.length} #${flag.index} ${flag.name}: ${entry.error ?? `${entry.parts} objects; ${entry.layout}; ${(entry.mismatch! * 100).toFixed(3)}% mismatch`}`,
     );
   }
-  await writeFile(
-    path.join(args.report, 'manifest.json'),
+  await writeManifest(manifestFile, args, manifest);
+  if (args.shard < 0) await writeReport(args, manifest);
+}
+
+type Args = ReturnType<typeof parseArgs>;
+
+const writeManifest = (file: string, args: Args, manifest: Entry[]) =>
+  writeFile(
+    file,
     JSON.stringify(
       {
         version: RASTER_VERSION,
@@ -323,10 +340,68 @@ async function main() {
       2,
     ),
   );
+
+/**
+ * Extraction is synchronous pixel work, so parallelism means processes. Each worker takes every
+ * Nth source at low priority (the machine stays usable) and the shards are merged into one report.
+ */
+async function runWorkers(args: Args, rows: { index: number }[]) {
+  const n = Math.min(args.concurrency, rows.length);
+  console.log(
+    `[raster] ${rows.length} sources across ${n} low-priority workers`,
+  );
+  const codes = await Promise.all(
+    Array.from({ length: n }, (_, shard) => {
+      const only = rows.filter((_, i) => i % n === shard).map((r) => r.index);
+      const child = spawn(
+        process.execPath,
+        [
+          ...process.execArgv,
+          process.argv[1],
+          '--only',
+          only.join(','),
+          '--limit',
+          String(only.length),
+          '--seed',
+          String(args.seed),
+          '--report',
+          args.report,
+          '--shard',
+          String(shard),
+          '--force',
+          ...(args.write ? ['--write'] : []),
+          ...(args.sources ? ['--sources', args.sources] : []),
+        ],
+        { stdio: 'inherit' },
+      );
+      if (child.pid) setPriority(child.pid, 10);
+      return new Promise<number>((resolve) =>
+        child.on('exit', (code) => resolve(code ?? 1)),
+      );
+    }),
+  );
+  const manifest: Entry[] = [];
+  for (let shard = 0; shard < n; shard++)
+    try {
+      const file = path.join(args.report, `manifest-${shard}.json`);
+      manifest.push(
+        ...(JSON.parse(await readFile(file, 'utf8')) as { flags: Entry[] })
+          .flags,
+      );
+    } catch {
+      console.error(`[raster] worker ${shard} left no manifest`);
+    }
+  manifest.sort((a, b) => a.index - b.index);
+  await writeManifest(path.join(args.report, 'manifest.json'), args, manifest);
+  await writeReport(args, manifest);
+  if (codes.some((code) => code !== 0)) process.exitCode = 1;
+}
+
+async function writeReport(args: Args, manifest: Entry[]) {
   const cards = manifest
     .map(
       (f) =>
-        `<article data-status="${f.status}"><h3>#${f.index} ${escaped(f.name)}</h3><p>${f.status === 'ok' ? `${f.parts} objects · ${f.layout} · ${(f.mismatch! * 100).toFixed(3)}% mismatch` : escaped(f.error ?? 'Needs review')}</p><div class="comparison"><figure><img src="${f.status === 'ok' ? `${f.index}/original.png` : escaped(f.image)}"><figcaption>Original</figcaption></figure>${f.status === 'ok' ? `<figure><img src="${f.index}/rebuilt.png"><figcaption>Reconstructed</figcaption></figure><figure><img src="${f.index}/field.png"><figcaption>Field with all objects removed</figcaption></figure>` : ''}</div>${f.status === 'ok' ? `<div class="parts">${Array.from({ length: f.parts! }, (_, i) => `<figure><div class="checker"><img src="${f.index}/part-${i + 1}.png"></div><figcaption>Object ${i + 1}</figcaption></figure>`).join('')}</div>` : ''}<a href="http://localhost:3107/create?remix=${f.id}" target="_blank">Open editor</a></article>`,
+        `<article data-status="${f.status}"><h3>#${f.index} ${escaped(f.name)}</h3><p>${f.status === 'ok' ? `${f.parts} objects · ${f.layout} · ${(f.mismatch! * 100).toFixed(3)}% mismatch` : escaped(f.error ?? 'Needs review')}</p><div class="comparison"><figure><img loading="lazy" src="${f.status === 'ok' ? `${f.index}/original.png` : escaped(f.image)}"><figcaption>Original</figcaption></figure>${f.status === 'ok' ? `<figure><img loading="lazy" src="${f.index}/rebuilt.png"><figcaption>Reconstructed</figcaption></figure><figure><img loading="lazy" src="${f.index}/field.png"><figcaption>Field with all objects removed</figcaption></figure>` : ''}</div>${f.status === 'ok' ? `<div class="parts">${Array.from({ length: f.parts! }, (_, i) => `<figure><div class="checker"><img loading="lazy" src="${f.index}/part-${i + 1}.png"></div><figcaption>Object ${i + 1}</figcaption></figure>`).join('')}</div>` : ''}<a href="http://localhost:3107/create?remix=${f.id}" target="_blank">Open editor</a></article>`,
     )
     .join('');
   const ok = manifest.filter((f) => f.status === 'ok').length;
