@@ -95,7 +95,10 @@ function sample<T extends { id: string; image: string }>(
     createHash('sha256').update(`${seed}:${row.id}`).digest('hex');
   for (const row of rows) {
     const format =
-      new URL(row.image).pathname.split('.').pop()?.toLowerCase() ?? 'other';
+      new URL(row.image, 'https://vexilo.org').pathname
+        .split('.')
+        .pop()
+        ?.toLowerCase() ?? 'other';
     const key = format === 'jpeg' ? 'jpg' : format;
     const group = groups.get(key) ?? [];
     group.push(row);
@@ -188,10 +191,14 @@ async function main() {
       if (args.sources)
         source = await readFile(path.join(args.sources, String(flag.index)));
       else {
-        const response = await fetch(flag.image, {
-          signal: AbortSignal.timeout(30_000),
-          headers: { 'User-Agent': 'VexiloBot/1.0 (https://vexilo.org)' },
-        });
+        // Some catalogue images are protocol-relative (//upload.wikimedia.org/...).
+        const response = await fetch(
+          new URL(flag.image, 'https://vexilo.org'),
+          {
+            signal: AbortSignal.timeout(30_000),
+            headers: { 'User-Agent': 'VexiloBot/1.0 (https://vexilo.org)' },
+          },
+        );
         if (!response.ok)
           throw new Error(`Source request failed (${response.status})`);
         if (
