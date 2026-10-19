@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReviewQueueItem, updatePendingFlagRequest } from '@/actions/requests';
+import { MakerBadge } from '@/components/MakerBadge';
 import SourcesInput from '@/components/SourcesInput';
 import TagInput from '@/components/TagInput';
 import { Button } from '@/components/ui/button';
@@ -153,6 +154,7 @@ export function RequestPanel({
             {groupTotal > 1 && `, ${groupPosition} of ${groupTotal}`} · {timeAgo(item.createdAt)}
           </p>
           <p className='mt-1.5 text-[17px] font-semibold tracking-[-0.02em] truncate'>{after.flagName}</p>
+          <MakerBadge tags={after.tags} className='mt-1.5' />
         </div>
         <div className='flex items-center gap-1.5 text-sm text-muted-foreground shrink-0'>
           {groupTotal > 1 && (

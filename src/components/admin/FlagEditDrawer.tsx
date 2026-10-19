@@ -1,6 +1,7 @@
 'use client';
 
 import { updateAdminFlag } from '@/actions/flags';
+import { MakerBadge } from '@/components/MakerBadge';
 import SourcesInput from '@/components/SourcesInput';
 import TagInput from '@/components/TagInput';
 import { Button } from '@/components/ui/button';
@@ -85,7 +86,10 @@ export function FlagEditDrawer({ flag, onClose, onSaved, onDelete, onRegenerated
       className='fixed z-40 inset-0 sm:inset-auto sm:top-20 sm:right-4 sm:bottom-4 sm:w-[480px] flex flex-col overflow-hidden sm:rounded-[18px] bg-secondary-background shadow-pop'
     >
       <div className='px-6 pt-5 pb-4 flex items-center justify-between gap-3 border-b border-line'>
-        <p className='text-[17px] font-semibold tracking-[-0.02em] truncate'>{flag.name}</p>
+        <div className='min-w-0 flex flex-wrap items-center gap-2'>
+          <p className='text-[17px] font-semibold tracking-[-0.02em] truncate'>{flag.name}</p>
+          <MakerBadge tags={flag.tags} className='shrink-0' />
+        </div>
         <div className='flex items-center gap-3 shrink-0'>
           <Link href={`/flag/${encodeURIComponent(flag.name)}`} target='_blank' aria-label='Open flag page' className='text-muted-foreground hover:text-foreground'>
             <ExternalLink className='size-4' />

@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReviewQueueItem, updatePendingFlagRequest } from '@/actions/requests';
+import { MakerBadge } from '@/components/MakerBadge';
 import { cn } from '@/lib/utils';
 import { Check, CircleCheck, Copy, PartyPopper, SkipForward, Undo2, X } from '@/components/icons';
 import Image from 'next/image';
@@ -246,6 +247,7 @@ export function FocusMode({ items: initialItems, onApprove, onDecline, onPatched
               aria-label='Flag name'
               className='mt-2 resize-none [field-sizing:content] bg-transparent text-2xl sm:text-[28px] font-semibold tracking-[-0.03em] leading-tight outline-none border-b border-transparent focus:border-white/30'
             />
+            <MakerBadge tags={item.flag.tags} className='mt-2 self-start' />
 
             <div className='mt-6 space-y-4 text-sm'>
               {item.isEdit && item.oldFlag ? (

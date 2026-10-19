@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReviewQueueItem, addTagsToFlagRequests } from '@/actions/requests';
+import { MakerBadge } from '@/components/MakerBadge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -343,6 +344,7 @@ export function ReviewQueue() {
                         </div>
                         <div className='min-w-0'>
                           <p className='text-sm font-semibold truncate'>{item.flag.flagName}</p>
+                          <MakerBadge tags={item.flag.tags} className='mt-1' />
                           <div className='flex flex-wrap gap-1 mt-1'>
                             {describeEditChanges(item).map((change) => (
                               <span key={change} className='tabular-nums text-xs font-medium rounded-[5px] bg-main-soft text-main px-1.5 py-0.5'>
@@ -383,6 +385,7 @@ export function ReviewQueue() {
                         />
                       </div>
                       <p className='text-[13px] font-medium mt-2 truncate px-0.5'>{item.flag.flagName}</p>
+                      <MakerBadge tags={item.flag.tags} className='mt-1' />
                       {warning && <p className='text-xs text-warn truncate px-0.5'>{warning}</p>}
                     </div>
                   );

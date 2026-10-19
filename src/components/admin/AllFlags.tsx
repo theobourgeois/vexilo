@@ -10,6 +10,7 @@ import {
 } from '@/actions/flags';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { MakerBadge } from '@/components/MakerBadge';
 import { cn } from '@/lib/utils';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileX, Link2, Loader2, Search, Sparkles, Tag, Trash2, X } from '@/components/icons';
@@ -405,7 +406,12 @@ export function AllFlags() {
                       <Image src={row.image} alt='' width={56} height={40} className='max-h-5 w-auto max-w-[80%] object-contain' />
                     </div>
                   </td>
-                  <td className='font-semibold pr-4 max-w-[16rem] truncate'>{row.name}</td>
+                  <td className='font-semibold pr-4 max-w-[16rem]'>
+                    <div className='flex flex-wrap items-center gap-x-2 gap-y-1'>
+                      <span className='truncate'>{row.name}</span>
+                      <MakerBadge tags={row.tags} className='shrink-0' />
+                    </div>
+                  </td>
                   <td className='hidden md:table-cell pr-4'>
                     <div className='flex flex-wrap gap-1 max-w-xs'>
                       {row.tags.slice(0, 4).map((tagName) => (
