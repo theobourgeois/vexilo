@@ -387,8 +387,8 @@ export const flagEmblems = createTable(
  * Each SVG flag split into its field and objects, as a ready-made flag maker design for remixes.
  * `image` and `sourceHash` are what the parts were cut from, so a changed image is cut again;
  * `version` is the extractor's, so improving it can redo them all. `status` is 'ok' with a
- * design, 'empty' when the flag has no objects and no layout fits (the live remix handles it), or
- * 'failed' with an error.
+ * design, or 'failed' with an error (the live remix handles those). `mismatch` is the share of the
+ * flag's pixels that differ when it's rebuilt from the design; designs that differ much fail.
  */
 export const flagParts = createTable('flag_parts', {
   flagId: uuid('flag_id')
@@ -397,9 +397,10 @@ export const flagParts = createTable('flag_parts', {
   image: varchar('image', { length: 1000 }).notNull(),
   sourceHash: varchar('source_hash', { length: 64 }).notNull(),
   version: integer('version').notNull(),
-  status: varchar('status', { length: 20 }).$type<'ok' | 'empty' | 'failed'>().notNull(),
+  status: varchar('status', { length: 20 }).$type<'ok' | 'failed'>().notNull(),
   error: text('error'),
   design: jsonb('design').$type<StudioDesign>(),
+  mismatch: real('mismatch'),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 });
