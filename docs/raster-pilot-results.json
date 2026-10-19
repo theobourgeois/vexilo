@@ -1,6 +1,6 @@
 {
   "date": "2026-10-19",
-  "version": 1,
+  "version": 2,
   "flags": [
     {
       "index": 77,
@@ -14,8 +14,11 @@
     {
       "index": 209,
       "name": "Algiers (alt)",
-      "status": "review",
-      "error": "Input image exceeds pixel limit"
+      "status": "ok",
+      "parts": 0,
+      "layout": "image",
+      "mismatch": 1.6578249336870028e-06,
+      "meanError": 0.003001057194331104
     },
     {
       "index": 277,
@@ -39,13 +42,16 @@
       "index": 2575,
       "name": "Bandeira-cariacica",
       "status": "review",
-      "error": "No reliable field: background geometry or texture needs review"
+      "error": "An object is part of the field; needs review"
     },
     {
       "index": 2730,
       "name": "Bandeira-Praia Grande",
-      "status": "review",
-      "error": "An object includes a field region; needs review"
+      "status": "ok",
+      "parts": 1,
+      "layout": "triband-v",
+      "mismatch": 0.0043859649122807015,
+      "meanError": 0.009083895887188175
     },
     {
       "index": 2798,
@@ -59,7 +65,7 @@
       "status": "ok",
       "parts": 0,
       "layout": "bicolor-v",
-      "mismatch": 0.0030864197530864196,
+      "mismatch": 0,
       "meanError": 0.001593820307081245
     },
     {
@@ -68,8 +74,8 @@
       "status": "ok",
       "parts": 1,
       "layout": "bicolor-v",
-      "mismatch": 0.00021862139917695473,
-      "meanError": 0.0008134829633877443
+      "mismatch": 0.0014531893004115226,
+      "meanError": 0.0025923599757804983
     },
     {
       "index": 5419,
@@ -111,7 +117,7 @@
       "index": 8720,
       "name": "Östersunds",
       "status": "ok",
-      "parts": 2,
+      "parts": 1,
       "layout": "solid",
       "mismatch": 0,
       "meanError": 0.000358572119033513
@@ -131,8 +137,11 @@
     {
       "index": 10716,
       "name": "Bandera de la provincia Mamoré",
-      "status": "review",
-      "error": "An object includes a field region; needs review"
+      "status": "ok",
+      "parts": 3,
+      "layout": "hoist-triangle",
+      "mismatch": 0.007871212121212121,
+      "meanError": 0.006532528254626794
     },
     {
       "index": 11468,
@@ -141,19 +150,22 @@
       "parts": 1,
       "layout": "solid",
       "mismatch": 0,
-      "meanError": 0.00005262589272007161
+      "meanError": 5.262589272007161e-05
     },
     {
       "index": 11529,
       "name": "Box Elder County, Utah",
       "status": "review",
-      "error": "No reliable field: background geometry or texture needs review"
+      "error": "An object includes a field region; needs review"
     },
     {
       "index": 11634,
       "name": "British Arctic Territory Emergency Services (British Arctic Territory Flag Hoax)",
-      "status": "review",
-      "error": "No reliable field: background geometry or texture needs review"
+      "status": "ok",
+      "parts": 2,
+      "layout": "quartered",
+      "mismatch": 0.0019352493370969122,
+      "meanError": 0.0026223291575909018
     },
     {
       "index": 11643,
@@ -177,7 +189,7 @@
       "parts": 1,
       "layout": "solid",
       "mismatch": 0,
-      "meanError": 0.00045397265909203336
+      "meanError": 0.0004430681648534021
     },
     {
       "index": 11907,
@@ -185,8 +197,8 @@
       "status": "ok",
       "parts": 1,
       "layout": "stars-stripes",
-      "mismatch": 0.009089964370546318,
-      "meanError": 0.006256443453197308
+      "mismatch": 0.0033907363420427553,
+      "meanError": 0.007331280124829298
     },
     {
       "index": 12204,
@@ -201,7 +213,7 @@
       "index": 12368,
       "name": "Grand Gedeh County redesign by u/Scratch-ean",
       "status": "review",
-      "error": "No reliable field: background geometry or texture needs review"
+      "error": "An object includes a field region; needs review"
     },
     {
       "index": 12666,
@@ -218,7 +230,7 @@
       "status": "ok",
       "parts": 1,
       "layout": "solid",
-      "mismatch": 0.00012195121951219512,
+      "mismatch": 0.00011726078799249531,
       "meanError": 0.00041434548494041323
     },
     {
@@ -242,7 +254,7 @@
       "status": "ok",
       "parts": 1,
       "layout": "solid",
-      "mismatch": 0.0000015015015015015015,
+      "mismatch": 1.5015015015015015e-06,
       "meanError": 0.0008731147606712094
     },
     {
@@ -252,13 +264,13 @@
       "parts": 1,
       "layout": "solid",
       "mismatch": 0,
-      "meanError": 0.0000012745042932377868
+      "meanError": 1.2745042932377868e-06
     },
     {
       "index": 13592,
       "name": "Guayaquil (Redesign)",
       "status": "review",
-      "error": "No reliable field: background geometry or texture needs review"
+      "error": "An object includes a field region; needs review"
     },
     {
       "index": 13611,
@@ -275,8 +287,8 @@
       "status": "ok",
       "parts": 1,
       "layout": "image",
-      "mismatch": 0.013175702335858587,
-      "meanError": 0.019189929270406112
+      "mismatch": 0,
+      "meanError": 0.00869540790741056
     },
     {
       "index": 13795,
@@ -290,26 +302,38 @@
     {
       "index": 13869,
       "name": "Mazandarani",
-      "status": "review",
-      "error": "Reconstruction needs review (2.04% mismatch, 0.87% mean error)"
+      "status": "ok",
+      "parts": 1,
+      "layout": "triband-h",
+      "mismatch": 0,
+      "meanError": 0.003114695763576404
     },
     {
       "index": 14172,
       "name": "Free Star-Kind of America (Daydream in Black)",
-      "status": "review",
-      "error": "An object includes a field region; needs review"
+      "status": "ok",
+      "parts": 7,
+      "layout": "stars-stripes",
+      "mismatch": 0.010722573839662448,
+      "meanError": 0.009124256781014273
     },
     {
       "index": 14377,
       "name": "Penrith, UK",
-      "status": "review",
-      "error": "Reconstruction needs review (2.43% mismatch, 1.54% mean error)"
+      "status": "ok",
+      "parts": 4,
+      "layout": "saltire",
+      "mismatch": 0.008137027831130192,
+      "meanError": 0.015885208499219365
     },
     {
       "index": 14493,
       "name": "Ibaiti, Brazil",
-      "status": "review",
-      "error": "No reliable field: background geometry or texture needs review"
+      "status": "ok",
+      "parts": 1,
+      "layout": "triband-h",
+      "mismatch": 0.003588006594235108,
+      "meanError": 0.006024268226702228
     },
     {
       "index": 14567,
@@ -327,7 +351,7 @@
       "parts": 3,
       "layout": "solid",
       "mismatch": 0,
-      "meanError": 0.0002138959858106661
+      "meanError": 0.0002088892115848431
     },
     {
       "index": 15271,
@@ -347,14 +371,20 @@
     {
       "index": 15453,
       "name": "Klaipėda Region",
-      "status": "review",
-      "error": "An object is a narrow stripe artifact; needs review"
+      "status": "ok",
+      "parts": 1,
+      "layout": "bicolor-h",
+      "mismatch": 0,
+      "meanError": 0.00021705027282832982
     },
     {
       "index": 15465,
       "name": "United Nations Children's Fund",
-      "status": "review",
-      "error": "No reliable field: background geometry or texture needs review"
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.003365484551692041
     },
     {
       "index": 15495,
@@ -368,14 +398,17 @@
       "status": "ok",
       "parts": 2,
       "layout": "image",
-      "mismatch": 0.01299867197875166,
-      "meanError": 0.027614076027754446
+      "mismatch": 0.005312084993359893,
+      "meanError": 0.007580356101223654
     },
     {
       "index": 15582,
       "name": "Qing Republic",
-      "status": "review",
-      "error": "An object includes a field region; needs review"
+      "status": "ok",
+      "parts": 2,
+      "layout": "hoist-band",
+      "mismatch": 0.0014326530612244898,
+      "meanError": 0.004301853347054688
     }
   ]
 }

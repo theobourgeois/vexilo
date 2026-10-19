@@ -115,3 +115,44 @@ test('transparent coats of arms are held for review', async () => {
     /transparent/,
   );
 });
+
+test('a thin scan frame is cropped instead of holding the flag', async () => {
+  const source = await sharp(
+    await image(
+      '<rect width="300" height="200" fill="black"/><rect x="2" y="2" width="296" height="196" fill="#669aff"/><circle cx="150" cy="100" r="45" fill="white"/>',
+    ),
+  )
+    .jpeg({ quality: 90 })
+    .toBuffer();
+  const result = await extractRaster(source);
+  assert.equal(result.parts.length, 1);
+  assert.ok(
+    result.width >= 292 && result.width <= 296,
+    'only the frame is cropped',
+  );
+  assert.ok(result.fit.kind === 'layout' && result.fit.layout === 'solid');
+});
+
+test('a canton lifts off whole, and field-coloured edge pieces are held', async () => {
+  const jack =
+    '<svg width="150" height="100"><rect width="150" height="100" fill="#000161"/><path stroke="white" stroke-width="20" d="M0 0L150 100M150 0L0 100"/><path stroke="#cc0001" stroke-width="20" d="M75 0v100M0 50h150"/></svg>';
+  const result = await extractRaster(
+    await image(
+      '<rect width="300" height="200" fill="#cc0001"/><rect x="150" y="100" width="150" height="100" fill="#000161"/>' +
+        jack +
+        '<circle cx="225" cy="150" r="25" fill="white"/>',
+    ),
+  );
+  assert.equal(result.parts.length, 2);
+  const canton = result.parts.find((part) => part.box[0] === 0)!;
+  assert.deepEqual(canton.box, [0, 0, 0.5, 0.5]);
+  assert.equal(await alphaAt(canton.png, 10, 40), 255, 'its navy ground stays');
+  await assert.rejects(
+    extractRaster(
+      await image(
+        '<rect width="300" height="200" fill="#00923f"/><path fill="white" d="M0 0h300L150 200z"/>',
+      ),
+    ),
+    /review/,
+  );
+});
