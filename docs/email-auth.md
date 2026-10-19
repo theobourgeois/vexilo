@@ -4,8 +4,8 @@ Email and password signup uses NextAuth's Credentials provider with JWT sessions
 
 Before deploying, apply these migrations in order:
 
-1. `drizzle/0010_unique_user_email.sql` enforces case-insensitive email uniqueness. Resolve any existing duplicate emails first.
-2. `drizzle/0011_email_verification.sql` creates the pending verification table.
+1. `drizzle/0011_unique_user_email.sql` enforces case-insensitive email uniqueness. Resolve any existing duplicate emails first.
+2. `drizzle/0012_email_verification.sql` creates the pending verification table.
 
 Set these server-only variables locally and in the deployment environment:
 
