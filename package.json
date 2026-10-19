@@ -17,6 +17,10 @@
     "views:backfill": "tsx scripts/views/backfill-flag-views.ts",
     "colors:backfill": "tsx scripts/colors/backfill-flag-colors.ts",
     "emblems:import": "tsx scripts/emblems/import-emblems.ts",
+    "emblems:harvest": "tsx scripts/emblems/harvest-candidates.ts",
+    "emblems:cluster": "tsx scripts/emblems/cluster-candidates.ts",
+    "emblems:tag-sheets": "tsx scripts/emblems/tag-sheets.ts",
+    "emblems:review": "tsx scripts/emblems/build-review.ts",
     "parts:backfill": "tsx scripts/parts/backfill-flag-parts.ts",
     "parts:raster": "tsx scripts/parts/backfill-raster-parts.ts",
     "parts:raster:test": "tsx --test scripts/parts/raster-extractor.test.ts"

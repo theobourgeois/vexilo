@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Emblem review</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #f4f3ef; --fg: #1d1e22; --muted: #6c6d73; --line: #dcdad3; --main: #1f3a68; --bad: #c0392b; --good: #1e7d4f; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Inter", sans-serif; background: var(--bg); color: var(--fg); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 12px 20px; display: grid; gap: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  h1 { font-size: 16px; margin: 0 12px 0 0; }
+  button, .chip { font: inherit; cursor: pointer; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 11px; color: var(--fg); }
+  .chip.on, button.on { background: var(--fg); color: #fff; border-color: var(--fg); }
+  input[type=search] { font: inherit; width: 320px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 8px; }
+  .stats { color: var(--muted); margin-left: auto; }
+  .help { color: var(--muted); font-size: 12px; }
+  main { padding: 16px 20px 80px; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .art { position: relative; aspect-ratio: 1; display: grid; place-items: center; cursor: pointer; }
+  .art img { max-width: 72%; max-height: 72%; object-fit: contain; }
+  .art.light { background: #e9e8e4; } .art.mid { background: #b9bcc0; } .art.dark { background: #2a2b2f; }
+  .card.out .art::after { content: "✕"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 64px; color: var(--bad); background: rgba(255,255,255,.55); }
+  .card.in .art::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 64px; color: var(--good); background: rgba(255,255,255,.45); }
+  .card.out { border-color: var(--bad); } .card.in { border-color: var(--good); }
+  .meta { padding: 7px 9px 9px; display: grid; gap: 3px; }
+  .name { font-weight: 600; outline: none; border-radius: 4px; }
+  .tags { color: var(--muted); font-size: 11.5px; outline: none; border-radius: 4px; }
+  .name:focus, .tags:focus { background: #fff7d6; }
+  .edited { box-shadow: inset 2px 0 0 #e6a700; }
+  .sub { color: var(--muted); font-size: 11px; display: flex; gap: 6px; justify-content: space-between; }
+  .sub select { font: inherit; font-size: 11px; border: none; background: none; color: var(--muted); padding: 0; max-width: 60%; }
+  .suggest { color: var(--bad); }
+  .badge { font-size: 10px; padding: 0 5px; border-radius: 4px; background: #eceae4; color: var(--muted); }
+  .badge.new { background: #dfeaf8; color: var(--main); }
+  .more { grid-column: 1 / -1; text-align: center; padding: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>Emblem review</h1>
+    <span id="tabs"></span>
+    <input id="q" type="search" placeholder="Search name, tags, flags… (try “star”)">
+    <span class="stats" id="stats"></span>
+    <button id="export">Download decisions</button>
+  </div>
+  <div class="row" id="cats"></div>
+  <div class="help" id="help"></div>
+</header>
+<main id="grid"></main>
+<script src="data.js"></script>
+<script>
+const KEY = 'vexilo-emblem-review-v2';
+const state = { tab: 'library', cat: 'all', q: '', shown: 240 };
+const saved = JSON.parse(localStorage.getItem(KEY) || 'null') || { reject: window.EMBLEMS.filter((e) => e.suggest).map((e) => e.id) };
+const decisions = { reject: new Set(saved.reject || []), add: new Set(saved.add || []), edits: saved.edits || {} };
+const save = () => localStorage.setItem(KEY, JSON.stringify({ reject: [...decisions.reject], add: [...decisions.add], edits: decisions.edits }));
+
+const TABS = [
+  ['library', 'Picked', 'Click an emblem to reject or restore it. Ones marked “Claude:” start rejected; click to keep them. Click the name or tags to fix them (comma-separated). Category is the dropdown.'],
+  ['bench', 'Runners-up', 'Fine but not picked: too obscure, messy at small sizes, or near-duplicates. Click to add one to the library.'],
+  ['rejected', 'Junk', 'Thrown out in triage (fragments, lettering, cantons, stripe offcuts, low quality). Click to rescue one.'],
+];
+const all = window.EMBLEMS;
+const byTab = (tab) => all.filter((e) => e.tab === tab);
+const field = (e, k) => (decisions.edits[e.id] && decisions.edits[e.id][k] !== undefined ? decisions.edits[e.id][k] : e[k]);
+
+// The same ranking the editor will use: name, then tags, then flags.
+function score(e, q) {
+  if (!q) return 1;
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  let total = 0;
+  for (const w of words) {
+    const name = field(e, 'name').toLowerCase();
+    const tags = field(e, 'tags').map((t) => t.toLowerCase());
+    let s = 0;
+    if (new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(name)) s = 4;
+    else if (tags.some((t) => t === w)) s = 3.5;
+    else if (tags.some((t) => t.startsWith(w))) s = 3;
+    else if (name.includes(w) || tags.some((t) => t.includes(w))) s = 2;
+    else if ((e.flags || []).some((f) => f.toLowerCase().includes(w))) s = 1;
+    if (!s) return 0;
+    total += s;
+  }
+  return total;
+}
+
+function tone(colors) {
+  const lum = (h) => { const n = parseInt(h.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  if (!colors || !colors.length) return 'mid';
+  const l = colors.reduce((s, c) => s + lum(c), 0) / colors.length;
+  return l < 0.08 ? 'light' : l > 0.7 ? 'dark' : 'mid';
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+function render() {
+  const tab = TABS.find((t) => t[0] === state.tab);
+  document.getElementById('help').textContent = tab[2];
+  document.getElementById('tabs').innerHTML = TABS.map(([k, label]) => `<button data-tab="${k}" class="${state.tab === k ? 'on' : ''}">${label} (${byTab(k).length})</button>`).join(' ');
+  const pool = byTab(state.tab);
+  const cats = [...new Set(pool.map((e) => field(e, 'category')))].sort();
+  document.getElementById('cats').innerHTML = ['all', ...cats].map((c) => `<span class="chip ${state.cat === c ? 'on' : ''}" data-cat="${c}">${c === 'all' ? 'All' : c} ${c === 'all' ? pool.length : pool.filter((e) => field(e, 'category') === c).length}</span>`).join('');
+  const list = pool
+    .filter((e) => state.cat === 'all' || field(e, 'category') === state.cat)
+    .map((e) => [e, score(e, state.q)])
+    .filter(([, s]) => s > 0)
+    .sort((a, b) => b[1] - a[1] || (b[0].rank ?? 0) - (a[0].rank ?? 0))
+    .map(([e]) => e);
+  const kept = all.filter((e) => (e.tab === 'library' && !decisions.reject.has(e.id)) || (e.tab !== 'library' && decisions.add.has(e.id))).length;
+  document.getElementById('stats').textContent = `${list.length} shown · library would have ${kept} · ${decisions.reject.size} rejected, ${decisions.add.size} added, ${Object.keys(decisions.edits).length} edited`;
+  const categories = window.CATEGORIES;
+  document.getElementById('grid').innerHTML = list.slice(0, state.shown).map((e) => {
+    const cls = state.tab === 'library' ? (decisions.reject.has(e.id) ? 'out' : '') : (decisions.add.has(e.id) ? 'in' : '');
+    const edited = decisions.edits[e.id] ? 'edited' : '';
+    return `<div class="card ${cls} ${edited}" data-id="${e.id}">
+      <div class="art ${tone(e.colors)}" title="${esc((e.flags || []).join(' · '))}"><img loading="lazy" src="${e.thumb}" alt=""></div>
+      <div class="meta">
+        <div class="name" contenteditable="plaintext-only" data-edit="name">${esc(field(e, 'name') || e.flag)}</div>
+        <div class="tags" contenteditable="plaintext-only" data-edit="tags">${esc(field(e, 'tags').join(', '))}</div>
+        <div class="sub"><select data-edit="category">${categories.map((c) => `<option ${c === field(e, 'category') ? 'selected' : ''}>${c}</option>`).join('')}</select>
+          <span>${e.origin === 'library' ? '<span class="badge">current</span>' : '<span class="badge new">new</span>'} ${e.count > 1 ? `×${e.count}` : ''}</span></div>
+        <div class="sub"><span>${esc(e.flag)}</span>${e.reason ? `<span>${esc(e.reason)}</span>` : ''}</div>
+        ${e.suggest ? `<div class="sub suggest">Claude: ${esc(e.suggest)}</div>` : ''}
+      </div></div>`;
+  }).join('') + (list.length > state.shown ? `<div class="more"><button id="more">Show more (${list.length - state.shown} left)</button></div>` : '');
+}
+
+document.addEventListener('click', (ev) => {
+  const t = ev.target.closest('[data-tab],[data-cat],.art,#more,#export');
+  if (!t) return;
+  if (t.dataset.tab) { state.tab = t.dataset.tab; state.cat = 'all'; state.shown = 240; }
+  else if (t.dataset.cat) { state.cat = t.dataset.cat; state.shown = 240; }
+  else if (t.id === 'more') { state.shown += 480; }
+  else if (t.id === 'export') {
+    const blob = new Blob([JSON.stringify({ reject: [...decisions.reject], add: [...decisions.add], edits: decisions.edits }, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'emblem-decisions.json'; a.click();
+    return;
+  } else {
+    const id = t.closest('.card').dataset.id;
+    const set = state.tab === 'library' ? decisions.reject : decisions.add;
+    set.has(id) ? set.delete(id) : set.add(id);
+    save();
+  }
+  render();
+});
+document.addEventListener('focusout', (ev) => {
+  const el = ev.target.closest('[data-edit]');
+  if (!el || el.tagName === 'SELECT') return;
+  const e = all.find((x) => x.id === el.closest('.card').dataset.id);
+  const k = el.dataset.edit;
+  const value = k === 'tags' ? el.textContent.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean) : el.textContent.trim();
+  if (JSON.stringify(value) === JSON.stringify(field(e, k))) return;
+  decisions.edits[e.id] = { ...(decisions.edits[e.id] || {}), [k]: value };
+  save(); render();
+});
+document.addEventListener('change', (ev) => {
+  const el = ev.target.closest('select[data-edit]');
+  if (!el) return;
+  const id = el.closest('.card').dataset.id;
+  decisions.edits[id] = { ...(decisions.edits[id] || {}), category: el.value };
+  save(); render();
+});
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.closest('[data-edit]')) { ev.preventDefault(); ev.target.blur(); } });
+let timer;
+document.getElementById('q').addEventListener('input', (ev) => { clearTimeout(timer); timer = setTimeout(() => { state.q = ev.target.value.trim(); state.shown = 240; render(); }, 120); });
+render();
+</script>
+</body>
+</html>
