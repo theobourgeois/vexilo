@@ -1,0 +1,414 @@
+{
+  "date": "2026-10-19",
+  "version": 2,
+  "flags": [
+    {
+      "index": 77,
+      "name": "Honduras (2022-)",
+      "status": "ok",
+      "parts": 5,
+      "layout": "triband-h",
+      "mismatch": 0,
+      "meanError": 0.0007606849955749841
+    },
+    {
+      "index": 209,
+      "name": "Algiers (alt)",
+      "status": "ok",
+      "parts": 0,
+      "layout": "image",
+      "mismatch": 1.6578249336870028e-06,
+      "meanError": 0.003001057194331104
+    },
+    {
+      "index": 277,
+      "name": "Almaty Region",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.001077030469570602
+    },
+    {
+      "index": 449,
+      "name": "Flag Nakhon Ratchasima Province",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.0002872100243303288
+    },
+    {
+      "index": 2575,
+      "name": "Bandeira-cariacica",
+      "status": "review",
+      "error": "An object is part of the field; needs review"
+    },
+    {
+      "index": 2730,
+      "name": "Bandeira-Praia Grande",
+      "status": "ok",
+      "parts": 1,
+      "layout": "triband-v",
+      "mismatch": 0.0043859649122807015,
+      "meanError": 0.009083895887188175
+    },
+    {
+      "index": 2798,
+      "name": "Bandeira tucurui",
+      "status": "review",
+      "error": "No reliable field: background geometry or texture needs review"
+    },
+    {
+      "index": 3111,
+      "name": "Menton",
+      "status": "ok",
+      "parts": 0,
+      "layout": "bicolor-v",
+      "mismatch": 0,
+      "meanError": 0.001593820307081245
+    },
+    {
+      "index": 3716,
+      "name": "Mombasa flag",
+      "status": "ok",
+      "parts": 1,
+      "layout": "bicolor-v",
+      "mismatch": 0.0014531893004115226,
+      "meanError": 0.0025923599757804983
+    },
+    {
+      "index": 5419,
+      "name": "Kattar Dhal Talwar",
+      "status": "review",
+      "error": "No reliable field: background geometry or texture needs review"
+    },
+    {
+      "index": 5866,
+      "name": "Bandera de Cusco (hasta 1978)",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.00018777322929243494
+    },
+    {
+      "index": 8325,
+      "name": "Riga (current, no CoA, early design)",
+      "status": "review",
+      "error": "An object includes a field region; needs review"
+    },
+    {
+      "index": 8480,
+      "name": "Haram",
+      "status": "review",
+      "error": "An object includes a field region; needs review"
+    },
+    {
+      "index": 8608,
+      "name": "Sandnes",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.00022581354924135886
+    },
+    {
+      "index": 8720,
+      "name": "Östersunds",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.000358572119033513
+    },
+    {
+      "index": 8969,
+      "name": "FLAG Čukarica",
+      "status": "review",
+      "error": "No reliable field: background geometry or texture needs review"
+    },
+    {
+      "index": 8974,
+      "name": "Indjija-grb",
+      "status": "review",
+      "error": "Nonrectangular/transparent source needs review"
+    },
+    {
+      "index": 10716,
+      "name": "Bandera de la provincia Mamoré",
+      "status": "ok",
+      "parts": 3,
+      "layout": "hoist-triangle",
+      "mismatch": 0.007871212121212121,
+      "meanError": 0.006532528254626794
+    },
+    {
+      "index": 11468,
+      "name": "Misamis Occidental (Philippines)",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 5.262589272007161e-05
+    },
+    {
+      "index": 11529,
+      "name": "Box Elder County, Utah",
+      "status": "review",
+      "error": "An object includes a field region; needs review"
+    },
+    {
+      "index": 11634,
+      "name": "British Arctic Territory Emergency Services (British Arctic Territory Flag Hoax)",
+      "status": "ok",
+      "parts": 2,
+      "layout": "quartered",
+      "mismatch": 0.0019352493370969122,
+      "meanError": 0.0026223291575909018
+    },
+    {
+      "index": 11643,
+      "name": "Carillon Sacré-Coeur",
+      "status": "review",
+      "error": "An object includes a field region; needs review"
+    },
+    {
+      "index": 11647,
+      "name": "Trump MAGA fan made proposal",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.00033344200365000037
+    },
+    {
+      "index": 11679,
+      "name": "Standard of the South Korean Prime Minister",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.0004430681648534021
+    },
+    {
+      "index": 11907,
+      "name": "American Muslim Socialists",
+      "status": "ok",
+      "parts": 1,
+      "layout": "stars-stripes",
+      "mismatch": 0.0033907363420427553,
+      "meanError": 0.007331280124829298
+    },
+    {
+      "index": 12204,
+      "name": "Crawford County Sesquicentennial Celebration",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.0005904038570160829
+    },
+    {
+      "index": 12368,
+      "name": "Grand Gedeh County redesign by u/Scratch-ean",
+      "status": "review",
+      "error": "An object includes a field region; needs review"
+    },
+    {
+      "index": 12666,
+      "name": "Kasuga (Fukuoka)",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.0021364257653096897
+    },
+    {
+      "index": 12860,
+      "name": "Palestinian Islamic Jihad",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0.00011726078799249531,
+      "meanError": 0.00041434548494041323
+    },
+    {
+      "index": 12932,
+      "name": "Pampa",
+      "status": "review",
+      "error": "An object includes a field region; needs review"
+    },
+    {
+      "index": 13177,
+      "name": "República de Baja California",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.00318911066715398
+    },
+    {
+      "index": 13427,
+      "name": "Agadez (Proposed)",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 1.5015015015015015e-06,
+      "meanError": 0.0008731147606712094
+    },
+    {
+      "index": 13456,
+      "name": "Flag of the Ternate Sultanate (a.k.a Kingdom of Gapi)",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 1.2745042932377868e-06
+    },
+    {
+      "index": 13592,
+      "name": "Guayaquil (Redesign)",
+      "status": "review",
+      "error": "An object includes a field region; needs review"
+    },
+    {
+      "index": 13611,
+      "name": "Hui",
+      "status": "ok",
+      "parts": 5,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.0007827303759106122
+    },
+    {
+      "index": 13789,
+      "name": "Lazistan",
+      "status": "ok",
+      "parts": 1,
+      "layout": "image",
+      "mismatch": 0,
+      "meanError": 0.00869540790741056
+    },
+    {
+      "index": 13795,
+      "name": "Koch-Rajbongshi Liberation Organization - KRLO",
+      "status": "ok",
+      "parts": 0,
+      "layout": "bicolor-h",
+      "mismatch": 0,
+      "meanError": 0
+    },
+    {
+      "index": 13869,
+      "name": "Mazandarani",
+      "status": "ok",
+      "parts": 1,
+      "layout": "triband-h",
+      "mismatch": 0,
+      "meanError": 0.003114695763576404
+    },
+    {
+      "index": 14172,
+      "name": "Free Star-Kind of America (Daydream in Black)",
+      "status": "ok",
+      "parts": 7,
+      "layout": "stars-stripes",
+      "mismatch": 0.010722573839662448,
+      "meanError": 0.009124256781014273
+    },
+    {
+      "index": 14377,
+      "name": "Penrith, UK",
+      "status": "ok",
+      "parts": 4,
+      "layout": "saltire",
+      "mismatch": 0.008137027831130192,
+      "meanError": 0.015885208499219365
+    },
+    {
+      "index": 14493,
+      "name": "Ibaiti, Brazil",
+      "status": "ok",
+      "parts": 1,
+      "layout": "triband-h",
+      "mismatch": 0.003588006594235108,
+      "meanError": 0.006024268226702228
+    },
+    {
+      "index": 14567,
+      "name": "Nahua (Ethnic/National)",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.0005753095868314756
+    },
+    {
+      "index": 14923,
+      "name": "Capelle aan den IJssel",
+      "status": "ok",
+      "parts": 3,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.0002088892115848431
+    },
+    {
+      "index": 15271,
+      "name": "Coat of Arms of Kingdom of Candia (1205–1715)",
+      "status": "review",
+      "error": "Nonrectangular/transparent source needs review"
+    },
+    {
+      "index": 15355,
+      "name": "Tenet Organization",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.001914887920914049
+    },
+    {
+      "index": 15453,
+      "name": "Klaipėda Region",
+      "status": "ok",
+      "parts": 1,
+      "layout": "bicolor-h",
+      "mismatch": 0,
+      "meanError": 0.00021705027282832982
+    },
+    {
+      "index": 15465,
+      "name": "United Nations Children's Fund",
+      "status": "ok",
+      "parts": 1,
+      "layout": "solid",
+      "mismatch": 0,
+      "meanError": 0.003365484551692041
+    },
+    {
+      "index": 15495,
+      "name": "waveland",
+      "status": "review",
+      "error": "An object includes a field region; needs review"
+    },
+    {
+      "index": 15581,
+      "name": "Oregon Redesign by Randall Gray",
+      "status": "ok",
+      "parts": 2,
+      "layout": "image",
+      "mismatch": 0.005312084993359893,
+      "meanError": 0.007580356101223654
+    },
+    {
+      "index": 15582,
+      "name": "Qing Republic",
+      "status": "ok",
+      "parts": 2,
+      "layout": "hoist-band",
+      "mismatch": 0.0014326530612244898,
+      "meanError": 0.004301853347054688
+    }
+  ]
+}

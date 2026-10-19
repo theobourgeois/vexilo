@@ -48,7 +48,7 @@ export const getStudioEmblems = unstable_cache(
 
 /**
  * What the flag maker needs to remix a flag: its image and colours, and a design to start from —
- * its own if it was made here, else its parts cut from its SVG (scripts/parts) if they're current.
+ * its own if it was made here, else its cached SVG/raster parts (scripts/parts) if they're current.
  */
 export async function getRemixSource(flagId: string): Promise<RemixSource | null> {
   if (!z.string().uuid().safeParse(flagId).success) return null;
@@ -75,9 +75,9 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
       .from(flagEmblems)
       .where(sql`${flagEmblems.placements} @> ${JSON.stringify([{ flagId }])}::jsonb`),
     db
-      .select({ design: flagParts.design })
+      .select({ design: flagParts.design, status: flagParts.status })
       .from(flagParts)
-      .where(and(eq(flagParts.flagId, flagId), eq(flagParts.image, flag.image), eq(flagParts.status, 'ok')))
+      .where(and(eq(flagParts.flagId, flagId), eq(flagParts.image, flag.image)))
       .limit(1),
   ]);
 
@@ -86,7 +86,8 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
     name: flag.name,
     image: flag.image,
     palette: palette.map((color) => color.hex),
-    design: flag.design ?? parts?.design ?? null,
+    design: flag.design ?? (parts?.status === 'ok' ? parts.design : null) ?? null,
+    partsNeedReview: parts?.status === 'failed' && /\.(png|jpe?g|gif|webp|avif)(?:$|\?)/i.test(flag.image),
     placements: placed.flatMap((emblem) => {
       const placement = emblem.placements.find((p) => p.flagId === flagId);
       if (!placement) return [];
