@@ -14,7 +14,8 @@ export async function designToSvg(design: StudioDesign, width = 1200) {
   const layers: Record<string, string> = {};
   await Promise.all(
     design.layers
-      .filter((layer) => !layer.hidden)
+      // Shapes are drawn as paths, with nothing to load.
+      .filter((layer) => !layer.hidden && !layer.shape)
       .map(async (layer) => {
         layers[layer.id] = await toDataUrl(await recolor(layerImage(layer), layer.palette, layer.colors));
       }),

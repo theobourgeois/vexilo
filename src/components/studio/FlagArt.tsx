@@ -6,27 +6,30 @@ import { layerImage } from './cutout';
 import { useRecolored } from './images';
 import { defaultParams, LAYOUTS } from './layouts';
 import { flagWidth, layerBounds, layerCopies, layerWidth } from './model';
+import { shapePath } from './shapes';
 
 type Hrefs = { field?: string; layers?: Record<string, string> };
 
 /**
  * A design as an SVG in flag units (W wide, 1 tall). `hrefs` replaces the live, recoloured
- * images with fixed ones, which export uses to embed them.
+ * images with fixed ones, which export uses to embed them. `view` shows just that part of the
+ * flag (flag units), so a close zoom never draws more than fits on screen.
  */
 export function FlagArt({
   design,
   hrefs,
+  view,
   className,
   style,
   ...rest
-}: { design: StudioDesign; hrefs?: Hrefs } & Omit<React.SVGProps<SVGSVGElement>, 'viewBox'>) {
+}: { design: StudioDesign; hrefs?: Hrefs; view?: { x: number; y: number; w: number; h: number } } & Omit<React.SVGProps<SVGSVGElement>, 'viewBox'>) {
   const W = flagWidth(design);
   const id = React.useId().replace(/[^a-zA-Z0-9]/g, '');
   const outlined = design.layers.filter((layer) => layer.outline && !layer.hidden);
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox={`0 0 ${W} 1`}
+      viewBox={view ? `${view.x} ${view.y} ${view.w} ${view.h}` : `0 0 ${W} 1`}
       preserveAspectRatio='none'
       className={className}
       style={style}
@@ -72,7 +75,9 @@ export function FlagArt({
       <g clipPath={`url(#${id}-clip)`}>
         <FieldArt field={design.field} W={W} href={hrefs?.field} />
         {design.layers.map((layer) =>
-          layer.hidden ? null : (
+          layer.hidden ? null : layer.shape ? (
+            <ShapeArt key={layer.id} layer={layer} W={W} filter={layer.outline ? `url(#${id}-o-${layer.id})` : undefined} />
+          ) : (
             <LayerArt
               key={layer.id}
               layer={layer}
@@ -138,6 +143,31 @@ const LayerArt = React.memo(function LayerArt({
           width={w}
           height={h}
           preserveAspectRatio='none'
+          transform={`translate(${copy.cx} ${copy.cy}) rotate(${copy.rot}) scale(${layer.flipX ? -1 : 1} ${layer.flipY ? -1 : 1})`}
+        />
+      ))}
+    </g>
+  );
+});
+
+/** A shape or brush stroke, drawn at its box's size so strokes keep their width when stretched. */
+export const ShapeArt = React.memo(function ShapeArt({ layer, W, filter }: { layer: StudioLayer; W: number; filter?: string }) {
+  const shape = layer.shape!;
+  const h = layer.size;
+  const w = layerWidth(layer);
+  const d = shapePath(shape, w, h);
+  const brush = shape.kind === 'brush';
+  return (
+    <g filter={filter}>
+      {layerCopies(layer, W).map((copy, i) => (
+        <path
+          key={i}
+          d={d}
+          fill={shape.fill ? layer.colors[0] : 'none'}
+          stroke={shape.stroke > 0 ? (layer.colors[1] ?? layer.colors[0]) : 'none'}
+          strokeWidth={shape.stroke}
+          strokeLinecap={brush ? 'round' : 'butt'}
+          strokeLinejoin={brush ? 'round' : 'miter'}
           transform={`translate(${copy.cx} ${copy.cy}) rotate(${copy.rot}) scale(${layer.flipX ? -1 : 1} ${layer.flipY ? -1 : 1})`}
         />
       ))}

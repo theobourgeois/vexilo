@@ -36,11 +36,22 @@ const field = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('image'), src: z.string().url().max(1000), palette: z.array(hex).max(8), colors: z.array(hex).max(8) }),
 ]);
 
+const shape = z.object({
+  kind: z.enum(['rect', 'ellipse', 'triangle', 'diamond', 'star', 'polygon', 'cross', 'crescent', 'heart', 'line', 'arrow', 'brush']),
+  fill: z.boolean(),
+  stroke: z.number().min(0).max(1),
+  points: z.number().int().min(3).max(64).optional(),
+  inner: z.number().min(0).max(1).optional(),
+  corner: z.number().min(0).max(1).optional(),
+  path: z.array(z.tuple([unit, unit])).max(2000).optional(),
+});
+
 const layer = z.object({
   id: z.string().max(40),
   emblemId: z.string().max(64),
   name: z.string().max(120),
-  src: z.string().url().max(1000),
+  src: z.union([z.string().url().max(1000), z.literal('')]),
+  shape: shape.optional(),
   cutout: z
     .object({
       box: z.tuple([unit, unit, unit, unit]),
@@ -75,5 +86,6 @@ export const studioDesignSchema: z.ZodType<StudioDesign> = z.object({
   version: z.literal(1),
   ratio: z.tuple([z.number().positive().max(20), z.number().positive().max(20)]),
   field,
-  layers: z.array(layer).max(80),
+  // Room for brush strokes, which are a layer each.
+  layers: z.array(layer).max(200),
 });

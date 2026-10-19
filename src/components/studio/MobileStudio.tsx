@@ -27,7 +27,7 @@ import type { StudioEmblem } from './model';
 import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
-import { AlignControls, FieldSwatches, LayerMoreMenu, LayerSwatches, OutlineControls, RepeatControls } from './tools';
+import { AlignControls, FieldSwatches, LayerMoreMenu, LayerSwatches, OutlineControls, RepeatControls, ShapeControls } from './tools';
 import type { Panel } from './use-shortcuts';
 import type { Studio } from './use-studio';
 
@@ -105,6 +105,7 @@ export function MobileStudio({
   const [posting, setPosting] = React.useState(false);
   const { selectedLayers, fieldSelected, actions } = studio;
   const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
+  const allShapes = selectedLayers.length > 0 && selectedLayers.every((l) => l.shape);
   const importImages = useImageImport(studio);
 
   return (
@@ -146,14 +147,22 @@ export function MobileStudio({
           <div className='flex items-center gap-1 overflow-x-auto px-2 py-1.5 [scrollbar-width:none]'>
             {selectedLayers.length > 0 ? (
               <>
-                {single && (
-                  <div className='flex shrink-0 items-center gap-1.5 px-2'>
-                    <LayerSwatches studio={studio} layer={single} size={30} />
+                {allShapes ? (
+                  <div className='flex shrink-0 items-center px-1'>
+                    <ShapeControls studio={studio} layers={selectedLayers} />
                   </div>
+                ) : (
+                  <>
+                    {single && (
+                      <div className='flex shrink-0 items-center gap-1.5 px-2'>
+                        <LayerSwatches studio={studio} layer={single} size={30} />
+                      </div>
+                    )}
+                    <Action label='Match' onClick={actions.matchPalette}>
+                      <WandSparkles />
+                    </Action>
+                  </>
                 )}
-                <Action label='Match' onClick={actions.matchPalette}>
-                  <WandSparkles />
-                </Action>
                 <Action label='Flip' onClick={() => actions.flip('x')}>
                   <FlipHorizontal />
                 </Action>
@@ -168,7 +177,7 @@ export function MobileStudio({
                     <Repeat />
                   </Action>
                 )}
-                <Action
+                {!selectedLayers.some((l) => l.shape) && <Action
                   label='Outline'
                   active={selectedLayers.some((l) => l.outline)}
                   onClick={() => {
@@ -177,7 +186,7 @@ export function MobileStudio({
                   }}
                 >
                   <Outline />
-                </Action>
+                </Action>}
                 <Action label='Duplicate' onClick={() => actions.duplicateSelected()}>
                   <Copy />
                 </Action>

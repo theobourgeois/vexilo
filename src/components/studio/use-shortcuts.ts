@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
+import type { ToolKind } from './draw';
 import { alignScopes } from './regions';
-import type { View } from './StudioCanvas';
+import { MAX_ZOOM, type View } from './StudioCanvas';
 import type { Studio } from './use-studio';
 
 export type Panel = 'layout' | 'emblems' | 'colors' | 'layers';
@@ -10,7 +11,7 @@ const PANELS: Panel[] = ['layout', 'emblems', 'colors', 'layers'];
 
 /**
  * Design-tool keyboard shortcuts: undo/redo, clipboard, duplicate, delete, nudge, arrange,
- * flip, resize, zoom, select all, cycle selection and panel switching.
+ * flip, resize, zoom, select all, cycle selection, tools and panel switching.
  */
 export function useShortcuts(
   studio: Studio,
@@ -20,6 +21,10 @@ export function useShortcuts(
     /** Images pasted from the system clipboard. Returns whether it used them. */
     onPasteFiles?: (files: File[]) => Promise<boolean>;
     setPanel?: (panel: Panel) => void;
+    tool?: ToolKind;
+    setTool?: (tool: ToolKind) => void;
+    /** How far an arrow key nudges, in flag units; shift goes ten times as far. */
+    nudgeStep?: () => number;
     enabled: boolean;
   },
 ) {
@@ -55,7 +60,12 @@ export function useShortcuts(
         if (key === ']') return run(() => actions.arrange(e.shiftKey ? 'front' : 1));
         if (key === '[') return run(() => actions.arrange(e.shiftKey ? 'back' : -1));
         if (key === '0') return run(() => options.setView({ zoom: 1, panX: 0, panY: 0 }));
-        if (key === '=' || key === '+') return run(() => options.setView((v) => ({ zoom: Math.min(12, v.zoom * 1.25), panX: v.panX * 1.25, panY: v.panY * 1.25 })));
+        if (key === '=' || key === '+') {
+          return run(() => options.setView((v) => {
+            const zoom = Math.min(MAX_ZOOM, v.zoom * 1.25);
+            return { zoom, panX: (v.panX * zoom) / v.zoom, panY: (v.panY * zoom) / v.zoom };
+          }));
+        }
         if (key === '-') return run(() => options.setView((v) => ({ zoom: Math.max(0.2, v.zoom / 1.25), panX: v.panX / 1.25, panY: v.panY / 1.25 })));
         return;
       }
@@ -69,13 +79,17 @@ export function useShortcuts(
         }
       }
       if (key === 'backspace' || key === 'delete') return run(actions.deleteSelected);
-      if (key === 'escape') return run(() => studio.setSelection([]));
+      if (key === 'escape') return run(() => (options.tool && options.tool !== 'select' ? options.setTool?.('select') : studio.setSelection([])));
+      if (options.setTool && !e.shiftKey && !e.altKey) {
+        const tool = ({ v: 'select', u: 'shape', b: 'brush' } as const)[key as 'v'];
+        if (tool) return run(() => options.setTool!(tool));
+      }
       if (key === 'tab') return run(() => actions.selectNext(e.shiftKey ? -1 : 1));
       if (e.shiftKey && key === 'h') return run(() => actions.flip('x'));
       if (e.shiftKey && key === 'v') return run(() => actions.flip('y'));
       if (key === ']') return run(() => actions.scaleBy(1.08));
       if (key === '[') return run(() => actions.scaleBy(1 / 1.08));
-      const step = e.shiftKey ? 0.025 : 0.004;
+      const step = (options.nudgeStep?.() ?? 0.004) * (e.shiftKey ? 10 : 1);
       if (key === 'arrowleft') return run(() => actions.nudge(-step, 0));
       if (key === 'arrowright') return run(() => actions.nudge(step, 0));
       if (key === 'arrowup') return run(() => actions.nudge(0, -step));

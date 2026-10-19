@@ -21,12 +21,13 @@ import {
   ZoomControl,
   type Remix,
 } from './chrome';
-import { documentColors, type StudioEmblem } from './model';
+import { DEFAULT_DRAW, ToolOptions, ToolPicker, type DrawSettings, type ToolKind } from './draw';
+import { documentColors, pixelSize, type StudioEmblem } from './model';
 import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel, PanelTitle } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
 import { ContextToolbar } from './tools';
-import { ColorPicker } from './ui';
+import { ColorPicker, ToolDivider } from './ui';
 import { useShortcuts, type Panel } from './use-shortcuts';
 import type { Studio } from './use-studio';
 
@@ -56,14 +57,27 @@ export function DesktopStudio({
   const [menu, setMenu] = React.useState<{ x: number; y: number; onLayer: boolean } | null>(null);
   const [posting, setPosting] = React.useState(false);
   const [colorTarget, setColorTarget] = React.useState<ColorTarget | null>(null);
+  const [draw, setDraw] = React.useState<DrawSettings>(DEFAULT_DRAW);
+  const scaleRef = React.useRef(1);
   const exporter = useExport(studio);
   const importImages = useImageImport(studio);
+  const setTool = (tool: ToolKind) => {
+    setDraw((d) => ({ ...d, tool }));
+    if (tool !== 'select') setMode('flat');
+  };
 
   useShortcuts(studio, {
     setView,
     onExport: exporter.png,
     onPasteFiles: (files) => importImages(files),
     setPanel: (next) => setPanel((current) => (current === next ? null : next)),
+    tool: draw.tool,
+    setTool,
+    // One screen pixel, in whole export pixels: a single pixel up close.
+    nudgeStep: () => {
+      const px = pixelSize(studio.W);
+      return Math.max(1, Math.round(1 / (px * scaleRef.current))) * px;
+    },
     enabled: !posting,
   });
 
@@ -87,6 +101,9 @@ export function DesktopStudio({
           setView={setView}
           insets={insets}
           onContextMenu={setMenu}
+          draw={draw}
+          onShapeDrawn={() => setTool('select')}
+          scaleRef={scaleRef}
           onDoubleClickField={(slot, at) => setColorTarget({ ...at, kind: 'field', slot })}
           onDoubleClickLayer={(id, at) => setColorTarget({ ...at, kind: 'layer', id })}
           onDropFiles={(files, at) => importImages(files, at)}
@@ -140,12 +157,14 @@ export function DesktopStudio({
         </aside>
       )}
 
-      {/* Title bar */}
-      <header className='absolute right-5 top-5 flex h-11 items-center gap-2' style={{ left }}>
-        <FlagName studio={studio} className='h-9 max-w-[420px] text-[20px]' />
+      {/* Toolbar */}
+      <header className='absolute right-5 top-5 flex h-[52px] items-center gap-1.5 rounded-[14px] bg-surface py-1.5 pl-2 pr-1.5 shadow-pop' style={{ left }}>
+        <FlagName studio={studio} className='h-9 max-w-[360px] text-[18px]' />
         <RemixPill remix={remix} />
         <StartOver remix={remix} onStartOver={onStartOver} />
-        <span className='flex-1' />
+        <span className='min-w-2 flex-1' />
+        <ToolPicker tool={draw.tool} onChange={setTool} />
+        <ToolDivider />
         <UndoRedo studio={studio} />
         <ExportMenu studio={studio}>
           <Button variant='neutral' size='sm'>
@@ -158,6 +177,13 @@ export function DesktopStudio({
           Post
         </Button>
       </header>
+
+      <ToolOptions
+        studio={studio}
+        draw={draw}
+        onChange={(patch) => setDraw((d) => ({ ...d, ...patch }))}
+        className='absolute right-5 top-[80px]'
+      />
 
       {/* Glance and dock */}
       <Glance studio={studio} className='absolute bottom-5' style={{ left }} />
