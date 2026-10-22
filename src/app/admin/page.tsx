@@ -3,6 +3,7 @@
 import { getAdminCounts } from '@/actions/flags';
 import { AllFlags } from '@/components/admin/AllFlags';
 import { BrokenImages } from '@/components/admin/BrokenImages';
+import { ContestsAdmin } from '@/components/admin/ContestsAdmin';
 import { CreateFlags } from '@/components/admin/CreateFlags';
 import { CreatorsAdmin } from '@/components/admin/CreatorsAdmin';
 import { MiscTools } from '@/components/admin/MiscTools';
@@ -16,7 +17,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-const VIEWS = ['queue', 'reports', 'flags', 'broken', 'creators', 'create', 'tools'] as const;
+const VIEWS = ['queue', 'reports', 'flags', 'broken', 'creators', 'contests', 'create', 'tools'] as const;
 type AdminView = (typeof VIEWS)[number];
 
 type NavItem = {
@@ -95,6 +96,10 @@ function AdminContent() {
       ],
     },
     {
+      title: 'Events',
+      items: [{ view: 'contests', label: 'Design contests' }],
+    },
+    {
       title: 'Tools',
       items: [
         { view: 'create', label: 'Create flags' },
@@ -143,6 +148,7 @@ function AdminContent() {
         {view === 'flags' && <AllFlags />}
         {view === 'broken' && <BrokenImages />}
         {view === 'creators' && <CreatorsAdmin />}
+        {view === 'contests' && <ContestsAdmin />}
         {view === 'create' && <CreateFlags />}
         {view === 'tools' && <MiscTools />}
       </main>

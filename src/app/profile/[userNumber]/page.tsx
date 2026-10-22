@@ -13,11 +13,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
 import FlagImage from '@/components/FlagImage';
-import { ArrowLeft, ArrowRight, Edit, Flag, Heart, Link as LinkIcon, Settings } from '@/components/icons';
+import { ArrowLeft, ArrowRight, Edit, Flag, Heart, Link as LinkIcon, Settings, Trophy } from '@/components/icons';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { getUserByUserNumber } from '@/actions/users';
+import { getContestWins } from '@/actions/contests';
 import { useCallback } from 'react';
 
 type ViewMode = 'contributed' | 'favorites' | 'edited';
@@ -34,6 +35,11 @@ export default function ProfilePage() {
   const isFavoritesLegacy = searchParams.get('favorites') === 'true';
   const viewMode: ViewMode =
     viewParam || (isFavoritesLegacy ? 'favorites' : 'contributed');
+
+  const { data: contestWins } = useQuery({
+    queryKey: ['contestWins', userNumber],
+    queryFn: () => getContestWins(userNumber),
+  });
 
   const {
     data: userData,
@@ -214,6 +220,21 @@ export default function ProfilePage() {
                 <h1 className='truncate text-[26px] font-semibold tracking-[-0.035em]'>{user.name || 'Anonymous user'}</h1>
                 {user.favoriteFlag && (
                   <p className='truncate text-[13px] text-muted-foreground'>Flies {user.favoriteFlag.name}</p>
+                )}
+                {contestWins && contestWins.length > 0 && (
+                  <div className='mt-2 flex flex-wrap gap-1.5'>
+                    {contestWins.map((win) => (
+                      <Link
+                        key={win.slug}
+                        href={`/contest/${win.slug}`}
+                        title={win.theme}
+                        className='inline-flex h-6 items-center gap-1.5 rounded-full bg-[rgb(217_154_11/0.14)] px-2.5 text-[12px] font-semibold text-[#9a6a00] hover:brightness-110 dark:text-[#f2c14e]'
+                      >
+                        <Trophy className='size-3' />
+                        Contest winner · {win.title}
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </div>
               <div className='flex gap-2 self-start'>

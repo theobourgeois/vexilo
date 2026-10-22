@@ -523,6 +523,91 @@ export const gameResults = createTable(
   ],
 );
 
+/**
+ * A design contest. Its phase follows the dates (see src/lib/contest.ts): entries open at
+ * `startsAt`, voting runs from `votingStartsAt` to `endsAt`, and the winner only shows once an admin
+ * sets `winnerEntryId` and `announcedAt`. Drafts (`published` false) are visible to admins only.
+ */
+export const contests = createTable(
+  'contest',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    slug: varchar('slug', { length: 80 }).notNull(),
+    title: varchar('title', { length: 120 }).notNull(),
+    theme: varchar('theme', { length: 160 }).notNull(),
+    brief: text('brief').notNull().default(''),
+    rules: text('rules').array().notNull().default([]),
+    prize: varchar('prize', { length: 200 }).notNull().default(''),
+    startsAt: timestamp('starts_at', { mode: 'date' }).notNull(),
+    votingStartsAt: timestamp('voting_starts_at', { mode: 'date' }).notNull(),
+    endsAt: timestamp('ends_at', { mode: 'date' }).notNull(),
+    votesPerVoter: integer('votes_per_voter').notNull().default(3),
+    published: boolean('published').notNull().default(false),
+    winnerEntryId: uuid('winner_entry_id'),
+    announcedAt: timestamp('announced_at', { mode: 'date' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('contest_slug_idx').on(table.slug), index('contest_starts_idx').on(table.startsAt)],
+);
+
+/**
+ * One design per person per contest, made in the flag maker. Entries stay anonymous until the
+ * winner is announced. `ipHash` (a salted hash, never the address) helps spot people voting for
+ * themselves from other accounts. `flagId` is set once the entry is published to Browse.
+ */
+export const contestEntries = createTable(
+  'contest_entry',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contestId: uuid('contest_id')
+      .notNull()
+      .references(() => contests.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 120 }).notNull(),
+    statement: varchar('statement', { length: 400 }).notNull().default(''),
+    image: varchar('image', { length: 1000 }).notNull(),
+    design: jsonb('design').$type<StudioDesign>().notNull(),
+    status: varchar('status', { length: 16 }).$type<'active' | 'disqualified'>().notNull().default('active'),
+    statusReason: varchar('status_reason', { length: 200 }).notNull().default(''),
+    ipHash: varchar('ip_hash', { length: 64 }),
+    flagId: uuid('flag_id').references(() => flags.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('contest_entry_user_idx').on(table.contestId, table.userId),
+    index('contest_entry_user_id_idx').on(table.userId),
+  ],
+);
+
+/** One vote per voter per entry. Admins can void a vote; voided votes stop counting but are kept. */
+export const contestVotes = createTable(
+  'contest_vote',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contestId: uuid('contest_id')
+      .notNull()
+      .references(() => contests.id, { onDelete: 'cascade' }),
+    entryId: uuid('entry_id')
+      .notNull()
+      .references(() => contestEntries.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    ipHash: varchar('ip_hash', { length: 64 }),
+    voidedAt: timestamp('voided_at', { mode: 'date' }),
+    voidReason: varchar('void_reason', { length: 200 }).notNull().default(''),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('contest_vote_voter_idx').on(table.entryId, table.userId),
+    index('contest_vote_contest_user_idx').on(table.contestId, table.userId),
+  ],
+);
+
 export const favorites = createTable('favorite', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')

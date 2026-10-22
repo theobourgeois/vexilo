@@ -2,6 +2,7 @@ export const NAV_LINKS = [
   { href: '/', label: 'Browse' },
   { href: '/create', label: 'Create' },
   { href: '/play', label: 'Play' },
+  { href: '/contest', label: 'Contest' },
   { href: '/leaderboard', label: 'Leaderboard' },
 ];
 

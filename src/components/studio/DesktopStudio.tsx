@@ -3,9 +3,11 @@
 import React from 'react';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Download, Emblems, Layers, Palette, Send, SquaresFour, X } from '@/components/icons';
+import { Download, Emblems, Layers, Palette, Send, SquaresFour, Trophy, X } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import {
+  ContestEntryDialog,
+  ContestPill,
   ContextMenu,
   ExportMenu,
   FlagName,
@@ -19,6 +21,7 @@ import {
   ViewModeControl,
   WavePreview,
   ZoomControl,
+  type Contest,
   type Remix,
 } from './chrome';
 import { DEFAULT_DRAW, ToolOptions, ToolPicker, type DrawSettings, type ToolKind } from './draw';
@@ -44,11 +47,13 @@ export function DesktopStudio({
   studio,
   emblems,
   remix,
+  contest,
   onStartOver,
 }: {
   studio: Studio;
   emblems: StudioEmblem[];
   remix: Remix;
+  contest: Contest;
   onStartOver?: () => void;
 }) {
   const [panel, setPanel] = React.useState<Panel | null>('emblems');
@@ -161,6 +166,7 @@ export function DesktopStudio({
       <header className='absolute right-5 top-5 flex h-[52px] items-center gap-1.5 rounded-[14px] bg-surface py-1.5 pl-2 pr-1.5 shadow-pop' style={{ left }}>
         <FlagName studio={studio} className='h-9 max-w-[360px] text-[18px]' />
         <RemixPill remix={remix} />
+        <ContestPill contest={contest} />
         <StartOver remix={remix} onStartOver={onStartOver} />
         <span className='min-w-2 flex-1' />
         <ToolPicker tool={draw.tool} onChange={setTool} />
@@ -173,8 +179,8 @@ export function DesktopStudio({
           </Button>
         </ExportMenu>
         <Button size='sm' onClick={() => setPosting(true)}>
-          <Send />
-          Post
+          {contest ? <Trophy /> : <Send />}
+          {contest ? (contest.entry ? 'Update entry' : 'Submit entry') : 'Post'}
         </Button>
       </header>
 
@@ -195,7 +201,11 @@ export function DesktopStudio({
 
       <ContextMenu studio={studio} at={menu} onClose={() => setMenu(null)} />
       <CanvasColorPicker studio={studio} target={colorTarget} onClose={() => setColorTarget(null)} />
-      <PostDialog studio={studio} remix={remix} open={posting} onOpenChange={setPosting} />
+      {contest ? (
+        <ContestEntryDialog studio={studio} contest={contest} open={posting} onOpenChange={setPosting} />
+      ) : (
+        <PostDialog studio={studio} remix={remix} open={posting} onOpenChange={setPosting} />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle } from '@/components/icons';
+import { ContestLink } from '@/components/contest-link';
 import { FlagOfTheDayLink } from '@/components/flag-of-the-day-link';
 import { TopContributorsLink } from '@/components/top-contributors-link';
 import { GridArt, UnfurlArt } from '@/components/games/art';
@@ -33,7 +34,7 @@ function PuzzleCard({ puzzle, number }: { puzzle: (typeof PUZZLES)[number]; numb
   );
 }
 
-/** Flag of the day, today's puzzles and the week's top contributors, between the Browse title and search. */
+/** Flag of the day, the design contest, today's puzzles and the week's top contributors, between the Browse title and search. */
 export function TodayRail({ className }: { className?: string }) {
   // The puzzle number follows the player's own day, which the server can't know.
   const [number, setNumber] = React.useState<number | null>(null);
@@ -48,6 +49,7 @@ export function TodayRail({ className }: { className?: string }) {
       )}
     >
       <FlagOfTheDayLink className={CARD} />
+      <ContestLink className={CARD} />
       {PUZZLES.map((puzzle) => (
         <PuzzleCard key={puzzle.game} puzzle={puzzle} number={number} />
       ))}
