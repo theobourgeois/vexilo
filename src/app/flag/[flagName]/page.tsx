@@ -23,11 +23,13 @@ import { Suspense } from 'react';
 import FlagFieldsForm from '@/components/FlagFieldsForm';
 import SourceBadge from '@/components/SourceBadge';
 import { describeEdit } from '@/lib/edit-changes';
-import { getFlagColors, type PaletteColor } from '@/lib/flag-palette';
+import { getFlagColors, paletteFamilies, type PaletteColor } from '@/lib/flag-palette';
 import { ensureFlagImageSelfHosted } from '@/lib/storage/flag-image-mirror';
 import { getFlagNameById } from '@/lib/studio-data';
 import { MakerBadge } from '@/components/MakerBadge';
 import { MAKER_TAGS } from '@/lib/studio-design';
+import { collectionPath, getColourCollection } from '@/lib/collections';
+import { absoluteUrl, flagHeadline, flagPath, jsonLd } from '@/lib/seo';
 
 export type RelatedFlag = {
   name: string;
@@ -39,13 +41,20 @@ type Props = {
   params: Promise<{ flagName: string }>;
 };
 
+/** "Flag of Canada: Meaning & History | Vexilo", as people search for it; history only when the page has some. */
+function flagPageTitle(flag: { name: string; metadata?: { historicalContext?: string | null } | null }) {
+  const headline = flagHeadline(flag.name);
+  return flag.metadata?.historicalContext ? `${headline}: Meaning & History | Vexilo` : `${headline} | Vexilo`;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const flagName = decodeURIComponent((await params).flagName);
   const flag = await getFlagDetailFromName(flagName);
   if (flag) {
-    const pageUrl = `https://vexilo.org/flag/${encodeURIComponent(flag.name)}`;
+    const pageUrl = absoluteUrl(flagPath(flag.name));
+    const title = flagPageTitle(flag);
     return {
-      title: `${flag.name} - Vexilo`,
+      title,
       description: flag.displayDescription,
       keywords: [
         flag.name,
@@ -58,7 +67,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         'Flag Collection',
       ],
       openGraph: {
-        title: `${flag.name} - Vexilo`,
+        title: title,
         description: flag.displayDescription,
         url: pageUrl,
         siteName: 'Vexilo',
@@ -71,7 +80,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
       twitter: {
         card: 'summary_large_image',
-        title: `${flag.name} - Vexilo`,
+        title: title,
         description: flag.displayDescription,
         images: [
           {
@@ -138,6 +147,7 @@ async function ColoursPanel({ colors }: { colors: Promise<PaletteColor[]> }) {
   const palette = await colors;
   if (palette.length === 0) return null;
   const total = palette.reduce((sum, color) => sum + color.share, 0);
+  const collection = getColourCollection(paletteFamilies(palette));
   return (
     <Panel title='Colours' aside={palette.length}>
       <div className='relative mt-1 mb-1.5 flex h-3.5 overflow-hidden rounded-full after:absolute after:inset-0 after:rounded-full after:shadow-[inset_0_0_0_1px_var(--border)]'>
@@ -159,6 +169,15 @@ async function ColoursPanel({ colors }: { colors: Promise<PaletteColor[]> }) {
           </li>
         ))}
       </ul>
+      {collection && (
+        <Link
+          href={collectionPath(collection.slug)}
+          className='mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-main hover:underline'
+        >
+          More {collection.title.toLowerCase()}
+          <ChevronRight className='size-3' />
+        </Link>
+      )}
     </Panel>
   );
 }
@@ -249,6 +268,43 @@ async function ContributorsSection({ flagId }: { flagId: string }) {
       <Contributors contributors={contributors} totalEdits={totalEdits} edits={edits} />
     </div>
   );
+}
+
+/** schema.org description of the page and its flag image, for search results and image search. */
+function flagStructuredData(flag: { name: string; image: string; displayDescription: string; metadata?: { historicalContext?: string | null } | null }) {
+  const url = absoluteUrl(flagPath(flag.name));
+  const headline = flagHeadline(flag.name);
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        '@id': url,
+        url,
+        name: flagPageTitle(flag),
+        description: flag.displayDescription,
+        isPartOf: { '@type': 'WebSite', name: 'Vexilo', url: absoluteUrl('/') },
+        primaryImageOfPage: { '@id': `${url}#flag` },
+        breadcrumb: { '@id': `${url}#breadcrumb` },
+      },
+      {
+        '@type': 'ImageObject',
+        '@id': `${url}#flag`,
+        contentUrl: absoluteUrl(flag.image),
+        name: headline,
+        caption: headline,
+        description: flag.displayDescription,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': `${url}#breadcrumb`,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Vexilo', item: absoluteUrl('/') },
+          { '@type': 'ListItem', position: 2, name: flag.name, item: url },
+        ],
+      },
+    ],
+  };
 }
 
 const normalizeUrl = (url: string) => url.trim().replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '').toLowerCase();
@@ -402,6 +458,7 @@ export default async function FlagPage({
   return (
     <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
       <FlagViewTracker flagId={flag.id} />
+      <script type='application/ld+json' dangerouslySetInnerHTML={jsonLd(flagStructuredData(flag))} />
       <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
         <Link href='/' className='hover:text-foreground'>
           Browse

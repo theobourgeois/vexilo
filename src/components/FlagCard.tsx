@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Flag } from '@/lib/types';
 import { useSession } from 'next-auth/react';
 import React from 'react';
+import Link from 'next/link';
 import { toggleFavoriteFlag } from '@/actions/flags';
 import { changeFavoriteFlag, getUserData } from '@/actions/users';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -155,7 +156,12 @@ export default function FlagCard({
 
       <div className='flex items-center gap-2.5 py-3.5 pl-4 pr-3.5'>
         <div className='min-w-0 flex-1'>
-          <h3 className='truncate text-[15px] font-medium'>{flagName}</h3>
+          <h3 className='truncate text-[15px] font-medium'>
+            {/* A real link so search engines can follow cards; the card's own click handles the rest. */}
+            <Link href={`/flag/${encodeURIComponent(flagName)}`} onClick={(e) => e.stopPropagation()}>
+              {flagName}
+            </Link>
+          </h3>
           <p className='mt-0.5 truncate tabular-nums text-[11.5px] text-muted-foreground'>
             #{String(index).padStart(4, '0')}
             {tags?.[0] ? ` · ${tags[0]}` : ''}

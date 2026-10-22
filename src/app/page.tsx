@@ -1,5 +1,11 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import FlagSearch from '../components/FlagSearch';
+
+// Search and tag filters (?q=, ?tag=) are views of the same page.
+export const metadata: Metadata = {
+  alternates: { canonical: 'https://vexilo.org' },
+};
 
 export default function Home() {
   return (

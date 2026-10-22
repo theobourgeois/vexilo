@@ -90,9 +90,8 @@ export const metadata: Metadata = {
   // verification: {
   //     google: process.env.GOOGLE_VERIFICATION,
   // },
-  alternates: {
-    canonical: 'https://vexilo.org',
-  },
+  // No site-wide canonical: pages inherit it, which told search engines every page was the home page.
+  metadataBase: new URL('https://vexilo.org'),
   category: 'education',
   manifest: '/manifest.json',
 };

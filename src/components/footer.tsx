@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const LINKS = [
   { href: 'https://buymeacoffee.com/theobourgeois', label: 'Donate', external: true },
+  { href: '/flags', label: 'Collections' },
   { href: '/community-guidelines', label: 'Guidelines' },
   { href: '/privacy-policy', label: 'Privacy' },
   { href: '/terms-of-service', label: 'Terms' },
