@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { documentColors, EXPORT_WIDTH } from './model';
 import { isLinear, SHAPE_PRESETS, shapePath, type ShapePreset, type ShapeStyle } from './shapes';
 import { fontChoice, FONTS, previewFamily } from './text';
-import { ColorPicker, Slider, ToolButton, ToolDivider } from './ui';
+import { ColorPicker, Slider, ToolButton, ToolDivider, type Side } from './ui';
 import type { Studio } from './use-studio';
 
 export type ToolKind = 'select' | 'shape' | 'brush' | 'pen' | 'text';
@@ -110,7 +110,7 @@ export function PaintButton({
   /** Absent when it can't be turned off. */
   onToggle?: (on: boolean) => void;
   onColor: (color: string, transient: boolean) => void;
-  side?: 'top' | 'bottom';
+  side?: Side;
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -151,7 +151,7 @@ export function PaintButton({
 }
 
 /** A font menu, each name shown in its own face. */
-export function FontPicker({ value, onChange, side = 'bottom' }: { value: TextFont; onChange: (font: TextFont) => void; side?: 'top' | 'bottom' }) {
+export function FontPicker({ value, onChange, side = 'bottom' }: { value: TextFont; onChange: (font: TextFont) => void; side?: Side }) {
   const [open, setOpen] = React.useState(false);
   const current = fontChoice(value);
   return (

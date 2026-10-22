@@ -118,10 +118,21 @@ const text = z.object({
 });
 
 const repeat = z.object({
-  mode: z.enum(['row', 'column', 'ring', 'arc', 'grid']),
-  count: z.number().int().min(1).max(64),
+  mode: z.enum(['row', 'column', 'ring', 'arc', 'grid', 'path']),
+  count: z.number().int().min(1).max(400),
   spacing: z.number().min(-1).max(5),
   facing: z.boolean(),
+  columns: z.number().int().min(1).max(40).optional(),
+  rows: z.number().int().min(1).max(40).optional(),
+  spacingY: z.number().min(-1).max(5).optional(),
+  stagger: z.boolean().optional(),
+  rings: z.number().int().min(1).max(8).optional(),
+  ringGap: z.number().min(0).max(2).optional(),
+  even: z.boolean().optional(),
+  angle: z.number().min(-360).max(360).optional(),
+  spread: z.number().min(0).max(360).optional(),
+  along: z.string().max(40).optional(),
+  track: z.array(z.tuple([unit, unit, unit])).max(400).optional(),
 });
 
 const layer = z.object({

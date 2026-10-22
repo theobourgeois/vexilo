@@ -25,6 +25,7 @@ import {
   AlignRight,
   AlignTop,
   ArcIcon,
+  PathIcon,
   BezierCurve,
   BringForward,
   DistributeHorizontal,
@@ -34,12 +35,10 @@ import {
   ClipMask,
   ClippedBelow,
   ColumnsIcon,
-  Copy,
   Eye,
   EyeSlash,
   FlagTriangleRight,
   ExcludeShapes,
-  FlipHorizontal,
   FlipVertical,
   GridIcon,
   GroupIcon,
@@ -47,15 +46,11 @@ import {
   Lock,
   MergeShapes,
   NoClip,
-  MoreHorizontal,
-  Outline,
-  Repeat,
   RingIcon,
-  RotateQuarter,
   RowsIcon,
   SendBackward,
+  Shapes,
   SlidersHorizontal,
-  SquaresFour,
   SubtractShapes,
   SwapColors,
   Text,
@@ -67,7 +62,6 @@ import {
   Trash2,
   Ungroup,
   Unlock,
-  WandSparkles,
   X,
   ChevronDown,
 } from '@/components/icons';
@@ -77,13 +71,14 @@ import { clipTargets } from './clip';
 import { DIVISIONS, divisionParts } from './divisions';
 import { FontPicker, PaintButton, WidthSlider } from './draw';
 import { PartPreview } from './FlagArt';
-import { documentColors, fieldColors, layerWidth } from './model';
+import { documentColors, fieldColors, flagWidth, gridCount, gridShape, layerWidth } from './model';
+import { guideLine } from './repeats';
 import { alignScopes, type AlignScope } from './regions';
 import { defaultStroke, isLinear, naturalAspect } from './shapes';
-import { ColorPicker, Slider, Swatch, ToolButton, ToolDivider } from './ui';
-import type { Rect } from './StudioCanvas';
+import { ColorPicker, Slider, Swatch, ToolButton, ToolDivider, type Side } from './ui';
 import type { AlignEdge, ColorSlot, SelectionColor, Studio } from './use-studio';
 import { fontChoice } from './text';
+import { SvgImportError } from './import-svg';
 import { BOOLEAN_LABELS, canEditPoints, isOutline, type BooleanOp } from './vector';
 
 /** A colour swatch that opens the picker. `onChange` is live; the popover closing commits. */
@@ -101,7 +96,7 @@ export function ColorButton({
   studio: Studio;
   onChange: (color: string, transient: boolean) => void;
   size?: number;
-  side?: 'top' | 'bottom' | 'left' | 'right';
+  side?: Side;
   label: string;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -133,7 +128,7 @@ export function ColorButton({
 
 const MAX_SWATCHES = 5;
 
-export function LayerSwatches({ studio, layer, size, side }: { studio: Studio; layer: StudioLayer; size?: number; side?: 'top' | 'bottom' }) {
+export function LayerSwatches({ studio, layer, size, side }: { studio: Studio; layer: StudioLayer; size?: number; side?: Side }) {
   const shown = layer.colors.slice(0, MAX_SWATCHES);
   return (
     <>
@@ -153,7 +148,7 @@ export function LayerSwatches({ studio, layer, size, side }: { studio: Studio; l
 }
 
 /** The colours across everything selected; changing one repaints it wherever the selection uses it. */
-export function SelectionSwatches({ studio, size, side }: { studio: Studio; size?: number; side?: 'top' | 'bottom' }) {
+export function SelectionSwatches({ studio, size, side }: { studio: Studio; size?: number; side?: Side }) {
   return (
     <>
       {studio.selectionColors.slice(0, MAX_SWATCHES).map((entry, i) => (
@@ -174,7 +169,7 @@ function SelectionSwatch({
   entry: SelectionColor;
   label: string;
   size?: number;
-  side?: 'top' | 'bottom';
+  side?: Side;
 }) {
   // The slots it was in when the picker opened, kept while it's open.
   const held = React.useRef<ColorSlot[] | null>(null);
@@ -192,7 +187,7 @@ function SelectionSwatch({
 }
 
 /** The selected division's colours, or every colour the field shows. */
-export function FieldSwatches({ studio, size, side }: { studio: Studio; size?: number; side?: 'top' | 'bottom' }) {
+export function FieldSwatches({ studio, size, side }: { studio: Studio; size?: number; side?: Side }) {
   const division = studio.selectedDivision;
   if (division) {
     const shown = division.colors.slice(0, DIVISIONS[division.kind].cycles ? divisionParts(division) : 1);
@@ -248,6 +243,7 @@ const REPEAT_MODES: { mode: StudioRepeat['mode'] | null; label: string; icon: Re
   { mode: 'grid', label: 'Grid', icon: <GridIcon /> },
   { mode: 'ring', label: 'Ring', icon: <RingIcon /> },
   { mode: 'arc', label: 'Arc', icon: <ArcIcon /> },
+  { mode: 'path', label: 'Along a path', icon: <PathIcon /> },
 ];
 
 /** The repeat the toolbar edits: the whole group's when one is selected, else the one layer's. */
@@ -256,11 +252,23 @@ export function selectionRepeat(studio: Studio): { repeat: StudioRepeat | null }
   return studio.selectedLayers.length === 1 ? { repeat: studio.selectedLayers[0].repeat ?? null } : null;
 }
 
-export function RepeatControls({ studio }: { studio: Studio }) {
+export function RepeatControls({ studio, className = 'w-[264px]' }: { studio: Studio; className?: string }) {
   const repeat = selectionRepeat(studio)?.repeat ?? null;
-  const radial = repeat && (repeat.mode === 'ring' || repeat.mode === 'arc');
+  const { setRepeat } = studio.actions;
+  const live = (patch: Partial<StudioRepeat>) => setRepeat(patch, { transient: true });
+  const slider = (label: string, value: number, min: number, max: number, step: number, set: (v: number) => void, shown?: React.ReactNode) => (
+    <Field label={label} value={shown}>
+      <Slider label={label} min={min} max={max} step={step} value={value} onChange={set} onCommit={studio.history.commit} />
+    </Field>
+  );
+  const toggle = (label: string, checked: boolean, set: (on: boolean) => void) => (
+    <label className='flex items-center justify-between text-[12.5px] text-subtle'>
+      {label}
+      <Switch checked={checked} onCheckedChange={set} />
+    </label>
+  );
   return (
-    <div className='flex w-[248px] flex-col gap-3.5'>
+    <div className={cn('flex flex-col gap-3.5', className)}>
       <div className='vx-well flex gap-0.5 rounded-[11px] p-[3px]'>
         {REPEAT_MODES.map(({ mode, label, icon }) => (
           <ToolButton
@@ -274,39 +282,105 @@ export function RepeatControls({ studio }: { studio: Studio }) {
           </ToolButton>
         ))}
       </div>
-      {repeat && (
+      {(repeat?.mode === 'row' || repeat?.mode === 'column') && (
         <>
-          <Field label='Copies' value={repeat.count}>
-            <Slider
-              label='Copies'
-              min={2}
-              max={repeat.mode === 'grid' ? 36 : 24}
-              step={1}
-              value={repeat.count}
-              onChange={(count) => studio.actions.setRepeat({ count }, { transient: true })}
-              onCommit={studio.history.commit}
-            />
-          </Field>
-          <Field label={radial ? 'Radius' : 'Spacing'}>
-            <Slider
-              label={radial ? 'Radius' : 'Spacing'}
-              min={radial ? 0.04 : -0.4}
-              max={radial ? 0.7 : 2}
-              step={0.005}
-              value={repeat.spacing}
-              onChange={(spacing) => studio.actions.setRepeat({ spacing }, { transient: true })}
-              onCommit={studio.history.commit}
-            />
-          </Field>
-          {radial && (
-            <label className='flex items-center justify-between text-[12.5px] text-subtle'>
-              Turn with the circle
-              <Switch checked={repeat.facing} onCheckedChange={(facing) => studio.actions.setRepeat({ facing })} />
-            </label>
-          )}
+          {slider('Copies', repeat.count, 2, 24, 1, (count) => live({ count }), repeat.count)}
+          {slider('Spacing', repeat.spacing, -0.4, 2, 0.005, (spacing) => live({ spacing }))}
         </>
       )}
+      {repeat?.mode === 'grid' && <GridControls repeat={repeat} slider={slider} toggle={toggle} live={live} set={setRepeat} />}
+      {(repeat?.mode === 'ring' || repeat?.mode === 'arc') && <RingControls repeat={repeat} slider={slider} toggle={toggle} live={live} set={setRepeat} />}
+      {repeat?.mode === 'path' && <AlongControls studio={studio} repeat={repeat} slider={slider} toggle={toggle} live={live} />}
     </div>
+  );
+}
+
+type RepeatParts = {
+  repeat: StudioRepeat;
+  slider: (label: string, value: number, min: number, max: number, step: number, set: (v: number) => void, shown?: React.ReactNode) => React.ReactNode;
+  toggle: (label: string, checked: boolean, set: (on: boolean) => void) => React.ReactNode;
+  live: (patch: Partial<StudioRepeat>) => void;
+  set?: (patch: Partial<StudioRepeat>) => void;
+};
+
+/** Columns × rows, how far apart, and staggered rows like the US's 50 stars. */
+function GridControls({ repeat, slider, toggle, live, set }: RepeatParts) {
+  const { columns, rows } = gridShape(repeat);
+  return (
+    <>
+      <div className='grid grid-cols-2 gap-3'>
+        {slider('Columns', columns, 1, 20, 1, (c) => live({ columns: c, rows }), columns)}
+        {slider('Rows', rows, 1, 20, 1, (r) => live({ columns, rows: r }), rows)}
+      </div>
+      <div className='grid grid-cols-2 gap-3'>
+        {slider('Across', repeat.spacing, -0.4, 2, 0.005, (spacing) => live({ spacing }))}
+        {slider('Down', repeat.spacingY ?? repeat.spacing, -0.6, 2, 0.005, (spacingY) => live({ spacingY }))}
+      </div>
+      {toggle(`Stagger rows · ${repeat.columns ? repeat.count : gridCount(columns, rows, repeat.stagger)} copies`, Boolean(repeat.stagger), (stagger) =>
+        set!({ stagger, columns, rows }),
+      )}
+    </>
+  );
+}
+
+/** Copies on a ring or arc, how many rings share its centre, and which way it's turned. */
+function RingControls({ repeat, slider, toggle, live, set }: RepeatParts) {
+  const rings = repeat.rings ?? 1;
+  const gap = repeat.ringGap ?? Math.max(0.05, Math.min(0.3, repeat.spacing * 0.6));
+  return (
+    <>
+      <div className='grid grid-cols-2 gap-3'>
+        {slider(rings > 1 ? 'Inner copies' : 'Copies', repeat.count, 2, 24, 1, (count) => live({ count }), repeat.count)}
+        {slider('Radius', repeat.spacing, 0.02, 0.7, 0.005, (spacing) => live({ spacing }))}
+      </div>
+      <div className='grid grid-cols-2 gap-3'>
+        {slider('Rings', rings, 1, 6, 1, (r) => live({ rings: r, ringGap: gap }), rings)}
+        {rings > 1 && slider('Ring gap', gap, 0.01, 0.5, 0.005, (ringGap) => live({ ringGap }))}
+      </div>
+      <div className='grid grid-cols-2 gap-3'>
+        {slider('Turn', repeat.angle ?? 0, -180, 180, 1, (angle) => live({ angle: Math.abs(angle) < 3 ? 0 : angle }), `${Math.round(repeat.angle ?? 0)}°`)}
+        {repeat.mode === 'arc' && slider('Spread', repeat.spread ?? 150, 20, 360, 1, (spread) => live({ spread }), `${Math.round(repeat.spread ?? 150)}°`)}
+      </div>
+      {rings > 1 && toggle('More copies on outer rings', Boolean(repeat.even), (even) => set!({ even }))}
+      {rings > 1 && repeat.mode === 'ring' && toggle('Stagger rings', Boolean(repeat.stagger), (stagger) => set!({ stagger }))}
+      {toggle('Turn with the circle', repeat.facing, (facing) => set!({ facing }))}
+    </>
+  );
+}
+
+/** Which line the copies follow, how many, and where they start along it. */
+function AlongControls({ studio, repeat, slider, toggle, live }: RepeatParts & { studio: Studio }) {
+  const guides = studio.pathGuides;
+  const guide = studio.design.layers.find((l) => l.id === repeat.along);
+  const line = guide && guideLine(guide, flagWidth(studio.design));
+  if (guides.length === 0 && !guide) {
+    return <p className='text-[12.5px] leading-snug text-subtle'>Draw a line, curve or shape first, then the copies can follow it.</p>;
+  }
+  return (
+    <>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger className='vx-well flex h-8 cursor-pointer items-center gap-2 rounded-[9px] px-2.5 text-left text-[12.5px]'>
+          <PathIcon className='size-3.5 shrink-0 text-muted-foreground' />
+          <span className='min-w-0 flex-1 truncate'>{guide ? guide.name : repeat.along ? 'Its path was deleted' : 'Pick a path to follow'}</span>
+          <ChevronDown className='size-3 shrink-0 text-muted-foreground' />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='start' className='max-h-72 w-[264px] overflow-y-auto'>
+          <DropdownMenuRadioGroup value={repeat.along ?? ''} onValueChange={studio.actions.setGuide}>
+            {[...guides].reverse().map((l) => (
+              <DropdownMenuRadioItem key={l.id} value={l.id}>
+                <span className='truncate'>{l.name}</span>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {slider('Copies', repeat.count, 1, 60, 1, (count) => live({ count }), repeat.count)}
+      {line?.closed
+        ? slider('Start', repeat.spacing, 0, 1, 0.005, (spacing) => live({ spacing }))
+        : slider('Inset from the ends', Math.min(0.45, Math.max(0, repeat.spacing)), 0, 0.45, 0.005, (spacing) => live({ spacing }))}
+      {toggle('Turn with the path', repeat.facing, (facing) => studio.actions.setRepeat({ facing }))}
+      {guide && toggle('Show the path', !guide.hidden, studio.actions.showGuide)}
+    </>
   );
 }
 
@@ -335,8 +409,11 @@ export function OutlineControls({ studio, layer }: { studio: Studio; layer: Stud
   );
 }
 
-/** Fill, stroke and the shape's own settings, for selected shapes and brush strokes. */
-export function ShapeControls({ studio, layers, side = 'top' }: { studio: Studio; layers: StudioLayer[]; side?: 'top' | 'bottom' }) {
+/**
+ * Fill, stroke and the shape's own settings, for selected shapes and brush strokes. With
+ * `inlineSettings` the settings are left to be shown elsewhere rather than in a popover.
+ */
+export function ShapeControls({ studio, layers, side = 'top', inlineSettings }: { studio: Studio; layers: StudioLayer[]; side?: Side; inlineSettings?: boolean }) {
   const { actions } = studio;
   const first = layers[0];
   const shape = first.shape!;
@@ -383,7 +460,7 @@ export function ShapeControls({ studio, layers, side = 'top' }: { studio: Studio
           />
         )}
       </PaintButton>
-      {layers.length === 1 && <ShapeSettings studio={studio} layer={first} />}
+      {layers.length === 1 && !inlineSettings && <ShapeSettings studio={studio} layer={first} />}
     </>
   );
 }
@@ -399,7 +476,7 @@ const BOOLEANS: { op: BooleanOp; hint: string; icon: React.ReactNode }[] = [
  * Editing a shape's outline: its points when one is selected, or combining several into one.
  * Brush strokes are left out.
  */
-export function PathControls({ studio, side = 'top' }: { studio: Studio; side?: 'top' | 'bottom' }) {
+export function PathControls({ studio, side = 'top' }: { studio: Studio; side?: Side }) {
   const shapes = studio.selectedLayers.filter((l) => isOutline(l) && !l.locked && !l.hidden);
   if (shapes.length === 1 && studio.selectedLayers.length === 1) {
     if (!canEditPoints(shapes[0])) return null;
@@ -430,12 +507,11 @@ const TEXT_ALIGN: { align: StudioText['align']; label: string; icon: React.React
   { align: 'right', label: 'Align right', icon: <TextAlignRight /> },
 ];
 
-/** The words, face and setting of selected text. */
-export function TextControls({ studio, layers, side = 'top' }: { studio: Studio; layers: StudioLayer[]; side?: 'top' | 'bottom' }) {
+/** The words, face and setting of selected text; with `inlineSettings` the setting is left to be shown elsewhere. */
+export function TextControls({ studio, layers, side = 'top', inlineSettings }: { studio: Studio; layers: StudioLayer[]; side?: Side; inlineSettings?: boolean }) {
   const { actions, history } = studio;
   const text = layers[0].text!;
   const font = fontChoice(text.font);
-  const live = (patch: Partial<StudioText>) => actions.setText(patch, { transient: true });
   return (
     <>
       {layers.length === 1 && <TextEditButton studio={studio} layer={layers[0]} side={side} />}
@@ -452,35 +528,46 @@ export function TextControls({ studio, layers, side = 'top' }: { studio: Studio;
       >
         <TextItalic />
       </ToolButton>
-      <ToolPopover label='Text settings' icon={<SlidersHorizontal />} iconOnly side={side} onClose={history.commit}>
-        <div className='flex w-[248px] flex-col gap-3'>
-          <div className='flex items-center gap-0.5'>
-            {TEXT_ALIGN.map((a) => (
-              <ToolButton key={a.align} label={a.label} active={text.align === a.align} onClick={() => actions.setText({ align: a.align })}>
-                {a.icon}
-              </ToolButton>
-            ))}
-          </div>
-          <Field label='Letter spacing' value={`${Math.round(text.spacing * 100)}%`}>
-            <Slider label='Letter spacing' min={-0.2} max={1} step={0.01} value={text.spacing} onChange={(spacing) => live({ spacing })} onCommit={history.commit} />
-          </Field>
-          {text.content.includes('\n') && (
-            <Field label='Line height' value={text.leading.toFixed(2)}>
-              <Slider label='Line height' min={0.6} max={3} step={0.05} value={text.leading} onChange={(leading) => live({ leading })} onCommit={history.commit} />
-            </Field>
-          )}
-          <Field label='Curve' value={`${Math.round(text.curve)}°`}>
-            <Slider label='Curve' min={-360} max={360} step={1} value={text.curve} onChange={(curve) => live({ curve })} onCommit={history.commit} />
-          </Field>
-          <span className='-mt-1 text-[12px] text-muted-foreground'>Bend it up into an arch, or down into a smile. 360° goes all the way round.</span>
-        </div>
-      </ToolPopover>
+      {!inlineSettings && (
+        <ToolPopover label='Text settings' icon={<SlidersHorizontal />} iconOnly side={side} onClose={history.commit}>
+          <TextSettings studio={studio} text={text} className='w-[248px]' />
+        </ToolPopover>
+      )}
     </>
   );
 }
 
+/** How selected text is set: alignment, spacing and curve. */
+export function TextSettings({ studio, text, className }: { studio: Studio; text: StudioText; className?: string }) {
+  const { actions, history } = studio;
+  const live = (patch: Partial<StudioText>) => actions.setText(patch, { transient: true });
+  return (
+    <div className={cn('flex flex-col gap-3', className)}>
+      <div className='flex items-center gap-0.5'>
+        {TEXT_ALIGN.map((a) => (
+          <ToolButton key={a.align} label={a.label} active={text.align === a.align} onClick={() => actions.setText({ align: a.align })}>
+            {a.icon}
+          </ToolButton>
+        ))}
+      </div>
+      <Field label='Letter spacing' value={`${Math.round(text.spacing * 100)}%`}>
+        <Slider label='Letter spacing' min={-0.2} max={1} step={0.01} value={text.spacing} onChange={(spacing) => live({ spacing })} onCommit={history.commit} />
+      </Field>
+      {text.content.includes('\n') && (
+        <Field label='Line height' value={text.leading.toFixed(2)}>
+          <Slider label='Line height' min={0.6} max={3} step={0.05} value={text.leading} onChange={(leading) => live({ leading })} onCommit={history.commit} />
+        </Field>
+      )}
+      <Field label='Curve' value={`${Math.round(text.curve)}°`}>
+        <Slider label='Curve' min={-360} max={360} step={1} value={text.curve} onChange={(curve) => live({ curve })} onCommit={history.commit} />
+      </Field>
+      <span className='-mt-1 text-[12px] text-muted-foreground'>Bend it up into an arch, or down into a smile. 360° goes all the way round.</span>
+    </div>
+  );
+}
+
 /** The words themselves, open while the text is being typed. */
-function TextEditButton({ studio, layer, side }: { studio: Studio; layer: StudioLayer; side: 'top' | 'bottom' }) {
+function TextEditButton({ studio, layer, side }: { studio: Studio; layer: StudioLayer; side: Side }) {
   const { actions } = studio;
   const open = studio.textEdit?.id === layer.id;
   // Kept here so typing runs ahead of a font still loading.
@@ -522,7 +609,7 @@ function TextEditButton({ studio, layer, side }: { studio: Studio; layer: Studio
 }
 
 /** While a path's points are being edited: what can be done, and a way out. */
-export function PointEditBar({ studio, side = 'top' }: { studio: Studio; side?: 'top' | 'bottom' }) {
+export function PointEditBar({ studio, side = 'top' }: { studio: Studio; side?: Side }) {
   const { pathEdit, actions } = studio;
   if (!pathEdit) return null;
   return (
@@ -544,11 +631,26 @@ export function PointEditBar({ studio, side = 'top' }: { studio: Studio; side?: 
   );
 }
 
+/** Whether a shape has settings of its own: points, sides, corners or weight. */
+export const hasShapeSettings = (layer: StudioLayer) => {
+  const kind = layer.shape?.kind;
+  return kind === 'star' || kind === 'polygon' || kind === 'rect' || (kind !== undefined && isLinear(kind));
+};
+
 /** Points, sides, corners or weight, for the shapes that have them. */
 function ShapeSettings({ studio, layer }: { studio: Studio; layer: StudioLayer }) {
+  if (!hasShapeSettings(layer)) return null;
+  return (
+    <ToolPopover label='Shape' icon={<SlidersHorizontal />} iconOnly>
+      <ShapeSettingsFields studio={studio} layer={layer} className='w-[220px]' />
+    </ToolPopover>
+  );
+}
+
+/** The sliders behind `ShapeSettings`, for showing them in place. */
+export function ShapeSettingsFields({ studio, layer, className }: { studio: Studio; layer: StudioLayer; className?: string }) {
   const shape = layer.shape!;
   const { kind } = shape;
-  if (kind !== 'star' && kind !== 'polygon' && kind !== 'rect' && !isLinear(kind)) return null;
   const { history } = studio;
   // A shape at its own proportions stays there as its points change; a stretched one stays stretched.
   const reshape = (patch: Partial<NonNullable<StudioLayer['shape']>>) =>
@@ -562,36 +664,34 @@ function ShapeSettings({ studio, layer }: { studio: Studio; layer: StudioLayer }
       { transient: true },
     );
   return (
-    <ToolPopover label='Shape' icon={<SlidersHorizontal />} iconOnly>
-      <div className='flex w-[220px] flex-col gap-3.5'>
-        {(kind === 'star' || kind === 'polygon') && (
-          <Field label={kind === 'star' ? 'Points' : 'Sides'} value={shape.points}>
-            <Slider
-              label={kind === 'star' ? 'Points' : 'Sides'}
-              min={3}
-              max={kind === 'star' ? 24 : 12}
-              step={1}
-              value={shape.points ?? (kind === 'star' ? 5 : 6)}
-              onChange={(points) => reshape({ points })}
-              onCommit={history.commit}
-            />
-          </Field>
-        )}
-        {kind === 'star' && (
-          <Field label='Thickness'>
-            <Slider label='Thickness' min={0.15} max={0.95} step={0.01} value={shape.inner ?? 0.382} onChange={(inner) => reshape({ inner })} onCommit={history.commit} />
-          </Field>
-        )}
-        {kind === 'rect' && (
-          <Field label='Corners'>
-            <Slider label='Corners' min={0} max={1} step={0.01} value={shape.corner ?? 0} onChange={(corner) => reshape({ corner })} onCommit={history.commit} />
-          </Field>
-        )}
-        {isLinear(kind) && (
-          <WidthSlider studio={studio} label='Weight' min={0.003} max={0.25} value={layer.size} onChange={(size) => studio.actions.setWeight(size, { transient: true })} />
-        )}
-      </div>
-    </ToolPopover>
+    <div className={cn('flex flex-col gap-3.5', className)}>
+      {(kind === 'star' || kind === 'polygon') && (
+        <Field label={kind === 'star' ? 'Points' : 'Sides'} value={shape.points}>
+          <Slider
+            label={kind === 'star' ? 'Points' : 'Sides'}
+            min={3}
+            max={kind === 'star' ? 24 : 12}
+            step={1}
+            value={shape.points ?? (kind === 'star' ? 5 : 6)}
+            onChange={(points) => reshape({ points })}
+            onCommit={history.commit}
+          />
+        </Field>
+      )}
+      {kind === 'star' && (
+        <Field label='Thickness'>
+          <Slider label='Thickness' min={0.15} max={0.95} step={0.01} value={shape.inner ?? 0.382} onChange={(inner) => reshape({ inner })} onCommit={history.commit} />
+        </Field>
+      )}
+      {kind === 'rect' && (
+        <Field label='Corners'>
+          <Slider label='Corners' min={0} max={1} step={0.01} value={shape.corner ?? 0} onChange={(corner) => reshape({ corner })} onCommit={history.commit} />
+        </Field>
+      )}
+      {isLinear(kind) && (
+        <WidthSlider studio={studio} label='Weight' min={0.003} max={0.25} value={layer.size} onChange={(size) => studio.actions.setWeight(size, { transient: true })} />
+      )}
+    </div>
   );
 }
 
@@ -605,14 +705,14 @@ const ALIGN: { edge: AlignEdge; label: string; icon: React.ReactNode }[] = [
 ];
 
 /** Line the selection up with itself, the part of the field it's in, or the flag. */
-export function AlignControls({ studio }: { studio: Studio }) {
+export function AlignControls({ studio, className = 'w-[248px]' }: { studio: Studio; className?: string }) {
   const layers = studio.selectedLayers.filter((l) => !l.locked && !l.hidden);
   const scopes = alignScopes(studio.design, layers);
   const [picked, setPicked] = React.useState<AlignScope['id']>(scopes[0].id);
   const scope = scopes.find((s) => s.id === picked) ?? scopes[0];
   const { actions } = studio;
   return (
-    <div className='flex w-[248px] flex-col gap-2.5'>
+    <div className={cn('flex flex-col gap-2.5', className)}>
       {scopes.length > 1 && (
         <div className='vx-well flex gap-0.5 rounded-[11px] p-[3px]'>
           {scopes.map((s) => (
@@ -690,7 +790,7 @@ function ToolPopover({
   icon: React.ReactNode;
   active?: boolean;
   iconOnly?: boolean;
-  side?: 'top' | 'bottom';
+  side?: Side;
   onClose?: () => void;
   children: React.ReactNode;
 }) {
@@ -767,7 +867,15 @@ export function ClipSubmenu({ studio }: { studio: Studio }) {
 /** Whether the selection is more than one thing that could become a group. */
 export const canGroup = (studio: Studio) => !studio.selectedGroup && studio.selectedLayers.filter((l) => !l.locked).length > 1;
 
-export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Studio; children: React.ReactNode; side?: 'top' | 'bottom' }) {
+/** Turns an emblem into its shapes, saying why when it can't. */
+export function makeShapes(studio: Studio, id: string) {
+  toast.promise(studio.actions.convertToShapes(id), {
+    loading: 'Turning it into shapes…',
+    error: (error) => (error instanceof SvgImportError ? error.message : 'Couldn’t turn it into shapes.'),
+  });
+}
+
+export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Studio; children: React.ReactNode; side?: Side }) {
   const { actions, selectedLayers } = studio;
   const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
   return (
@@ -803,6 +911,11 @@ export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Stud
             <BezierCurve /> Convert to path
           </DropdownMenuItem>
         )}
+        {single && !single.locked && studio.canMakeShapes(single) && (
+          <DropdownMenuItem onSelect={() => makeShapes(studio, single.id)}>
+            <Shapes /> Convert to shapes
+          </DropdownMenuItem>
+        )}
         {single && canEditPoints(single) && (
           <DropdownMenuItem onSelect={() => actions.useAsFlagOutline(single.id)}>
             <FlagTriangleRight /> Use as flag shape
@@ -825,200 +938,5 @@ export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Stud
         )}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/** The floating bar above whatever is selected. */
-export function ContextToolbar({
-  studio,
-  rect,
-  container,
-  onOpenLayout,
-}: {
-  studio: Studio;
-  rect: Rect;
-  container: { w: number; h: number };
-  onOpenLayout: () => void;
-}) {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const [width, setWidth] = React.useState(0);
-  React.useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    setWidth(el.offsetWidth);
-    const observer = new ResizeObserver(() => setWidth(el.offsetWidth));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  const { selectedLayers, fieldSelected, actions } = studio;
-  const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
-  const anyOutline = selectedLayers.some((l) => l.outline);
-  const allShapes = selectedLayers.length > 0 && selectedLayers.every((l) => l.shape);
-  const allText = selectedLayers.length > 0 && selectedLayers.every((l) => l.text);
-  const anyShape = selectedLayers.some((l) => l.shape);
-  const repeat = selectionRepeat(studio);
-
-  // Clear the rotate handle above the selection.
-  const lift = 58 + (selectedLayers.some((l) => !l.locked && !l.hidden) && !studio.pathEdit ? 30 : 0);
-  const above = rect.y - lift > 12;
-  const top = above ? rect.y - lift : Math.min(rect.y + rect.h + 14, container.h - 60);
-  const left = Math.min(Math.max(rect.x + rect.w / 2 - width / 2, 12), container.w - width - 12);
-
-  let content: React.ReactNode = null;
-  if (studio.pathEdit) {
-    content = <PointEditBar studio={studio} />;
-  } else if (selectedLayers.length > 0) {
-    content = (
-      <>
-        {allShapes ? (
-          <>
-            {allText && (
-              <>
-                <TextControls studio={studio} layers={selectedLayers} />
-                <ToolDivider />
-              </>
-            )}
-            <ShapeControls studio={studio} layers={selectedLayers} />
-            <PathControls studio={studio} />
-          </>
-        ) : (
-          <>
-            <div className='flex items-center gap-1.5 px-1.5'>
-              {single && !studio.selectedGroup ? <LayerSwatches studio={studio} layer={single} /> : <SelectionSwatches studio={studio} />}
-            </div>
-            <ToolButton label='Match palette' onClick={actions.matchPalette}>
-              <WandSparkles />
-              <span>Match palette</span>
-            </ToolButton>
-          </>
-        )}
-        <ToolDivider />
-        <ToolButton label='Flip' onClick={() => actions.flip('x')}>
-          <FlipHorizontal />
-        </ToolButton>
-        <ToolButton label='Rotate' onClick={() => actions.rotateBy(90)}>
-          <RotateQuarter />
-        </ToolButton>
-        <ToolPopover label='Align' icon={<AlignCentre />} iconOnly>
-          <AlignControls studio={studio} />
-        </ToolPopover>
-        <ToolDivider />
-        {repeat && (
-          <ToolPopover label='Repeat' icon={<Repeat />} active={Boolean(repeat.repeat)}>
-            <RepeatControls studio={studio} />
-          </ToolPopover>
-        )}
-        {studio.selectedGroup ? (
-          <ToolButton label='Ungroup (⇧⌘G)' onClick={actions.ungroup}>
-            <Ungroup />
-          </ToolButton>
-        ) : (
-          canGroup(studio) && (
-            <ToolButton label='Group (⌘G)' onClick={actions.group}>
-              <GroupIcon />
-              <span>Group</span>
-            </ToolButton>
-          )
-        )}
-        {/* Shapes have their own stroke. */}
-        {!anyShape && <OutlineButton studio={studio} active={anyOutline} />}
-        <ToolDivider />
-        <ToolButton label='Duplicate' onClick={() => actions.duplicateSelected()}>
-          <Copy />
-        </ToolButton>
-        <ToolButton label='Delete' onClick={actions.deleteSelected}>
-          <Trash2 />
-        </ToolButton>
-        <LayerMoreMenu studio={studio}>
-          <ToolButton label='More'>
-            <MoreHorizontal />
-          </ToolButton>
-        </LayerMoreMenu>
-      </>
-    );
-  } else if (studio.selectedDivision) {
-    const division = studio.selectedDivision;
-    content = (
-      <>
-        <div className='flex items-center gap-1.5 px-1.5'>
-          <FieldSwatches studio={studio} />
-        </div>
-        <ToolDivider />
-        <ToolButton label='Edit' onClick={onOpenLayout}>
-          <SquaresFour />
-          <span>{division.name ?? DIVISIONS[division.kind].label}</span>
-        </ToolButton>
-        <ToolDivider />
-        <ToolButton label='Duplicate' onClick={() => actions.duplicateDivision(division.id)}>
-          <Copy />
-        </ToolButton>
-        <ToolButton label='Delete' onClick={() => actions.removeDivision(division.id)}>
-          <Trash2 />
-        </ToolButton>
-      </>
-    );
-  } else if (fieldSelected) {
-    content = (
-      <>
-        <div className='flex items-center gap-1.5 px-1.5'>
-          <FieldSwatches studio={studio} />
-        </div>
-        <ToolDivider />
-        <ToolButton label='Shuffle colours' onClick={actions.cycleFieldColors}>
-          <SwapColors />
-        </ToolButton>
-        <ToolButton label='Field' onClick={onOpenLayout}>
-          <SquaresFour />
-          <span>Field</span>
-        </ToolButton>
-      </>
-    );
-  }
-  if (!content) return null;
-
-  return (
-    <div
-      ref={ref}
-      // Its menus and popovers are portaled but still bubble here through React: keep them off the canvas.
-      onPointerDown={(e) => e.stopPropagation()}
-      onPointerMove={(e) => e.stopPropagation()}
-      onPointerUp={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.stopPropagation()}
-      className='absolute z-20 flex items-center gap-0.5 rounded-[13px] bg-surface p-[5px] shadow-pop'
-      style={{ left, top, visibility: width ? 'visible' : 'hidden' }}
-    >
-      {content}
-    </div>
-  );
-}
-
-function OutlineButton({ studio, active }: { studio: Studio; active: boolean }) {
-  const single = studio.selectedLayers.length === 1 ? studio.selectedLayers[0] : null;
-  const [open, setOpen] = React.useState(false);
-  return (
-    <div className='flex items-center'>
-      <ToolButton label='Outline' active={active} onClick={studio.actions.toggleOutline} className={cn(active && single && 'rounded-r-none')}>
-        <Outline />
-        <span>Outline</span>
-      </ToolButton>
-      {active && single?.outline && (
-        <Popover open={open} onOpenChange={(next) => (setOpen(next), !next && studio.history.commit())}>
-          <PopoverTrigger asChild>
-            <button
-              type='button'
-              aria-label='Outline settings'
-              className='inline-flex h-8 cursor-pointer items-center gap-1 rounded-r-[9px] bg-main-soft pl-0.5 pr-1.5 text-main'
-            >
-              <span className='size-3.5 rounded-[4px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.2)]' style={{ background: single.outline.color }} />
-              <ChevronDown className='size-3' />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side='top' sideOffset={10} className='w-auto p-3.5' onOpenAutoFocus={(e) => e.preventDefault()}>
-            <OutlineControls studio={studio} layer={single} />
-          </PopoverContent>
-        </Popover>
-      )}
-    </div>
   );
 }

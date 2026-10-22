@@ -13,6 +13,7 @@ export const getStudioEmblems = unstable_cache(
       .select({
         id: flagEmblems.id,
         image: flagEmblems.image,
+        svg: flagEmblems.svg,
         width: flagEmblems.width,
         height: flagEmblems.height,
         colors: flagEmblems.colors,
@@ -47,10 +48,11 @@ export const getStudioEmblems = unstable_cache(
         aspect: row.width / row.height,
         colors: row.colors,
         copies: row.copies,
+        ...(row.svg && { vector: true }),
       }))
       .sort((a, b) => b.rank - a.rank || b.copies - a.copies || a.name.localeCompare(b.name));
   },
-  ['studio-emblems-v2'],
+  ['studio-emblems-v3'],
   { revalidate: 60 * 60, tags: ['studio-emblems'] },
 );
 
@@ -73,6 +75,7 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
       .select({
         id: flagEmblems.id,
         image: flagEmblems.image,
+        svg: flagEmblems.svg,
         width: flagEmblems.width,
         height: flagEmblems.height,
         colors: flagEmblems.colors,
@@ -117,6 +120,7 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
             aspect: emblem.width / emblem.height,
             colors: emblem.colors,
             copies: emblem.copies,
+            ...(emblem.svg && { vector: true }),
           },
           box: placement.box,
           copies: placement.copies,

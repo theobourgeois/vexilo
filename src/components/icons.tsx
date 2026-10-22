@@ -143,6 +143,7 @@ export const ColumnsIcon = bold(Ph.Columns, 'ColumnsIcon');
 export const GridIcon = bold(Ph.DotsNine, 'GridIcon');
 export const RingIcon = bold(Ph.CirclesFour, 'RingIcon');
 export const ArcIcon = bold(Ph.CircleHalf, 'ArcIcon');
+export const PathIcon = bold(Ph.Path, 'PathIcon');
 export const Eyedropper = bold(Ph.Eyedropper, 'Eyedropper');
 export const BringForward = bold(Ph.ArrowLineUp, 'BringForward');
 export const SendBackward = bold(Ph.ArrowLineDown, 'SendBackward');

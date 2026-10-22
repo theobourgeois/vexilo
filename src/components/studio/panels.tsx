@@ -27,6 +27,7 @@ import {
   SquaresFour,
   Trash2,
   Ungroup,
+  Shapes,
   Unlock,
   Upload,
   X,
@@ -51,13 +52,13 @@ import { FlagArt, PartPreview } from './FlagArt';
 import { layerImage } from './cutout';
 import { DIVISION_KINDS, DIVISIONS, divisionLabel, divisionParams, divisionParts } from './divisions';
 import { divisionFor, LAYOUT_TEMPLATES, PART_TEMPLATES, sameShape, templateField, type FieldTemplate, type StackField } from './field';
-import { membersBox, membersOf, stackUnits } from './groups';
+import { groupPlacements, membersBox, membersOf, stackUnits } from './groups';
 import { useRecolored } from './images';
 import { documentColors, flagWidth, layerColors, layerWidth, type StudioEmblem } from './model';
 import { newOutline, OUTLINE_KINDS, outlineD, outlineParams, OUTLINES } from './outline';
 import { shapePath } from './shapes';
 import { EMBLEM_MIME } from './StudioCanvas';
-import { canGroup, ClipChoiceArt, ClipSubmenu, ColorButton } from './tools';
+import { canGroup, ClipChoiceArt, ClipSubmenu, ColorButton, makeShapes } from './tools';
 import { ColorPicker, Slider, Swatch } from './ui';
 import { FIELD, type Studio } from './use-studio';
 
@@ -599,7 +600,7 @@ const Setting = ({ label, value, children }: { label: string; value?: string; ch
   </div>
 );
 
-function DivisionSettings({ studio, division }: { studio: Studio; division: StudioDivision }) {
+export function DivisionSettings({ studio, division }: { studio: Studio; division: StudioDivision }) {
   const { actions, history } = studio;
   const def = DIVISIONS[division.kind];
   const params = divisionParams(division);
@@ -998,6 +999,7 @@ export function LayersPanel({ studio, onOpenField }: { studio: Studio; onOpenFie
   const [renaming, setRenaming] = React.useState<string | null>(null);
   const naming = (id: string) => ({ editing: renaming === id, setEditing: (on: boolean) => setRenaming(on ? id : null) });
   const [menu, setMenu] = React.useState<RowMenuAt | null>(null);
+  const copies = (groupId: string) => groupPlacements(design, groupId, flagWidth(design)).length;
 
   // Top-down: each group's row, then its layers when it's open.
   const rows: LayerRow[] = [];
@@ -1122,7 +1124,7 @@ export function LayersPanel({ studio, onOpenField }: { studio: Studio; onOpenFie
                 </button>
                 <GroupThumb design={design} members={members} />
                 <LayerName name={group.name} {...naming(group.id)} onRename={(name) => actions.renameGroup(group.id, name)} />
-                {group.repeat && group.repeat.count > 1 && <span className='shrink-0 text-[11.5px] tabular-nums text-muted-foreground'>×{group.repeat.count}</span>}
+                {group.repeat && copies(group.id) > 1 && <span className='shrink-0 text-[11.5px] tabular-nums text-muted-foreground'>×{copies(group.id)}</span>}
                 <button
                   type='button'
                   aria-label={locked ? 'Unlock group' : 'Lock group'}
@@ -1302,6 +1304,11 @@ function LayerRowMenu({
             {selectedLayers.some((l) => l.group) && (
               <DropdownMenuItem onSelect={actions.ungroup}>
                 <Ungroup /> Ungroup <Shortcut>⇧⌘G</Shortcut>
+              </DropdownMenuItem>
+            )}
+            {layer && !layer.locked && studio.canMakeShapes(layer) && (
+              <DropdownMenuItem onSelect={() => makeShapes(studio, layer.id)}>
+                <Shapes /> Convert to shapes
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />

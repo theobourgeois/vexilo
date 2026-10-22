@@ -16,6 +16,7 @@ import type {
   StudioText,
 } from '@/lib/studio-design';
 import { clipsBelow } from './clip';
+import { emblemShapes } from './emblem-shapes';
 import { contrastRatio, luminance, matchToPalette, sameColor } from './colors';
 import { fieldAnchors, type FieldPart } from './divisions';
 import { divisionFor, recolorStack, stackColors, swapStackColor, templateField, type FieldTemplate, type StackField } from './field';
@@ -39,7 +40,9 @@ import {
   fitSize,
   flagWidth,
   newLayer,
+  gridCount,
   REPEAT_SIZE,
+  scaleRepeat,
   replaceColor,
   uid,
   unionBox,
@@ -49,7 +52,8 @@ import {
   type StudioEmblem,
 } from './model';
 import { applyVector, invert, mapContours, removeNodes, scaling } from './paths';
-import { applyPoses, boxCentre, poseOf, rotatePoses, scalePoses } from './transform';
+import { canGuide, syncTracks } from './repeats';
+import { applyPoses, boxCentre, poseOf, rotatePoses, scalePoses, selectionFrame } from './transform';
 import { canEditPoints, combinedLayer, isOutline, combineContours, layerAffine, localContours, toPath, withContours, worldContours, type BooleanOp } from './vector';
 import { isPlainRect, newOutline, OUTLINES } from './outline';
 import { DEFAULT_TEXT, loadTextFont, newTextLayer, retypeset, textReady } from './text';
@@ -102,7 +106,18 @@ function cloneLayers(sources: StudioLayer[], groups: StudioGroup[], whole: (grou
     }
     return { ...copy, group: group.id };
   });
-  return { layers, groups: [...copied.values()] };
+  // Copies keep following a path copied with them, and stay where they are without it.
+  const ids = new Map(sources.map((l, i) => [l.id, layers[i].id]));
+  const retrack = <R extends StudioRepeat | null>(repeat: R): R => {
+    if (!repeat?.along) return repeat;
+    const along = ids.get(repeat.along);
+    const rest = { ...repeat };
+    delete rest.along;
+    return along ? { ...rest, along } : rest;
+  };
+  for (const [i, l] of layers.entries()) if (l.repeat?.along) layers[i] = { ...l, repeat: retrack(l.repeat) };
+  const copiedGroups = [...copied.values()].map((g) => (g.repeat?.along ? { ...g, repeat: retrack(g.repeat) } : g));
+  return { layers, groups: copiedGroups };
 }
 
 const withGroups = (d: StudioDesign, groups: StudioGroup[]): StudioDesign => (groups.length ? { ...d, groups: [...(d.groups ?? []), ...groups] } : d);
@@ -160,12 +175,16 @@ function scaleGroupRepeats(design: StudioDesign, groupIds: Set<string>, k: numbe
   return {
     ...design,
     groups: design.groups.map((g) =>
-      groupIds.has(g.id) && g.repeat && (g.repeat.mode === 'ring' || g.repeat.mode === 'arc') ? { ...g, repeat: { ...g.repeat, spacing: g.repeat.spacing * k } } : g,
+      groupIds.has(g.id) ? { ...g, repeat: scaleRepeat(g.repeat, k) } : g,
     ),
   };
 }
 
-export function useStudio(initial: StudioDoc) {
+/**
+ * The editor's state and what can be done to it. `vectorEmblems` are the library emblems drawn
+ * from an SVG, which can be turned into shapes.
+ */
+export function useStudio(initial: StudioDoc, vectorEmblems: ReadonlySet<string> = new Set()) {
   const history = useHistory<StudioDoc>(initial);
   const doc = history.present;
   const design = doc.design;
@@ -183,10 +202,16 @@ export function useStudio(initial: StudioDoc) {
     [selection, ids],
   );
   const selectedLayers = design.layers.filter((l) => liveSelection.includes(l.id));
+  /** Whether a layer is an emblem whose drawing can become shapes. */
+  const canMakeShapes = (layer: StudioLayer) => !layer.shape && !layer.cutout && vectorEmblems.has(layer.emblemId);
   /** The group selected whole, which then moves, recolours and repeats as one. */
   const selectedGroup = wholeGroup(design, liveSelection);
   /** The group the selection is inside, so clicks pick its layers one by one. */
   const entered = enteredGroup(design, liveSelection);
+  /** The repeat the selection edits: the whole group's when one is selected, else the one layer's. */
+  const selectionRepeat = selectedGroup ? selectedGroup.repeat : selectedLayers.length === 1 ? selectedLayers[0].repeat : null;
+  /** The layers the selection's copies could follow along: any line or shape outside it. */
+  const pathGuides = design.layers.filter((l) => canGuide(l) && !liveSelection.includes(l.id));
   const selectedDivision = divisions.find((d) => liveSelection.includes(divisionKey(d.id))) ?? null;
   /** The field or one of its divisions. */
   const fieldSelected = liveSelection.some((id) => id === FIELD || DIVISION.test(id));
@@ -220,7 +245,11 @@ export function useStudio(initial: StudioDoc) {
   }, [textEditId, textEdit, leftText, history]);
 
   const update = React.useCallback(
-    (fn: (d: StudioDesign) => StudioDesign, opts?: Opts) => history.set((d) => ({ ...d, design: tidyGroups(fn(d.design)) }), opts),
+    (fn: (d: StudioDesign) => StudioDesign, opts?: Opts) =>
+      history.set((d) => {
+        const next = tidyGroups(fn(d.design));
+        return { ...d, design: syncTracks(d.design, next, flagWidth(next)) };
+      }, opts),
     [history],
   );
 
@@ -287,6 +316,13 @@ export function useStudio(initial: StudioDoc) {
     addLayer(layer: StudioLayer, opts?: Opts & { select?: boolean }) {
       update((d) => ({ ...d, layers: [...d.layers, layer] }), opts);
       if (opts?.select !== false) setSelectionState([layer.id]);
+    },
+
+    /** Adds imported layers on top, with any groups they're in, and selects them. */
+    addLayers(layers: StudioLayer[], groups: StudioGroup[] = []) {
+      if (layers.length === 0) return;
+      update((d) => withGroups({ ...d, layers: [...d.layers, ...layers] }, groups));
+      setSelectionState(layers.map((l) => l.id));
     },
 
     /**
@@ -401,6 +437,21 @@ export function useStudio(initial: StudioDoc) {
       if (!pathEdit) return;
       const contours = pathEdit.layer.shape!.contours ?? [];
       setPathEdit({ id: pathEdit.id, nodes: contours.flatMap((c, ci) => c.nodes.map((_, ni) => `${ci}:${ni}`)) });
+    },
+
+    /**
+     * Swaps an emblem drawn from an SVG for its shapes, as path layers in its place, selected.
+     * Throws an SvgImportError, saying why, when it can't.
+     */
+    async convertToShapes(id: string) {
+      const layer = design.layers.find((l) => l.id === id);
+      if (!layer || layer.locked || !canMakeShapes(layer)) return;
+      const { layers, groups } = await emblemShapes(layer, design, W);
+      update((d) => {
+        const at = d.layers.findIndex((l) => l.id === id);
+        return at < 0 ? d : withGroups({ ...d, layers: [...d.layers.slice(0, at), ...layers, ...d.layers.slice(at + 1)] }, groups);
+      });
+      setSelectionState(layers.map((l) => l.id));
     },
 
     /** The selected shapes as paths, so their points can be moved. */
@@ -578,7 +629,7 @@ export function useStudio(initial: StudioDoc) {
           return u.layers.map((l) => ({
             ...poseOf(l),
             size: clamp(l.size * factor, 0.015, 3),
-            repeat: l.repeat && (l.repeat.mode === 'ring' || l.repeat.mode === 'arc') ? { ...l.repeat, spacing: l.repeat.spacing * factor } : l.repeat,
+            repeat: scaleRepeat(l.repeat, factor),
             ...(l.shape && { shape: { ...l.shape, stroke: l.shape.stroke * factor } }),
           }));
         }
@@ -662,6 +713,28 @@ export function useStudio(initial: StudioDoc) {
       update((d) => scaleGroupRepeats({ ...d, layers: applyPoses(d.layers, poses) }, groups, k));
     },
 
+    /**
+     * Moves, sizes or turns the selection to exact numbers on its frame: left and top edges,
+     * width and height (flag units, the top left staying put), and turn about its middle.
+     */
+    setFrame(next: Partial<{ x: number; y: number; w: number; h: number; rotation: number }>, opts?: Opts) {
+      const layers = design.layers.filter((l) => editable.includes(l.id) && !l.hidden);
+      const frame = selectionFrame(design, layers, W);
+      if (!frame) return;
+      let poses = layers.map(poseOf);
+      const fx = next.w !== undefined ? Math.max(next.w, 0.005) / frame.w : 1;
+      const fy = next.h !== undefined ? Math.max(next.h, 0.005) / frame.h : 1;
+      if (fx !== 1 || fy !== 1) poses = scalePoses(poses, frame, [-frame.w / 2, -frame.h / 2], fx, fy, W);
+      if (next.rotation !== undefined && next.rotation !== frame.rotation) {
+        poses = rotatePoses(poses, [frame.cx, frame.cy], next.rotation - frame.rotation, W);
+      }
+      const dx = next.x !== undefined ? next.x - (frame.cx - frame.w / 2) : 0;
+      const dy = next.y !== undefined ? next.y - (frame.cy - frame.h / 2) : 0;
+      if (dx || dy) poses = poses.map((p) => ({ ...p, x: p.x + dx / W, y: p.y + dy }));
+      const groups = new Set(selectionUnits(design, layers).flatMap((u) => (u.group ? [u.group] : [])));
+      update((d) => scaleGroupRepeats({ ...d, layers: applyPoses(d.layers, poses) }, groups, Math.sqrt(fx * fy)), opts);
+    },
+
     /** Puts stretched emblems back in their own proportions, keeping their height. */
     unstretch: () =>
       updateLayers(editable, (l) => {
@@ -703,26 +776,58 @@ export function useStudio(initial: StudioDoc) {
       updateLayers(editable, (l) => ({ ...l, clip: on ? { kind: 'below' } : null }));
     },
 
-    /** Repeats the selected layers, or the group selected whole. */
+    /** Repeats the selected layers, or the group selected whole. Along a path, they follow the newest line or shape, hidden. */
     setRepeatMode(mode: StudioRepeat['mode'] | null) {
+      const along = mode === 'path' ? pathGuides.at(-1)?.id : undefined;
+      const withGuide = (repeat: StudioRepeat): StudioRepeat => (along ? { ...repeat, along } : repeat);
+      const hideGuide = (d: StudioDesign) => (along ? { ...d, layers: d.layers.map((l) => (l.id === along ? { ...l, hidden: true } : l)) } : d);
       if (selectedGroup) {
         const box = membersBox(membersOf(design.layers, selectedGroup.id), W);
-        if (!box) return;
-        return updateGroup(selectedGroup.id, (g) => {
-          if (mode === null) return { ...g, repeat: null };
-          return g.repeat?.mode === mode ? g : { ...g, repeat: defaultGroupRepeat(mode, box, g.repeat?.facing) };
-        });
+        if (!box || selectedGroup.repeat?.mode === mode) return;
+        const repeat = mode && withGuide(defaultGroupRepeat(mode, box, selectedGroup.repeat?.facing));
+        return update((d) => hideGuide({ ...d, groups: d.groups?.map((g) => (g.id === selectedGroup.id ? { ...g, repeat } : g)) }));
       }
-      updateLayers(editable, (l) => {
-        if (mode === null) return { ...l, repeat: null };
-        if (l.repeat?.mode === mode) return l;
-        // A new pattern starts from its own defaults, with the emblem shrunk to suit it.
-        return { ...l, size: Math.min(l.size, REPEAT_SIZE[mode]), repeat: { ...defaultRepeat(mode, l), facing: l.repeat?.facing ?? false } };
-      });
+      const targets = editable.filter((id) => design.layers.find((l) => l.id === id)?.repeat?.mode !== mode || mode === null);
+      if (targets.length === 0) return;
+      update((d) =>
+        hideGuide({
+          ...d,
+          layers: d.layers.map((l) => {
+            if (!targets.includes(l.id)) return l;
+            if (mode === null) return { ...l, repeat: null };
+            // A new pattern starts from its own defaults, with the emblem shrunk to suit it.
+            return { ...l, size: Math.min(l.size, REPEAT_SIZE[mode]), repeat: withGuide({ ...defaultRepeat(mode, l), facing: l.repeat?.facing ?? false }) };
+          }),
+        }),
+      );
     },
     setRepeat(patch: Partial<StudioRepeat>, opts?: Opts) {
-      if (selectedGroup) return updateGroup(selectedGroup.id, (g) => (g.repeat ? { ...g, repeat: { ...g.repeat, ...patch } } : g), opts);
-      updateLayers(editable, (l) => (l.repeat ? { ...l, repeat: { ...l.repeat, ...patch } } : l), opts);
+      // A grid set by columns and rows has as many copies as fit them.
+      const apply = (r: StudioRepeat): StudioRepeat => {
+        const next = { ...r, ...patch };
+        return next.mode === 'grid' && next.columns && next.rows ? { ...next, count: gridCount(next.columns, next.rows, next.stagger) } : next;
+      };
+      if (selectedGroup) return updateGroup(selectedGroup.id, (g) => (g.repeat ? { ...g, repeat: apply(g.repeat) } : g), opts);
+      updateLayers(editable, (l) => (l.repeat ? { ...l, repeat: apply(l.repeat) } : l), opts);
+    },
+    /** Has the selection's copies follow another layer, hidden, showing the one they followed before. */
+    setGuide(id: string) {
+      const before = selectionRepeat?.along;
+      const retarget = (r: StudioRepeat | null) => (r?.mode === 'path' ? { ...r, along: id } : r);
+      update((d) => ({
+        ...d,
+        groups: selectedGroup ? d.groups?.map((g) => (g.id === selectedGroup.id ? { ...g, repeat: retarget(g.repeat) } : g)) : d.groups,
+        layers: d.layers.map((l) => {
+          const layer = !selectedGroup && editable.includes(l.id) ? { ...l, repeat: retarget(l.repeat) } : l;
+          if (l.id === id) return { ...layer, hidden: true };
+          return l.id === before && before !== id ? { ...layer, hidden: false } : layer;
+        }),
+      }));
+    },
+    /** Shows or hides the path the selection's copies follow. */
+    showGuide(shown: boolean) {
+      const along = selectionRepeat?.along;
+      if (along) updateLayers([along], (l) => ({ ...l, hidden: !shown }));
     },
 
     setLayerColor: (id: string, index: number, color: string, opts?: Opts) =>
@@ -973,6 +1078,8 @@ export function useStudio(initial: StudioDoc) {
     selection: liveSelection,
     selectedLayers,
     selectedGroup,
+    canMakeShapes,
+    pathGuides,
     entered,
     selectionColors,
     pathEdit,

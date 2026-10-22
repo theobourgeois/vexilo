@@ -64,9 +64,9 @@ export const BOOLEAN_LABELS: Record<BooleanOp, string> = {
 };
 
 // Paper.js does the curve maths; it loads the first time shapes are combined.
-type Paper = typeof import('paper/dist/paper-core');
+export type Paper = typeof import('paper/dist/paper-core');
 let paperScope: Promise<Paper> | null = null;
-function loadPaper() {
+export function loadPaper() {
   paperScope ??= import('paper/dist/paper-core').then((m) => {
     const paper = (m as unknown as { default?: Paper }).default ?? m;
     paper.setup(new paper.Size(1, 1));

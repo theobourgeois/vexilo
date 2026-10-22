@@ -48,6 +48,7 @@ import {
   ClipMask,
   ClippedBelow,
   FlagTriangleRight,
+  Shapes,
 } from '@/components/icons';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Segmented } from '@/components/ui/segmented';
@@ -59,7 +60,7 @@ import { clipsBelow, clipTargets, samePart } from './clip';
 import { fieldPartAt } from './divisions';
 import { EXPORT_WIDTH, flagWidth, RATIOS, type StudioDoc } from './model';
 import type { View } from './StudioCanvas';
-import { canGroup } from './tools';
+import { canGroup, makeShapes } from './tools';
 import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
 import { canEditPoints } from './vector';
@@ -526,6 +527,7 @@ export function ContextMenu({
               {!clipsBelow(single) &&
                 item('Clip to layer below', <ClippedBelow />, actions.toggleClipBelow, studio.design.layers[0]?.id === single.id)}
               {clip && item('Release clip', <ClipMask />, () => actions.setClip(null))}
+              {studio.canMakeShapes(single) && item('Convert to shapes', <Shapes />, () => makeShapes(studio, single.id))}
               {canEditPoints(single) && item('Use as flag shape', <FlagTriangleRight />, () => actions.useAsFlagOutline(single.id))}
             </>
           )}

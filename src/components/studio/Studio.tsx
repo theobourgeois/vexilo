@@ -38,7 +38,11 @@ function useIsMobile() {
 }
 
 export default function Studio({ emblems, remix }: { emblems: StudioEmblem[]; remix: RemixSource | null }) {
-  const studio = useStudio({ name: remix ? `${remix.name.replace(/^the /, '')} remix` : 'Untitled flag', design: newDesign() });
+  const vectorEmblems = React.useMemo(
+    () => new Set([...emblems, ...(remix?.placements.map((p) => p.emblem) ?? [])].filter((e) => e.vector).map((e) => e.id)),
+    [emblems, remix],
+  );
+  const studio = useStudio({ name: remix ? `${remix.name.replace(/^the /, '')} remix` : 'Untitled flag', design: newDesign() }, vectorEmblems);
   const [ready, setReady] = React.useState(false);
   const mobile = useIsMobile();
   const key = draftKey(remix?.id ?? null);

@@ -90,12 +90,36 @@ export type StudioField =
   | StudioImageField;
 
 export type StudioRepeat = {
-  mode: 'row' | 'column' | 'ring' | 'arc' | 'grid';
+  mode: 'row' | 'column' | 'ring' | 'arc' | 'grid' | 'path';
+  /** How many copies: all of them in a grid, those on the innermost ring of rings and arcs. */
   count: number;
-  /** Gap between copies (row, column, grid) as a fraction of the copy's size, or the radius (ring, arc) as a fraction of flag height. */
+  /**
+   * Gap between copies (row, column, grid) as a fraction of the copy's size, the radius (ring,
+   * arc) as a fraction of flag height, or where along the path the copies start (path, 0–1).
+   */
   spacing: number;
-  /** Ring and arc copies turn to face outwards. */
+  /** Ring, arc and path copies turn to face outwards, or along the path. */
   facing: boolean;
+  /** Grid: copies across and rows down. Without them it's as square as `count` allows. */
+  columns?: number;
+  rows?: number;
+  /** Grid: gap between rows, as a fraction of the copy's height; `spacing` when unset. */
+  spacingY?: number;
+  /** Grid: every other row one copy shorter, sitting in the gaps (the US's 50 stars). Ring: every other ring turned half a step. */
+  stagger?: boolean;
+  /** Ring, arc: how many rings share the centre, and how far apart they are (flag height). */
+  rings?: number;
+  ringGap?: number;
+  /** Ring, arc: outer rings get more copies, as far apart as on the innermost one. */
+  even?: boolean;
+  /** Ring, arc: degrees the pattern is turned clockwise from starting at the top. */
+  angle?: number;
+  /** Arc: degrees it spans. */
+  spread?: number;
+  /** Path: the layer the copies follow. */
+  along?: string;
+  /** Path: each copy's place from the pattern's middle (flag units) and the path's heading there (degrees), kept in step with `along`. */
+  track?: [number, number, number][];
 };
 
 /**

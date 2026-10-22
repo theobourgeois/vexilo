@@ -7,6 +7,9 @@ import { cn } from '@/lib/utils';
 import { FLAG_COLORS, normalizeHex, sameColor } from './colors';
 import { ReferencePalette } from './ReferencePalette';
 
+/** Which way a popover or tooltip opens from what it's attached to. */
+export type Side = 'top' | 'bottom' | 'left' | 'right';
+
 export function Swatch({
   color,
   active,
@@ -72,7 +75,7 @@ export function ToolButton({
   children,
   side = 'top',
   ...props
-}: { label: string; active?: boolean; side?: 'top' | 'bottom' | 'left' | 'right' } & React.ComponentProps<'button'>) {
+}: { label: string; active?: boolean; side?: Side } & React.ComponentProps<'button'>) {
   return (
     <Tooltip delayDuration={350}>
       <TooltipTrigger asChild>

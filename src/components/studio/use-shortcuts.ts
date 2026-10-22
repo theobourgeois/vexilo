@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { ToolKind } from './draw';
+import { isSvgMarkup } from './import-svg';
 import { alignScopes } from './regions';
 import { MAX_ZOOM, type View } from './StudioCanvas';
 import type { Studio } from './use-studio';
@@ -130,6 +131,9 @@ export function useShortcuts(
       if (target?.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"]')) return;
       e.preventDefault();
       const files = [...(e.clipboardData?.files ?? [])];
+      // Design tools copy shapes as SVG markup.
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      if (files.length === 0 && isSvgMarkup(text)) files.push(new File([text], 'Pasted SVG.svg', { type: 'image/svg+xml' }));
       if (files.length && options.onPasteFiles && (await options.onPasteFiles(files))) return;
       studio.actions.paste();
     };

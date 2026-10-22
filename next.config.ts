@@ -32,6 +32,10 @@ const nextConfig: NextConfig = {
     ],
   },
   reactStrictMode: false,
+  experimental: {
+    // Posting a flag sends its PNG and its design, which can carry an imported coat of arms.
+    serverActions: { bodySizeLimit: '4mb' },
+  },
 };
 
 export default nextConfig;

@@ -1,6 +1,6 @@
 import type { StudioDesign, StudioGroup, StudioLayer, StudioRepeat } from '@/lib/studio-design';
 import { layerShownAt } from './clip';
-import { hitsLayer, layerBounds, layerCopies, unionBox, type Box } from './model';
+import { hitsLayer, layerBounds, layerCopies, scaleRepeat, unionBox, type Box } from './model';
 
 /**
  * Where one copy of a group goes: points turn by `rot` degrees about the group's centre (ox, oy),
@@ -113,7 +113,7 @@ export function scaleRings(groups: StudioGroup[] | undefined, from: StudioGroup[
   if (!groups || from.length === 0) return groups;
   return groups.map((g) => {
     const start = from.find((f) => f.id === g.id)?.repeat;
-    return start ? { ...g, repeat: { ...start, spacing: start.spacing * k } } : g;
+    return start ? { ...g, repeat: scaleRepeat(start, k) } : g;
   });
 }
 
@@ -191,12 +191,17 @@ export function withWholeGroups(design: StudioDesign, ids: string[]): string[] {
 /** A repeat for a group, its spacing set so the copies sit apart. */
 export function defaultGroupRepeat(mode: StudioRepeat['mode'], box: Box, facing = false): StudioRepeat {
   const span = Math.max(box.x1 - box.x0, box.y1 - box.y0) * 1.15;
-  const count = mode === 'ring' ? 8 : mode === 'arc' ? 5 : mode === 'grid' ? 4 : 3;
+  const count = mode === 'ring' ? 8 : mode === 'arc' ? 5 : mode === 'grid' ? 4 : mode === 'path' ? 6 : 3;
   const spacing =
     mode === 'ring'
       ? Math.min(0.7, Math.max(0.15, (count * span) / (2 * Math.PI)))
       : mode === 'arc'
         ? Math.min(0.7, Math.max(0.15, (span * (count - 1)) / ((150 * Math.PI) / 180)))
-        : 0.25;
-  return { mode, count, spacing, facing };
+        : mode === 'path'
+          ? 0
+          : 0.25;
+  const repeat: StudioRepeat = { mode, count, spacing, facing };
+  if (mode === 'grid') Object.assign(repeat, { columns: 2, rows: 2 });
+  if (mode === 'ring' || mode === 'arc') repeat.even = true;
+  return repeat;
 }

@@ -173,7 +173,7 @@ export const hitsPath = (shape: StudioShape, w: number, h: number, point: Pt, re
   hitsContours(shapeContours(shape, w, h), point, { fill: shape.fill, reach: shape.stroke / 2 + reach });
 
 /** Where a brush stroke's points sit in a w × h box: inside it by half the stroke. */
-function brushPoints(path: Pt[], w: number, h: number, stroke: number): Pt[] {
+export function brushPoints(path: Pt[], w: number, h: number, stroke: number): Pt[] {
   const iw = Math.max(0, w - stroke);
   const ih = Math.max(0, h - stroke);
   return path.map(([x, y]) => [-iw / 2 + x * iw, -ih / 2 + y * ih]);

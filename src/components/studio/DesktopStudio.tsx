@@ -28,10 +28,12 @@ import { documentColors, pixelSize, type StudioEmblem } from './model';
 import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel, PanelTitle } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
-import { ContextToolbar } from './tools';
+import { Inspector } from './inspector';
 import { ColorPicker, ToolDivider } from './ui';
 import { useShortcuts, type Panel } from './use-shortcuts';
 import type { Studio } from './use-studio';
+
+const INSPECTOR = 280;
 
 const RAIL: { panel: Panel; label: string; icon: React.ReactNode }[] = [
   { panel: 'layout', label: 'Field', icon: <SquaresFour /> },
@@ -85,7 +87,9 @@ export function DesktopStudio({
 
   const drawerOpen = panel !== null;
   const left = drawerOpen ? 436 : 104;
-  const insets = { top: 132, right: 24, bottom: 92, left };
+  // The inspector's width and the gap either side of it.
+  const right = INSPECTOR + 40;
+  const insets = { top: 132, right, bottom: 92, left };
 
   const addEmblem = (emblem: StudioEmblem, at?: { x: number; y: number }) => {
     studio.actions.addEmblem(emblem, at);
@@ -113,11 +117,6 @@ export function DesktopStudio({
             const emblem = emblems.find((e) => e.id === id);
             if (emblem) addEmblem(emblem, at);
           }}
-          renderOverlay={({ selection, container, busy }) =>
-            selection && !busy && !menu ? (
-              <ContextToolbar studio={studio} rect={selection} container={container} onOpenLayout={() => setPanel('layout')} />
-            ) : null
-          }
         />
       ) : (
         <div className='absolute' style={{ left, right: insets.right, top: insets.top - 40, bottom: insets.bottom }}>
@@ -180,12 +179,12 @@ export function DesktopStudio({
         </Button>
       </header>
 
-      <ToolOptions
-        studio={studio}
-        draw={draw}
-        onChange={(patch) => setDraw((d) => ({ ...d, ...patch }))}
-        className='absolute right-5 top-[80px]'
-      />
+      {/* Centred over the canvas, clear of the drawer and inspector. */}
+      <div className='pointer-events-none absolute top-[84px] flex justify-center' style={{ left, right }}>
+        <ToolOptions studio={studio} draw={draw} onChange={(patch) => setDraw((d) => ({ ...d, ...patch }))} className='pointer-events-auto' />
+      </div>
+
+      <Inspector studio={studio} onOpenLayout={() => setPanel('layout')} className='absolute bottom-[84px] right-5 top-[84px]' style={{ width: INSPECTOR }} />
 
       {/* Glance and dock */}
       <Glance studio={studio} className='absolute bottom-5' style={{ left }} />
