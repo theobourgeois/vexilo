@@ -1,11 +1,9 @@
 import { Suspense } from 'react';
 import FlagSearch from '../components/FlagSearch';
-import { FlagMakerAlert } from '@/components/alert-banner';
 
 export default function Home() {
   return (
     <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
-      <FlagMakerAlert />
       <Suspense
         fallback={
           <div className='pt-7'>

@@ -22,6 +22,7 @@ export const ArrowLeft = bold(Ph.ArrowLeft, 'ArrowLeft');
 export const ArrowRight = bold(Ph.ArrowRight, 'ArrowRight');
 export const ArrowDown = bold(Ph.ArrowDown, 'ArrowDown');
 export const ArrowUpRight = bold(Ph.ArrowUpRight, 'ArrowUpRight');
+export const ArrowsDownUp = bold(Ph.ArrowsDownUp, 'ArrowsDownUp');
 export const Award = bold(Ph.Medal, 'Award');
 export const Medal = Award;
 export const BookOpen = bold(Ph.BookOpen, 'BookOpen');

@@ -8,6 +8,7 @@ import { ArrowRight } from '@/components/icons';
 import FlagImage from '@/components/FlagImage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { TODAY_CARD, TodayCardText } from '@/components/today-card';
 import { cn } from '@/lib/utils';
 
 const MEDAL_COLORS = ['bg-[#d99a0b]', 'bg-[#9a9fa8]', 'bg-[#c0743f]'];
@@ -52,7 +53,7 @@ function weekRange() {
   return `${monthDay(since)} – ${since.getMonth() === until.getMonth() ? day(until) : monthDay(until)}`;
 }
 
-/** This week's top three contributors beside the Browse title; hover or tap to see who they are. */
+/** This week's top three contributors in the Today row on Browse; hover or tap to see who they are. */
 export function TopContributorsLink({ className }: { className?: string }) {
   const { data: contributors } = useQuery({
     queryKey: ['topContributorsWeek'],
@@ -84,10 +85,7 @@ export function TopContributorsLink({ className }: { className?: string }) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label={`Top contributors this week: ${names}`}
-        className={cn(
-          'group flex min-w-0 items-center gap-3.5 rounded-[12px] p-1.5 pr-2.5 text-left transition-colors hover:bg-foreground/[0.05] data-[state=open]:bg-foreground/[0.05]',
-          className,
-        )}
+        className={cn(TODAY_CARD, 'cursor-pointer', className)}
         onPointerEnter={hoverOpen}
         onPointerLeave={hoverClose}
         onPointerDown={(event) => {
@@ -101,22 +99,18 @@ export function TopContributorsLink({ className }: { className?: string }) {
           pointerType.current = '';
         }}
       >
-        <span className='flex h-[52px] w-[76px] shrink-0 items-center justify-center'>
+        <span className='flex w-[62px] shrink-0 items-center justify-center'>
           {contributors.map((contributor, index) => (
             <ContributorAvatar
               key={contributor.userNumber}
               contributor={contributor}
               stacked
               covered={index < contributors.length - 1}
-              className={cn('size-[30px] shadow-[0_0_0_2.5px_var(--background)]', index > 0 && '-ml-[9px]')}
+              className={cn('size-[28px] shadow-[0_0_0_2.5px_var(--surface)]', index > 0 && '-ml-[9px]')}
             />
           ))}
         </span>
-        <span className='min-w-0 flex-1'>
-          <span className='block text-xs text-muted-foreground'>Top contributors this week</span>
-          <span className='mt-0.5 block truncate text-[15px] font-medium'>{names}</span>
-        </span>
-        <ArrowRight className='ml-1 size-4 shrink-0 text-muted-foreground transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-foreground' />
+        <TodayCardText label='Top this week' title={names} />
       </PopoverTrigger>
       <PopoverContent
         align='start'

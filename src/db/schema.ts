@@ -498,6 +498,31 @@ export const leaderboard = createTable('leaderboard', {
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 });
 
+/**
+ * One finished daily game per player (a browser, signed in or not), so a result can be compared
+ * with everyone else's that day. `score` is guesses used for Unfurl (7 when unsolved) and squares
+ * filled for Vexigrid; `picks` holds the guesses or the board, so other stats can be worked out later.
+ */
+export const gameResults = createTable(
+  'game_result',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    game: varchar('game', { length: 16 }).$type<'unfurl' | 'grid'>().notNull(),
+    date: date('date', { mode: 'string' }).notNull(),
+    player: varchar('player', { length: 64 }).notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    solved: boolean('solved').notNull(),
+    guesses: integer('guesses').notNull(),
+    score: integer('score').notNull(),
+    picks: jsonb('picks').$type<(string | null)[]>().notNull(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('game_result_player_idx').on(table.game, table.date, table.player),
+    index('game_result_user_idx').on(table.userId),
+  ],
+);
+
 export const favorites = createTable('favorite', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')
