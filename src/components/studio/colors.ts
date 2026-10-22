@@ -43,6 +43,15 @@ export function luminance(hex: string) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/** Partway from one colour to another, t from 0 to 1. */
+export function mixColors(a: string, b: string, t: number) {
+  const [ca, cb] = [hexToRgb(a), hexToRgb(b)];
+  return rgbToHex([0, 1, 2].map((i) => ca[i] + (cb[i] - ca[i]) * t) as Rgb);
+}
+
+/** Where a gradient from a colour goes by default: lighter, or darker when it's already light. */
+export const gradientEnd = (color: string) => mixColors(color, luminance(color) > 0.6 ? '#000000' : '#FFFFFF', 0.45);
+
 export function contrastRatio(a: string, b: string) {
   const [la, lb] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (la + 0.05) / (lb + 0.05);

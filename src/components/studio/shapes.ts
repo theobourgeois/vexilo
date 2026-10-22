@@ -1,5 +1,6 @@
-import type { ShapeKind, StudioLayer, StudioShape } from '@/lib/studio-design';
+import type { PathContour, ShapeKind, StudioLayer, StudioShape } from '@/lib/studio-design';
 import { uid } from './model';
+import { contoursD, fitContours, hitsContours, mapContours, parsePathD, segmentDistance, type Affine } from './paths';
 
 type Pt = [number, number];
 
@@ -46,6 +47,30 @@ function radial(count: number, inner?: number) {
     return [r * Math.cos(a), r * Math.sin(a)];
   });
   return normalize(pts);
+}
+
+/**
+ * The circle a star's or polygon's points lie on, in a w × h box centred on the origin: its
+ * centre sits off the box's when the points don't reach every side, as on a five-pointed star.
+ */
+export function radialCircle(shape: StudioShape, w: number, h: number) {
+  if (shape.kind !== 'star' && shape.kind !== 'polygon') return null;
+  const count = shape.points ?? (shape.kind === 'star' ? 5 : 6);
+  const inner = shape.kind === 'star' ? (shape.inner ?? 0.382) : undefined;
+  // As `radial` lays them out.
+  const n = inner === undefined ? count : count * 2;
+  const pts = Array.from({ length: n }, (_, i) => {
+    const r = inner === undefined || i % 2 === 0 ? 1 : inner;
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    return [r * Math.cos(a), r * Math.sin(a)];
+  });
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  // The path's box, inside the stroke.
+  const [bw, bh] = [Math.max(0, w - shape.stroke), Math.max(0, h - shape.stroke)];
+  const [sx, sy] = [bw / (x1 - x0), bh / (y1 - y0)];
+  return { cx: (-(x0 + x1) / 2) * sx, cy: (-(y0 + y1) / 2) * sy, rx: sx, ry: sy };
 }
 
 function normalize(pts: Pt[]) {
@@ -99,6 +124,7 @@ export function naturalAspect(shape: Pick<StudioShape, 'kind' | 'points' | 'inne
  */
 export function shapePath(shape: StudioShape, w: number, h: number): string {
   if (shape.kind === 'brush') return brushPath(shape.path ?? [], w, h, shape.stroke);
+  if (shape.kind === 'path') return contoursD(mapContours(shape.contours ?? [], insetBox(w, h, shape.stroke)));
   const s = shape.stroke;
   const bw = Math.max(0, w - s);
   const bh = Math.max(0, h - s);
@@ -154,8 +180,24 @@ export function shapePath(shape: StudioShape, w: number, h: number): string {
   }
 }
 
+/** Maps a path's fractions into a w × h box centred on the origin, inside its stroke. */
+const insetBox = (w: number, h: number, stroke: number): Affine => {
+  const [bw, bh] = [Math.max(0, w - stroke), Math.max(0, h - stroke)];
+  return [bw, 0, 0, bh, -bw / 2, -bh / 2];
+};
+
+/** Any shape's outline as editable contours, in its w × h box centred on the origin. */
+export function shapeContours(shape: StudioShape, w: number, h: number): PathContour[] {
+  if (shape.kind === 'path') return mapContours(shape.contours ?? [], insetBox(w, h, shape.stroke));
+  return parsePathD(shapePath(shape, w, h));
+}
+
+/** Whether a point in a path layer's own box (centred, unrotated) is on it. */
+export const hitsPath = (shape: StudioShape, w: number, h: number, point: Pt, reach: number) =>
+  hitsContours(shapeContours(shape, w, h), point, { fill: shape.fill, reach: shape.stroke / 2 + reach });
+
 /** Where a brush stroke's points sit in a w × h box: inside it by half the stroke. */
-function brushPoints(path: Pt[], w: number, h: number, stroke: number): Pt[] {
+export function brushPoints(path: Pt[], w: number, h: number, stroke: number): Pt[] {
   const iw = Math.max(0, w - stroke);
   const ih = Math.max(0, h - stroke);
   return path.map(([x, y]) => [-iw / 2 + x * iw, -ih / 2 + y * ih]);
@@ -176,13 +218,6 @@ export function smoothPath(pts: Pt[]) {
 }
 
 export const brushPath = (path: Pt[], w: number, h: number, stroke: number) => smoothPath(brushPoints(path, w, h, stroke));
-
-function segmentDistance(p: Pt, a: Pt, b: Pt) {
-  const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
-  const length = dx * dx + dy * dy;
-  const t = length ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length)) : 0;
-  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
-}
 
 /** Whether a point in a brush layer's own box (centred, unrotated) is on the stroke. */
 export function hitsBrush(shape: StudioShape, w: number, h: number, point: Pt, reach: number) {
@@ -240,6 +275,38 @@ export function newShapeLayer(preset: ShapePreset, box: ShapeBox, style: ShapeSt
   };
 }
 
+/** The stroke an open path gets, as it has nothing to fill. */
+const PATH_STROKE = 0.008;
+
+/** A path drawn with the pen, from contours in flag units. Open paths are only stroked. */
+export function newPathLayer(contours: PathContour[], style: ShapeStyle, W: number): StudioLayer {
+  const closed = contours.every((c) => c.closed);
+  const filled = closed && style.filled;
+  const stroke = filled ? style.strokeWidth : style.strokeWidth || PATH_STROKE;
+  const fit = fitContours(contours);
+  const w = Math.max(MIN_SIDE, fit.w + stroke);
+  const h = Math.max(MIN_SIDE, fit.h + stroke);
+  const colors = [style.fill, style.stroke];
+  return {
+    id: uid(),
+    emblemId: 'shape',
+    name: 'Path',
+    src: '',
+    shape: { kind: 'path', fill: filled, stroke, contours: fit.contours },
+    aspect: w / h,
+    palette: [...colors],
+    colors,
+    x: fit.cx / W,
+    y: fit.cy,
+    size: h,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+    outline: null,
+    repeat: null,
+  };
+}
+
 /** A brush stroke through points in flag units. */
 export function newBrushLayer(points: Pt[], color: string, width: number, W: number): StudioLayer {
   const xs = points.map((p) => p[0]);
@@ -272,5 +339,9 @@ export function newBrushLayer(points: Pt[], color: string, width: number, W: num
 /** The colours a shape actually shows. */
 export function shapeColors(layer: Pick<StudioLayer, 'colors' | 'shape'>) {
   const shape = layer.shape!;
-  return [...(shape.fill ? [layer.colors[0]] : []), ...(shape.stroke > 0 ? [layer.colors[1] ?? layer.colors[0]] : [])];
+  return [
+    ...(shape.fill ? [layer.colors[0]] : []),
+    ...(shape.fill && shape.gradient ? [layer.colors[2] ?? layer.colors[0]] : []),
+    ...(shape.stroke > 0 ? [layer.colors[1] ?? layer.colors[0]] : []),
+  ];
 }

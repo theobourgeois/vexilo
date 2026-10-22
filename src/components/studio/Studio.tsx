@@ -6,6 +6,7 @@ import type { StudioContest } from '@/actions/contests';
 import { Loader2 } from '@/components/icons';
 import { DesktopStudio } from './DesktopStudio';
 import { decodeDoc } from './export';
+import { migrateDesign } from './field';
 import { MobileStudio } from './MobileStudio';
 import { newDesign, type RemixSource, type StudioDoc, type StudioEmblem } from './model';
 import { buildRemixDesign } from './remix';
@@ -17,7 +18,10 @@ const draftKey = (remixId: string | null, contestSlug: string | null) =>
 function loadDraft(key: string): StudioDoc | null {
   try {
     const value = JSON.parse(localStorage.getItem(key) ?? 'null');
-    return value?.design?.version === 1 && typeof value.name === 'string' ? value : null;
+    // Drafts from before divisions are opened in the current version.
+    return (value?.design?.version === 1 || value?.design?.version === 2) && typeof value.name === 'string'
+      ? { name: value.name, design: migrateDesign(value.design) }
+      : null;
   } catch {
     return null;
   }
@@ -44,8 +48,12 @@ export default function Studio({
   remix: RemixSource | null;
   contest?: StudioContest | null;
 }) {
+  const vectorEmblems = React.useMemo(
+    () => new Set([...emblems, ...(remix?.placements.map((p) => p.emblem) ?? [])].filter((e) => e.vector).map((e) => e.id)),
+    [emblems, remix],
+  );
   const startName = contest?.entry?.title ?? (remix ? `${remix.name.replace(/^the /, '')} remix` : 'Untitled flag');
-  const studio = useStudio({ name: startName, design: newDesign() });
+  const studio = useStudio({ name: startName, design: newDesign() }, vectorEmblems);
   const [ready, setReady] = React.useState(false);
   const mobile = useIsMobile();
   const key = draftKey(remix?.id ?? null, contest?.slug ?? null);
@@ -57,7 +65,7 @@ export default function Studio({
   const getOriginal = React.useCallback(() => {
     const entry = contest?.entry?.design;
     original.current ??= (
-      entry ? Promise.resolve(entry) : remix ? buildRemixDesign(remix).catch(() => newDesign()) : Promise.resolve(newDesign())
+      entry ? Promise.resolve(migrateDesign(entry)) : remix ? buildRemixDesign(remix).catch(() => newDesign()) : Promise.resolve(newDesign())
     ).then((design) => ({
       name: startName,
       design,

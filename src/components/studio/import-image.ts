@@ -5,6 +5,7 @@ import { openSignIn } from '@/lib/sign-in';
 import { toast } from 'sonner';
 import { uploadStudioImage } from '@/actions/studio';
 import { loadImage } from './cutout';
+import { isSvgFile, MAX_LAYERS, readSvg, SvgImportError, SvgTooDetailedError } from './import-svg';
 import type { StudioEmblem } from './model';
 import type { Studio } from './use-studio';
 
@@ -110,14 +111,44 @@ function removeBackground(px: Uint8ClampedArray, w: number, h: number) {
   }
 }
 
-const nameOf = (file: File) => file.name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ').trim().slice(0, 40) || 'Image';
+const nameOf = (file: File, fallback: string) => file.name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ').trim().slice(0, 40) || fallback;
 
-/** Turns dropped, pasted or picked image files into layers. Returns whether there were any images. */
+/**
+ * Turns dropped, pasted or picked image files into layers. SVGs come in as shapes that can be
+ * recoloured and edited; other images are uploaded. Returns whether there were any images.
+ */
 export function useImageImport(studio: Studio) {
   const { data: session } = useSession();
   return async (files: Iterable<File>, at?: { x: number; y: number }) => {
-    const images = [...files].filter((file) => file.type.startsWith('image/')).slice(0, 4);
-    if (images.length === 0) return false;
+    const all = [...files].filter((file) => file.type.startsWith('image/') || isSvgFile(file)).slice(0, 4);
+    if (all.length === 0) return false;
+    // Several at once fan out a little instead of stacking.
+    const spot = (i: number) => at && { x: at.x + i * 0.04, y: at.y + i * 0.04 };
+    const images: File[] = [];
+    let used = studio.design.layers.length;
+    for (const [i, file] of all.entries()) {
+      if (!isSvgFile(file)) {
+        images.push(file);
+        continue;
+      }
+      const id = toast.loading('Adding SVG');
+      try {
+        const name = nameOf(file, 'SVG');
+        const result = await readSvg(await file.text(), { name, W: studio.W, at: spot(i), budget: MAX_LAYERS - used });
+        studio.actions.addLayers(result.layers, result.group ? [result.group] : []);
+        used += result.layers.length;
+        const left = [result.skipped.text && 'text', result.skipped.images && 'pictures'].filter(Boolean);
+        if (left.length) toast(`Added ${name} without its ${left.join(' or ')}`, { id, description: 'Only shapes can come in from an SVG.' });
+        else toast.dismiss(id);
+      } catch (error) {
+        if (error instanceof SvgTooDetailedError) {
+          // Still worth having, just not part by part.
+          toast(error.message, { id, description: 'Adding it as an image instead.' });
+          images.push(file);
+        } else toast.error(error instanceof SvgImportError ? error.message : 'Couldn’t read that SVG', { id });
+      }
+    }
+    if (images.length === 0) return true;
     if (!session?.user) {
       toast('Sign in to use your own images', { action: { label: 'Sign in', onClick: () => openSignIn() } });
       return true;
@@ -132,7 +163,7 @@ export function useImageImport(studio: Studio) {
         }
         const emblem: StudioEmblem = {
           id: 'upload',
-          name: nameOf(file),
+          name: nameOf(file, 'Image'),
           names: [],
           collection: 'upload',
           src: result.url,
@@ -140,8 +171,7 @@ export function useImageImport(studio: Studio) {
           colors: result.colors,
           copies: 1,
         };
-        // Several at once fan out a little instead of stacking.
-        studio.actions.addEmblem(emblem, at && { x: at.x + i * 0.04, y: at.y + i * 0.04 });
+        studio.actions.addEmblem(emblem, spot(i));
         toast.dismiss(id);
       } catch {
         toast.error('Couldn’t read that image', { id });

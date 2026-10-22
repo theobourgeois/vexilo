@@ -11,7 +11,7 @@ import { flagParts, flags } from '../../src/db/schema';
 import { defaultParams, LAYOUT_VARIANTS, LAYOUTS } from '../../src/components/studio/layouts';
 import { MAX_FLAG_IMAGE_BYTES } from '../../src/lib/batch-flags';
 import { CLOUD_FRONT_URL } from '../../src/lib/constant';
-import type { LayoutId, StudioDesign, StudioLayer } from '../../src/lib/studio-design';
+import type { LayoutId, StudioDesignV1, StudioLayer } from '../../src/lib/studio-design';
 import { studioDesignSchema } from '../../src/lib/studio-design-schema';
 
 /**
@@ -106,10 +106,10 @@ const fitColors = (result: Extracted, fit: Fit) =>
 
 const fitShapes = (aspect: number, fit: Fit) => LAYOUTS[fit.layout].shapes(aspect, { ...defaultParams(fit.layout), ...fit.params });
 
-function buildDesign(result: Extracted, fit: Fit | null, urls: { field: string | null; parts: string[] }): StudioDesign {
+function buildDesign(result: Extracted, fit: Fit | null, urls: { field: string | null; parts: string[] }): StudioDesignV1 {
   const aspect = result.aspect;
   const ratio: [number, number] = [1, Math.round(aspect * 1000) / 1000];
-  const field: StudioDesign['field'] = fit
+  const field: StudioDesignV1['field'] = fit
     ? {
         kind: 'layout',
         layout: fit.layout,

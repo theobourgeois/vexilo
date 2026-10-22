@@ -2,15 +2,18 @@
 
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Cursor, PaintBrush, Shapes } from '@/components/icons';
+import { ChevronDown, Cursor, PaintBrush, PenNib, Shapes, SwapColors, Text } from '@/components/icons';
+import type { TextFont } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import { documentColors, EXPORT_WIDTH } from './model';
 import { isLinear, SHAPE_PRESETS, shapePath, type ShapePreset, type ShapeStyle } from './shapes';
-import { ColorPicker, Slider, ToolButton, ToolDivider } from './ui';
+import { fontChoice, FONTS, previewFamily } from './text';
+import { ColorPicker, Slider, ToolButton, ToolDivider, type Side } from './ui';
 import type { Studio } from './use-studio';
 
-export type ToolKind = 'select' | 'shape' | 'brush';
+export type ToolKind = 'select' | 'shape' | 'brush' | 'pen' | 'text';
 
 /** The tool in hand, and how it paints. */
 export type DrawSettings = ShapeStyle & {
@@ -20,6 +23,8 @@ export type DrawSettings = ShapeStyle & {
   brushColor: string;
   /** Fraction of flag height. */
   brushSize: number;
+  font: TextFont;
+  textColor: string;
 };
 
 export const DEFAULT_DRAW: DrawSettings = {
@@ -31,11 +36,15 @@ export const DEFAULT_DRAW: DrawSettings = {
   strokeWidth: 0,
   brushColor: '#FFFFFF',
   brushSize: 0.012,
+  font: 'inter',
+  textColor: '#FFFFFF',
 };
 
 const TOOLS: { tool: ToolKind; label: string; icon: React.ReactNode }[] = [
   { tool: 'select', label: 'Select (V)', icon: <Cursor /> },
   { tool: 'shape', label: 'Shapes (U)', icon: <Shapes /> },
+  { tool: 'pen', label: 'Pen (P)', icon: <PenNib /> },
+  { tool: 'text', label: 'Text (T)', icon: <Text /> },
   { tool: 'brush', label: 'Brush (B)', icon: <PaintBrush /> },
 ];
 
@@ -61,17 +70,18 @@ export function ShapeIcon({ preset, className }: { preset: ShapePreset; classNam
   else if (kind === 'rect') [w, h] = [19, 13];
   return (
     <svg viewBox='-12 -12 24 24' aria-hidden className={cn('size-[18px]', className)}>
-      <path d={shapePath(shape, w, h)} fill='currentColor' transform={isLinear(kind) ? 'rotate(-45)' : undefined} />
+      <path d={shapePath(shape, w, h)} fill='currentColor' fillRule='evenodd' transform={isLinear(kind) ? 'rotate(-45)' : undefined} />
     </svg>
   );
 }
 
 /** A fill or stroke as a chip: solid for a fill, a ring for a stroke, struck through when off. */
-function PaintChip({ color, on, ring }: { color: string; on: boolean; ring?: boolean }) {
+/** A paint's chip: its colour, or `paint` (a CSS background, for a gradient) in its place. */
+function PaintChip({ color, paint, on, ring }: { color: string; paint?: string; on: boolean; ring?: boolean }) {
   return (
     <span
       className='relative size-[18px] shrink-0 overflow-hidden rounded-[5px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.18)]'
-      style={on ? (ring ? { boxShadow: `inset 0 0 0 4px ${color}, inset 0 0 0 5px rgb(0 0 0 / 0.18)` } : { background: color }) : undefined}
+      style={on ? (ring ? { boxShadow: `inset 0 0 0 4px ${color}, inset 0 0 0 5px rgb(0 0 0 / 0.18)` } : { background: paint ?? color }) : undefined}
     >
       {!on && <span className='absolute left-1/2 top-1/2 h-px w-[140%] -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-[#e5484d]' />}
     </span>
@@ -86,6 +96,7 @@ export function PaintButton({
   studio,
   label,
   color,
+  paint,
   on,
   ring,
   onToggle,
@@ -95,13 +106,16 @@ export function PaintButton({
 }: {
   studio: Studio;
   label: string;
+  /** The colour the picker edits. */
   color: string;
+  /** What the chip shows instead, as a CSS background. */
+  paint?: string;
   on: boolean;
   ring?: boolean;
   /** Absent when it can't be turned off. */
   onToggle?: (on: boolean) => void;
   onColor: (color: string, transient: boolean) => void;
-  side?: 'top' | 'bottom';
+  side?: Side;
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -116,7 +130,7 @@ export function PaintButton({
             open && 'bg-foreground/[0.06] text-foreground',
           )}
         >
-          <PaintChip color={color} on={on} ring={ring} />
+          <PaintChip color={color} paint={paint} on={on} ring={ring} />
           {label}
         </button>
       </PopoverTrigger>
@@ -138,6 +152,91 @@ export function PaintButton({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** A row of choices, one of them picked. */
+export function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void }) {
+  return (
+    <div role='radiogroup' aria-label={label} className='flex gap-0.5 rounded-[9px] bg-foreground/[0.05] p-0.5'>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type='button'
+          role='radio'
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            'h-7 flex-1 cursor-pointer rounded-[7px] text-[12.5px] font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+            value === o.value && 'bg-background text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.12)]',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A gradient's two ends as chips either side of it, one picked for the colour picker to edit. */
+export function GradientStops({ from, to, stop, onStop, onSwap }: { from: string; to: string; stop: 0 | 2; onStop: (stop: 0 | 2) => void; onSwap: () => void }) {
+  const chip = (index: 0 | 2, color: string, label: string) => (
+    <button
+      type='button'
+      aria-label={label}
+      aria-pressed={stop === index}
+      onClick={() => onStop(index)}
+      className={cn(
+        'size-6 shrink-0 cursor-pointer rounded-[7px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.18)] outline-none ring-offset-2 ring-offset-popover focus-visible:ring-2 focus-visible:ring-ring',
+        stop === index && 'ring-2 ring-foreground',
+      )}
+      style={{ background: color }}
+    />
+  );
+  return (
+    <div className='flex items-center gap-2'>
+      {chip(0, from, 'Start colour')}
+      <span className='h-2.5 flex-1 rounded-full shadow-[inset_0_0_0_1px_rgb(0_0_0/0.12)]' style={{ background: `linear-gradient(90deg, ${from}, ${to})` }} />
+      {chip(2, to, 'End colour')}
+      <ToolButton label='Swap colours' onClick={onSwap}>
+        <SwapColors />
+      </ToolButton>
+    </div>
+  );
+}
+
+/** A font menu, each name shown in its own face. */
+export function FontPicker({ value, onChange, side = 'bottom' }: { value: TextFont; onChange: (font: TextFont) => void; side?: Side }) {
+  const [open, setOpen] = React.useState(false);
+  const current = fontChoice(value);
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type='button'
+          aria-label='Font'
+          className={cn(
+            'inline-flex h-8 w-[132px] shrink-0 cursor-pointer items-center justify-between gap-1 rounded-[9px] px-2 text-[13px] font-medium text-subtle outline-none transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+            open && 'bg-foreground/[0.06] text-foreground',
+          )}
+        >
+          <span className='truncate'>{current.label}</span>
+          <ChevronDown className='size-3 shrink-0' />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side={side} sideOffset={10} align='start' className='w-56'>
+        <DropdownMenuRadioGroup value={value} onValueChange={(id) => onChange(id as TextFont)}>
+          {FONTS.map((f) => (
+            <DropdownMenuRadioItem key={f.id} value={f.id} className='justify-between'>
+              <span className='text-[16px]' style={{ fontFamily: open ? `${previewFamily(f.id)}, var(--font-sans)` : undefined }}>
+                {f.id === 'cairo' ? 'عربي' : f.label}
+              </span>
+              <span className='text-[12px] text-muted-foreground'>{f.id === 'cairo' ? f.label : f.hint}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -175,7 +274,23 @@ function shiftHint(preset: ShapePreset) {
   return preset.shape.kind === 'rect' ? 'Shift for a square' : 'Shift to keep its shape';
 }
 
-/** What the shape or brush tool will paint with, under the toolbar. */
+function StrokeButton({ studio, draw, onChange }: { studio: Studio; draw: DrawSettings; onChange: (patch: Partial<DrawSettings>) => void }) {
+  return (
+    <PaintButton
+      studio={studio}
+      label='Stroke'
+      ring
+      color={draw.stroke}
+      on={draw.strokeWidth > 0}
+      onToggle={(on) => onChange({ strokeWidth: on ? 0.008 : 0, ...(!on && { filled: true }) })}
+      onColor={(stroke) => onChange({ stroke, strokeWidth: draw.strokeWidth || 0.008 })}
+    >
+      {draw.strokeWidth > 0 && <WidthSlider studio={studio} value={draw.strokeWidth} onChange={(strokeWidth) => onChange({ strokeWidth })} />}
+    </PaintButton>
+  );
+}
+
+/** What the shape, pen, brush or text tool will paint with, under the toolbar. */
 export function ToolOptions({
   studio,
   draw,
@@ -194,7 +309,26 @@ export function ToolOptions({
   const linear = isLinear(preset.shape.kind);
   return (
     <div className={cn('flex h-11 items-center gap-0.5 rounded-[13px] bg-surface p-[5px] shadow-pop', className)} style={style}>
-      {draw.tool === 'shape' ? (
+      {draw.tool === 'text' ? (
+        <>
+          <FontPicker value={draw.font} onChange={(font) => onChange({ font })} />
+          <ToolDivider />
+          <PaintButton studio={studio} label='Colour' color={draw.textColor} on onColor={(textColor) => onChange({ textColor })} />
+          <span className='px-2 text-[12.5px] text-muted-foreground'>Click the flag to type</span>
+        </>
+      ) : draw.tool === 'pen' ? (
+        <>
+          <PaintButton
+            studio={studio}
+            label='Fill'
+            color={draw.fill}
+            on={draw.filled}
+            onToggle={(filled) => onChange({ filled, ...(!filled && !draw.strokeWidth && { strokeWidth: 0.008 }) })}
+            onColor={(fill) => onChange({ fill, filled: true })}
+          />
+          <StrokeButton studio={studio} draw={draw} onChange={onChange} />
+        </>
+      ) : draw.tool === 'shape' ? (
         <>
           {SHAPE_PRESETS.map((p) => (
             <ToolButton
@@ -217,19 +351,7 @@ export function ToolOptions({
             onToggle={linear ? undefined : (filled) => onChange({ filled, ...(!filled && !draw.strokeWidth && { strokeWidth: 0.008 }) })}
             onColor={(fill) => onChange({ fill, filled: true })}
           />
-          <PaintButton
-            studio={studio}
-            label='Stroke'
-            ring
-            color={draw.stroke}
-            on={draw.strokeWidth > 0}
-            onToggle={(on) => onChange({ strokeWidth: on ? 0.008 : 0, ...(!on && { filled: true }) })}
-            onColor={(stroke) => onChange({ stroke, strokeWidth: draw.strokeWidth || 0.008 })}
-          >
-            {draw.strokeWidth > 0 && (
-              <WidthSlider studio={studio} value={draw.strokeWidth} onChange={(strokeWidth) => onChange({ strokeWidth })} />
-            )}
-          </PaintButton>
+          <StrokeButton studio={studio} draw={draw} onChange={onChange} />
         </>
       ) : (
         <>

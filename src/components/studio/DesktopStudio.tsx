@@ -4,6 +4,7 @@ import React from 'react';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Download, Emblems, Layers, Palette, Send, SquaresFour, Trophy, X } from '@/components/icons';
+import type { StudioDesign } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import {
   ContestEntryDialog,
@@ -24,24 +25,27 @@ import {
   type Contest,
   type Remix,
 } from './chrome';
+import type { FieldPart } from './divisions';
 import { DEFAULT_DRAW, ToolOptions, ToolPicker, type DrawSettings, type ToolKind } from './draw';
 import { documentColors, pixelSize, type StudioEmblem } from './model';
 import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel, PanelTitle } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
-import { ContextToolbar } from './tools';
+import { Inspector } from './inspector';
 import { ColorPicker, ToolDivider } from './ui';
 import { useShortcuts, type Panel } from './use-shortcuts';
 import type { Studio } from './use-studio';
 
+const INSPECTOR = 280;
+
 const RAIL: { panel: Panel; label: string; icon: React.ReactNode }[] = [
-  { panel: 'layout', label: 'Layout', icon: <SquaresFour /> },
+  { panel: 'layout', label: 'Field', icon: <SquaresFour /> },
   { panel: 'emblems', label: 'Emblems', icon: <Emblems /> },
   { panel: 'colors', label: 'Colours', icon: <Palette /> },
   { panel: 'layers', label: 'Layers', icon: <Layers /> },
 ];
 
-type ColorTarget = { x: number; y: number; kind: 'field'; slot: number } | { x: number; y: number; kind: 'layer'; id: string };
+type ColorTarget = { x: number; y: number; kind: 'field'; part: FieldPart } | { x: number; y: number; kind: 'layer'; id: string };
 
 export function DesktopStudio({
   studio,
@@ -88,7 +92,9 @@ export function DesktopStudio({
 
   const drawerOpen = panel !== null;
   const left = drawerOpen ? 436 : 104;
-  const insets = { top: 132, right: 24, bottom: 92, left };
+  // The inspector's width and the gap either side of it.
+  const right = INSPECTOR + 40;
+  const insets = { top: 132, right, bottom: 92, left };
 
   const addEmblem = (emblem: StudioEmblem, at?: { x: number; y: number }) => {
     studio.actions.addEmblem(emblem, at);
@@ -109,18 +115,13 @@ export function DesktopStudio({
           draw={draw}
           onShapeDrawn={() => setTool('select')}
           scaleRef={scaleRef}
-          onDoubleClickField={(slot, at) => setColorTarget({ ...at, kind: 'field', slot })}
+          onDoubleClickField={(part, at) => setColorTarget({ ...at, kind: 'field', part })}
           onDoubleClickLayer={(id, at) => setColorTarget({ ...at, kind: 'layer', id })}
           onDropFiles={(files, at) => importImages(files, at)}
           onDropEmblem={(id, at) => {
             const emblem = emblems.find((e) => e.id === id);
             if (emblem) addEmblem(emblem, at);
           }}
-          renderOverlay={({ selection, container, busy }) =>
-            selection && !busy && !menu ? (
-              <ContextToolbar studio={studio} rect={selection} container={container} onOpenLayout={() => setPanel('layout')} />
-            ) : null
-          }
         />
       ) : (
         <div className='absolute' style={{ left, right: insets.right, top: insets.top - 40, bottom: insets.bottom }}>
@@ -158,7 +159,7 @@ export function DesktopStudio({
           {panel === 'emblems' && <EmblemsPanel emblems={emblems} onAdd={(emblem) => addEmblem(emblem)} onUpload={(files) => importImages(files)} />}
           {panel === 'layout' && <LayoutPanel studio={studio} />}
           {panel === 'colors' && <ColoursPanel studio={studio} />}
-          {panel === 'layers' && <LayersPanel studio={studio} />}
+          {panel === 'layers' && <LayersPanel studio={studio} onOpenField={() => setPanel('layout')} />}
         </aside>
       )}
 
@@ -184,12 +185,12 @@ export function DesktopStudio({
         </Button>
       </header>
 
-      <ToolOptions
-        studio={studio}
-        draw={draw}
-        onChange={(patch) => setDraw((d) => ({ ...d, ...patch }))}
-        className='absolute right-5 top-[80px]'
-      />
+      {/* Centred over the canvas, clear of the drawer and inspector. */}
+      <div className='pointer-events-none absolute top-[84px] flex justify-center' style={{ left, right }}>
+        <ToolOptions studio={studio} draw={draw} onChange={(patch) => setDraw((d) => ({ ...d, ...patch }))} className='pointer-events-auto' />
+      </div>
+
+      <Inspector studio={studio} onOpenLayout={() => setPanel('layout')} className='absolute bottom-[84px] right-5 top-[84px]' style={{ width: INSPECTOR }} />
 
       {/* Glance and dock */}
       <Glance studio={studio} className='absolute bottom-5' style={{ left }} />
@@ -213,7 +214,7 @@ export function DesktopStudio({
 /** The colour picker that double-clicking a stripe or emblem opens, right where you clicked. */
 function CanvasColorPicker({ studio, target, onClose }: { studio: Studio; target: ColorTarget | null; onClose: () => void }) {
   const layer = target?.kind === 'layer' ? studio.design.layers.find((l) => l.id === target.id) : null;
-  const value = target?.kind === 'field' ? studio.design.field.colors[target.slot] : layer?.colors[0];
+  const value = target?.kind === 'field' ? fieldPartColor(studio.design, target.part) : layer?.colors[0];
   if (!target || !value) return null;
   return (
     <Popover open onOpenChange={(open) => (!open && (studio.history.commit(), onClose()))}>
@@ -226,7 +227,7 @@ function CanvasColorPicker({ studio, target, onClose }: { studio: Studio; target
           documentColors={documentColors(studio.design)}
           onChange={(color) =>
             target.kind === 'field'
-              ? studio.actions.setFieldColor(target.slot, color, { transient: true })
+              ? studio.actions.setFieldPartColor(target.part, color, { transient: true })
               : studio.actions.setLayerColor(target.id, 0, color, { transient: true })
           }
           onCommit={studio.history.commit}
@@ -236,3 +237,11 @@ function CanvasColorPicker({ studio, target, onClose }: { studio: Studio; target
   );
 }
 
+/** The colour a field part shows now, which may have changed since it was picked. */
+function fieldPartColor(design: StudioDesign, part: FieldPart) {
+  const field = design.field;
+  if (field.kind !== 'stack') return undefined;
+  const division = field.divisions.find((d) => d.id === part.divisionId);
+  if (!division) return part.divisionId ? undefined : field.color;
+  return part.target === 'fimbriation' ? division.fimbriation?.color : division.colors[part.slot];
+}

@@ -1,4 +1,4 @@
-import type { StudioDesign } from '@/lib/studio-design';
+import type { StoredStudioDesign } from '@/lib/studio-design';
 
 export type RelatedFlag = {
   name: string;
@@ -20,7 +20,7 @@ export type Flag = {
   sources: string[];
   /** Set for flags made in the flag maker. */
   remixOf?: string | null;
-  design?: StudioDesign | null;
+  design?: StoredStudioDesign | null;
 };
 
 export type FlagRequestWithUser = {

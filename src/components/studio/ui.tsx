@@ -7,6 +7,9 @@ import { cn } from '@/lib/utils';
 import { FLAG_COLORS, normalizeHex, sameColor } from './colors';
 import { ReferencePalette } from './ReferencePalette';
 
+/** Which way a popover or tooltip opens from what it's attached to. */
+export type Side = 'top' | 'bottom' | 'left' | 'right';
+
 export function Swatch({
   color,
   active,
@@ -72,7 +75,7 @@ export function ToolButton({
   children,
   side = 'top',
   ...props
-}: { label: string; active?: boolean; side?: 'top' | 'bottom' | 'left' | 'right' } & React.ComponentProps<'button'>) {
+}: { label: string; active?: boolean; side?: Side } & React.ComponentProps<'button'>) {
   return (
     <Tooltip delayDuration={350}>
       <TooltipTrigger asChild>
@@ -123,7 +126,7 @@ export function ColorPicker({
   const EyeDropper = typeof window !== 'undefined' ? (window as unknown as { EyeDropper?: EyeDropperCtor }).EyeDropper : undefined;
 
   return (
-    <div className='-m-1.5 flex max-h-[min(520px,var(--radix-popover-content-available-height,70dvh))] w-[248px] flex-col gap-3 overflow-y-auto p-1.5'>
+    <div className='flex w-[248px] flex-col gap-3'>
       <div className='flex items-center gap-2'>
         <label className='relative size-9 shrink-0 cursor-pointer overflow-hidden rounded-[10px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.16)]' style={{ background: value }}>
           <input

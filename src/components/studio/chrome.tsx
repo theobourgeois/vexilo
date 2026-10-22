@@ -28,6 +28,7 @@ import {
   Fit,
   Flag,
   FlipHorizontal,
+  GroupIcon,
   GoogleLogo,
   History,
   Link as LinkIcon,
@@ -36,6 +37,7 @@ import {
   Send,
   Shuffle,
   Trash2,
+  Ungroup,
   Undo,
   WandSparkles,
   Wind,
@@ -46,17 +48,30 @@ import {
   Plus,
   Trophy,
   ArrowRight,
+  ClipMask,
+  ClippedBelow,
+  FlagTriangleRight,
+  Shapes,
+  Ruler,
 } from '@/components/icons';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Segmented } from '@/components/ui/segmented';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@/lib/studio-design';
 import { formatContestDate, STATEMENT_MAX } from '@/lib/contest';
-import { blobToDataUrl, designToPng, designToSvg, download, encodeDoc, fileName } from './export';
+import { autoUnits, construction } from './construction';
+import { ConstructionSheet, type SheetOptions } from './ConstructionSheet';
+import { blobToDataUrl, constructionToPng, constructionToSvg, designToPng, designToSvg, download, encodeDoc, fileName } from './export';
 import { FlagArt } from './FlagArt';
-import { EXPORT_WIDTH, RATIOS, type StudioDoc } from './model';
+import { clipsBelow, clipTargets, samePart } from './clip';
+import { fieldPartAt } from './divisions';
+import { EXPORT_WIDTH, flagWidth, RATIOS, type StudioDoc } from './model';
 import type { View } from './StudioCanvas';
+import { canGroup, makeShapes } from './tools';
 import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
+import { canEditPoints } from './vector';
 
 export type Remix = { id: string; name: string } | null;
 export type Contest = StudioContest | null;
@@ -180,25 +195,111 @@ export function useExport(studio: Studio) {
 
 export function ExportMenu({ studio, children, side = 'bottom' }: { studio: Studio; children: React.ReactNode; side?: 'top' | 'bottom' }) {
   const exporter = useExport(studio);
+  const [sheet, setSheet] = React.useState(false);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align='end' sideOffset={8} className='w-48'>
-        <DropdownMenuItem onSelect={exporter.png}>
-          <FileImage /> PNG
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={exporter.svg}>
-          <FileSvg /> SVG
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={exporter.copyImage}>
-          <ClipboardIcon /> Copy image
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={exporter.link}>
-          <LinkIcon /> Copy link
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+        <DropdownMenuContent side={side} align='end' sideOffset={8} className='w-52'>
+          <DropdownMenuItem onSelect={exporter.png}>
+            <FileImage /> PNG
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={exporter.svg}>
+            <FileSvg /> SVG
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setSheet(true)}>
+            <Ruler /> Construction sheet…
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={exporter.copyImage}>
+            <ClipboardIcon /> Copy image
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={exporter.link}>
+            <LinkIcon /> Copy link
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConstructionDialog studio={studio} open={sheet} onOpenChange={setSheet} />
+    </>
+  );
+}
+
+/** The flag with its construction measured out, to check against and to download. */
+function ConstructionDialog({ studio, open, onOpenChange }: { studio: Studio; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className='w-[calc(100%-2rem)] max-w-[920px] sm:max-w-[920px] max-h-[calc(100dvh-2rem)] overflow-y-auto gap-4'>
+        <ConstructionSheetPanel studio={studio} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConstructionSheetPanel({ studio }: { studio: Studio }) {
+  const { design, doc } = studio;
+  const [show, setShow] = React.useState({ field: true, emblems: true, colors: true });
+  const [unitsText, setUnitsText] = React.useState('');
+  const auto = React.useMemo(() => autoUnits(design, construction(design, show)), [design, show]);
+  const typed = Number(unitsText);
+  const units = unitsText.trim() && typed > 0 && typed <= 10000 ? typed : auto.units;
+  const options: SheetOptions = { ...show, units };
+  const name = doc.name.trim() || 'Untitled flag';
+  const save = async (kind: 'svg' | 'png') => {
+    try {
+      const blob =
+        kind === 'svg'
+          ? new Blob([(await constructionToSvg(design, name, options)).svg], { type: 'image/svg+xml' })
+          : await constructionToPng(design, name, options);
+      download(blob, `${fileName(doc.name)}-construction.${kind}`);
+    } catch {
+      toast.error('Could not export the construction sheet');
+    }
+  };
+  const toggle = (key: keyof typeof show, label: string) => (
+    <label className='flex items-center gap-2 text-[13px] text-subtle'>
+      <Switch checked={show[key]} onCheckedChange={(on) => setShow({ ...show, [key]: on })} />
+      {label}
+    </label>
+  );
+  return (
+    <>
+      <div>
+        <DialogTitle className='text-[17px]'>Construction sheet</DialogTitle>
+        <DialogDescription className='mt-1 text-[13px] text-subtle'>
+          {auto.whole && !unitsText.trim()
+            ? `Every length is a whole number of units, with ${units} units to the hoist.`
+            : `Lengths are in units, with ${units} to the hoist${auto.whole ? '' : '; some aren’t whole, so they’re given to two places'}.`}
+        </DialogDescription>
+      </div>
+      <div className='overflow-hidden rounded-[12px] border border-line bg-white'>
+        <ConstructionSheet design={design} name={name} options={options} className='mx-auto block h-auto max-h-[58dvh] w-auto max-w-full' />
+      </div>
+      <div className='flex flex-wrap items-center gap-x-5 gap-y-3'>
+        <label className='flex items-center gap-2 text-[13px] text-subtle'>
+          Hoist
+          <Input
+            inputMode='decimal'
+            aria-label='Units to the hoist'
+            value={unitsText}
+            placeholder={String(auto.units)}
+            onChange={(e) => setUnitsText(e.target.value.replace(/[^\d.]/g, ''))}
+            className='h-8 w-16 tabular-nums'
+          />
+          units
+        </label>
+        {toggle('field', 'Field')}
+        {toggle('emblems', 'Emblems')}
+        {toggle('colors', 'Colours')}
+        <div className='ml-auto flex gap-2'>
+          <Button variant='neutral' size='sm' onClick={() => save('svg')}>
+            <FileSvg /> SVG
+          </Button>
+          <Button size='sm' onClick={() => save('png')}>
+            <FileImage /> PNG
+          </Button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -411,21 +512,104 @@ export function ContestEntryDialog({
 // ───────────────────────── Dock & glance ─────────────────────────
 
 const ratioKey = (r: [number, number]) => `${r[0]}:${r[1]}`;
+const sameRatio = (a: [number, number], b: [number, number]) => Math.abs(a[1] / a[0] - b[1] / b[0]) < 1e-6;
+
+/** Ratios real flags fly at, beyond the four in the dock. */
+const MORE_RATIOS: { ratio: [number, number]; flag: string }[] = [
+  { ratio: [10, 19], flag: 'United States' },
+  { ratio: [5, 8], flag: 'Sweden' },
+  { ratio: [8, 11], flag: 'Norway' },
+  { ratio: [28, 37], flag: 'Denmark' },
+  { ratio: [13, 15], flag: 'Belgium' },
+  { ratio: [7, 10], flag: 'Brazil' },
+  { ratio: [11, 28], flag: 'Qatar' },
+  { ratio: [3, 4], flag: 'Bermuda' },
+  { ratio: [4, 7], flag: 'Ivory Coast' },
+];
 
 export function RatioControl({ studio, className }: { studio: Studio; className?: string }) {
   const current = studio.design.ratio;
-  const known = RATIOS.some((r) => r[1] / r[0] === current[1] / current[0]);
+  const known = RATIOS.find((r) => sameRatio(r, current));
+  const [open, setOpen] = React.useState(false);
   return (
-    <Segmented
-      aria-label='Ratio'
-      className={className}
-      value={known ? ratioKey(RATIOS.find((r) => r[1] / r[0] === current[1] / current[0])!) : 'custom'}
-      onChange={(value) => {
-        const ratio = RATIOS.find((r) => ratioKey(r) === value);
-        if (ratio) studio.actions.setRatio(ratio);
-      }}
-      options={RATIOS.map((r) => ({ value: ratioKey(r), label: ratioKey(r) }))}
-    />
+    <Popover open={open} onOpenChange={(next) => (setOpen(next), !next && studio.history.commit())}>
+      <PopoverAnchor asChild>
+        <div className='inline-flex'>
+          <Segmented
+            aria-label='Ratio'
+            className={className}
+            value={known ? ratioKey(known) : 'custom'}
+            onChange={(value) => {
+              const ratio = RATIOS.find((r) => ratioKey(r) === value);
+              if (ratio) studio.actions.setRatio(ratio);
+              else setOpen(true);
+            }}
+            options={[
+              ...RATIOS.map((r) => ({ value: ratioKey(r), label: ratioKey(r) })),
+              { value: 'custom', label: known ? 'Custom' : ratioKey(current) },
+            ]}
+          />
+        </div>
+      </PopoverAnchor>
+      <PopoverContent side='top' align='end' sideOffset={12} className='w-[264px] p-3'>
+        <CustomRatio studio={studio} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+const trimNumber = (n: number) => String(Math.round(n * 1000) / 1000);
+
+function CustomRatio({ studio }: { studio: Studio }) {
+  const current = studio.design.ratio;
+  const [text, setText] = React.useState(() => current.map(trimNumber) as [string, string]);
+  const edit = (i: 0 | 1, value: string) => {
+    const next: [string, string] = i === 0 ? [value, text[1]] : [text[0], value];
+    setText(next);
+    const ratio = next.map(Number) as [number, number];
+    if (ratio.every((n) => n > 0 && n <= 20)) studio.actions.setRatio(ratio, { transient: true });
+  };
+  const input = (i: 0 | 1, label: string) => (
+    <label className='flex min-w-0 flex-1 flex-col gap-1 text-[12px] text-subtle'>
+      {label}
+      <Input
+        type='number'
+        inputMode='decimal'
+        min={0.1}
+        max={20}
+        step='any'
+        value={text[i]}
+        onChange={(e) => edit(i, e.target.value)}
+        onBlur={studio.history.commit}
+        className='h-8 tabular-nums'
+      />
+    </label>
+  );
+  return (
+    <div className='flex flex-col gap-3'>
+      <div className='flex items-end gap-2'>
+        {input(0, 'Height')}
+        <span className='pb-1.5 text-subtle'>:</span>
+        {input(1, 'Width')}
+      </div>
+      <div className='grid grid-cols-3 gap-1'>
+        {MORE_RATIOS.map(({ ratio, flag }) => (
+          <button
+            key={flag}
+            type='button'
+            title={flag}
+            onClick={() => (setText(ratio.map(trimNumber) as [string, string]), studio.actions.setRatio(ratio))}
+            className={cn(
+              'flex cursor-pointer flex-col items-center rounded-[8px] px-1 py-1.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+              sameRatio(ratio, current) ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
+            )}
+          >
+            <span className='text-[13px] font-medium tabular-nums'>{ratioKey(ratio)}</span>
+            <span className='w-full truncate text-center text-[11px] text-muted-foreground'>{flag}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -522,10 +706,18 @@ export function ContextMenu({
       className='flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium outline-none hover:bg-foreground/[0.06] disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-subtle'
     >
       {icon}
-      {label}
+      <span className='min-w-0 truncate'>{label}</span>
     </button>
   );
   const hasLayers = selectedLayers.length > 0;
+  const single = selectedLayers.length === 1 && !selectedLayers[0].locked ? selectedLayers[0] : null;
+  // Offers the field part under the layer's middle, the one it most likely belongs in.
+  const under = single && fieldPartAt(studio.design, single.x * flagWidth(studio.design), single.y);
+  const partTarget =
+    single && under?.divisionId && under.target === 'fill'
+      ? clipTargets(studio.design).find((t) => samePart(t.ref, { divisionId: under.divisionId!, part: under.part }))
+      : null;
+  const clip = single?.clip;
   return (
     <div
       ref={ref}
@@ -540,9 +732,24 @@ export function ContextMenu({
           {item('Duplicate', <Plus />, () => actions.duplicateSelected())}
           {item('Match palette', <WandSparkles />, actions.matchPalette)}
           {item('Flip', <FlipHorizontal />, () => actions.flip('x'))}
+          {canGroup(studio) && item('Group', <GroupIcon />, actions.group)}
+          {selectedLayers.some((l) => l.group) && item('Ungroup', <Ungroup />, actions.ungroup)}
           <div className='my-1 h-px bg-line' />
           {item('Bring to front', <BringForward />, () => actions.arrange('front'))}
           {item('Send to back', <SendBackward />, () => actions.arrange('back'))}
+          {single && (
+            <>
+              <div className='my-1 h-px bg-line' />
+              {partTarget &&
+                !samePart(clip?.kind === 'part' ? clip : null, partTarget.ref) &&
+                item(`Clip to ${partTarget.label}`, <ClipMask />, () => actions.setClip({ kind: 'part', ...partTarget.ref }))}
+              {!clipsBelow(single) &&
+                item('Clip to layer below', <ClippedBelow />, actions.toggleClipBelow, studio.design.layers[0]?.id === single.id)}
+              {clip && item('Release clip', <ClipMask />, () => actions.setClip(null))}
+              {studio.canMakeShapes(single) && item('Convert to shapes', <Shapes />, () => makeShapes(studio, single.id))}
+              {canEditPoints(single) && item('Use as flag shape', <FlagTriangleRight />, () => actions.useAsFlagOutline(single.id))}
+            </>
+          )}
           <div className='my-1 h-px bg-line' />
           {item('Delete', <Trash2 />, actions.deleteSelected)}
         </>

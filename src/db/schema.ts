@@ -1,5 +1,5 @@
 import { Flag } from '@/lib/types';
-import type { EmblemPlacement, StudioDesign } from '@/lib/studio-design';
+import type { EmblemPlacement, StoredStudioDesign } from '@/lib/studio-design';
 import { relations, sql } from 'drizzle-orm';
 import {
   date,
@@ -258,7 +258,7 @@ export const flags = createTable(
       .default([]),
     // Flags made in the flag maker: the flag it remixed (if any) and the editable design.
     remixOf: uuid('remix_of').references((): AnyPgColumn => flags.id, { onDelete: 'set null' }),
-    design: jsonb('design').$type<StudioDesign>(),
+    design: jsonb('design').$type<StoredStudioDesign>(),
   },
   (table) => ({
     indexUnique: uniqueIndex('index_unique').on(table.index),
@@ -405,7 +405,7 @@ export const flagParts = createTable('flag_parts', {
   version: integer('version').notNull(),
   status: varchar('status', { length: 20 }).$type<'ok' | 'failed'>().notNull(),
   error: text('error'),
-  design: jsonb('design').$type<StudioDesign>(),
+  design: jsonb('design').$type<StoredStudioDesign>(),
   mismatch: real('mismatch'),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
@@ -569,7 +569,7 @@ export const contestEntries = createTable(
     title: varchar('title', { length: 120 }).notNull(),
     statement: varchar('statement', { length: 400 }).notNull().default(''),
     image: varchar('image', { length: 1000 }).notNull(),
-    design: jsonb('design').$type<StudioDesign>().notNull(),
+    design: jsonb('design').$type<StoredStudioDesign>().notNull(),
     status: varchar('status', { length: 16 }).$type<'active' | 'disqualified'>().notNull().default('active'),
     statusReason: varchar('status_reason', { length: 200 }).notNull().default(''),
     ipHash: varchar('ip_hash', { length: 64 }),

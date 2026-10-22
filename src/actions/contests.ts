@@ -9,7 +9,7 @@ import { bannedUsers, contestEntries, contests, contestVotes, users } from '@/db
 import { getServerAuthSession } from '@/lib/auth';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { contestPhase, seededShuffle, STATEMENT_MAX, type ContestPhase } from '@/lib/contest';
-import type { StudioDesign } from '@/lib/studio-design';
+import type { StoredStudioDesign, StudioDesign } from '@/lib/studio-design';
 import { studioDesignSchema } from '@/lib/studio-design-schema';
 import { deleteFileFromUrl, uploadFile } from './s3';
 
@@ -38,7 +38,7 @@ export type AnonymousEntry = { id: string; title: string; statement: string; ima
 
 export type NamedEntry = Omit<AnonymousEntry, 'mine'> & { designer: ContestDesigner; flagId: string | null };
 
-export type MyEntry = { id: string; title: string; statement: string; image: string; design: StudioDesign };
+export type MyEntry = { id: string; title: string; statement: string; image: string; design: StoredStudioDesign };
 
 export type ContestView = {
   contest: ContestSummary;
@@ -394,7 +394,7 @@ export type StudioContest = {
   title: string;
   theme: string;
   votingStartsAt: Date;
-  entry: { title: string; statement: string; design: StudioDesign } | null;
+  entry: { title: string; statement: string; design: StoredStudioDesign } | null;
 };
 
 /** The contest the flag maker is entering, with the caller's entry so they can keep editing it. */

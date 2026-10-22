@@ -1,5 +1,6 @@
-import type { StudioLayer } from '@/lib/studio-design';
-import { clamp, layerBounds, layerWidth, unionBox, type Box } from './model';
+import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
+import { layerPlacements, placedBounds } from './groups';
+import { clamp, layerCopies, layerWidth, scaleRepeat, unionBox, type Box } from './model';
 
 /** The box the transform handles sit on, in flag units: centre, size and rotation (degrees). */
 export type Frame = { cx: number; cy: number; w: number; h: number; rotation: number };
@@ -20,15 +21,16 @@ const rad = (degrees: number) => (degrees * Math.PI) / 180;
 export const normAngle = (degrees: number) => ((((degrees + 180) % 360) + 360) % 360) - 180;
 
 /**
- * One emblem turns with its own box; several (or a repeated one) share the box around them all.
+ * One emblem turns with its own box; several (or a repeated one, or one in a repeated group)
+ * share the box around them all.
  */
-export function selectionFrame(layers: StudioLayer[], W: number): Frame | null {
+export function selectionFrame(design: StudioDesign, layers: StudioLayer[], W: number): Frame | null {
   if (layers.length === 0) return null;
   const [only] = layers;
-  if (layers.length === 1 && (!only.repeat || only.repeat.count < 2)) {
+  if (layers.length === 1 && layerCopies(only, W).length === 1 && layerPlacements(design, only, W).length === 1) {
     return { cx: only.x * W, cy: only.y, w: layerWidth(only), h: only.size, rotation: only.rotation };
   }
-  const box = unionBox(layers.map((l) => layerBounds(l, W)));
+  const box = unionBox(layers.map((l) => placedBounds(design, l, W)));
   return { cx: (box.x0 + box.x1) / 2, cy: (box.y0 + box.y1) / 2, w: box.x1 - box.x0, h: box.y1 - box.y0, rotation: 0 };
 }
 
@@ -77,10 +79,7 @@ export function scalePoses(poses: LayerPose[], frame: Frame, about: [number, num
     const height = clamp(pose.size * Math.hypot(fx * s, fy * c), MIN_SIZE, 3);
     const width = Math.max(MIN_SIZE, layerWidth(pose) * Math.hypot(fx * c, fy * s));
     const stretch = width / (height * pose.aspect);
-    const repeat =
-      pose.repeat && (pose.repeat.mode === 'ring' || pose.repeat.mode === 'arc')
-        ? { ...pose.repeat, spacing: pose.repeat.spacing * Math.sqrt(fx * fy) }
-        : pose.repeat;
+    const repeat = scaleRepeat(pose.repeat, Math.sqrt(fx * fy));
     // A stroke grows with the shape, but a stretch along one side alone leaves it be.
     const shape = pose.shape?.stroke ? { ...pose.shape, stroke: pose.shape.stroke * Math.min(height / pose.size, width / layerWidth(pose)) } : pose.shape;
     return { ...pose, x: u / W, y: v, size: height, stretch: Math.abs(stretch - 1) < 1e-3 ? undefined : stretch, repeat, shape };
