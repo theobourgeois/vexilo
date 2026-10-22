@@ -90,6 +90,7 @@ const field = z.discriminatedUnion('kind', [
 
 const handle = z.tuple([z.number().min(-1000).max(1000), z.number().min(-1000).max(1000)]);
 const pathNode = z.object({ x: unit, y: unit, in: handle.optional(), out: handle.optional() });
+const contours = z.array(z.object({ nodes: z.array(pathNode).min(1).max(2000), closed: z.boolean() })).max(400);
 
 const shape = z.object({
   kind: z.enum(['rect', 'ellipse', 'triangle', 'diamond', 'star', 'polygon', 'cross', 'crescent', 'heart', 'line', 'arrow', 'brush', 'path']),
@@ -99,7 +100,7 @@ const shape = z.object({
   inner: z.number().min(0).max(1).optional(),
   corner: z.number().min(0).max(1).optional(),
   path: z.array(z.tuple([unit, unit])).max(2000).optional(),
-  contours: z.array(z.object({ nodes: z.array(pathNode).min(1).max(2000), closed: z.boolean() })).max(400).optional(),
+  contours: contours.optional(),
 });
 
 const layer = z.object({
@@ -143,11 +144,17 @@ const layer = z.object({
 });
 
 const ratio = z.tuple([z.number().positive().max(20), z.number().positive().max(20)]);
+const outline = z.object({
+  kind: z.enum(['rect', 'rounded', 'swallowtail', 'tongued', 'pennant', 'burgee', 'nepal', 'custom']),
+  params: z.record(z.string(), unit),
+  contours: contours.optional(),
+  trim: z.object({ color: hex, width: z.number().min(0).max(0.5) }).nullable().optional(),
+});
 // Room for brush strokes, which are a layer each.
 const layers = z.array(layer).max(200);
 
 /** Either version of a design; open one in the flag maker with `migrateDesign`. */
 export const studioDesignSchema: z.ZodType<StoredStudioDesign> = z.union([
-  z.object({ version: z.literal(2), ratio, field, layers }),
+  z.object({ version: z.literal(2), ratio, outline: outline.nullable().optional(), field, layers }),
   z.object({ version: z.literal(1), ratio, field: fieldV1, layers }),
 ]);

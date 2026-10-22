@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { DivisionKind, PathContour, StudioClip, StudioDesign, StudioDivision, StudioLayer, StudioOutline, StudioRepeat, StudioShape } from '@/lib/studio-design';
+import type { DivisionKind, FlagOutlineKind, PathContour, StudioClip, StudioDesign, StudioDivision, StudioLayer, StudioOutline, StudioRepeat, StudioShape } from '@/lib/studio-design';
 import { clipsBelow } from './clip';
 import { contrastRatio, luminance, matchToPalette, sameColor } from './colors';
 import { fieldAnchors, type FieldPart } from './divisions';
@@ -25,9 +25,10 @@ import {
   type StudioDoc,
   type StudioEmblem,
 } from './model';
-import { applyVector, invert, removeNodes } from './paths';
+import { applyVector, invert, mapContours, removeNodes, scaling } from './paths';
 import { applyPoses, poseOf, scalePoses } from './transform';
-import { canEditPoints, combinedLayer, combineContours, layerAffine, localContours, toPath, withContours, type BooleanOp } from './vector';
+import { canEditPoints, combinedLayer, combineContours, layerAffine, localContours, toPath, withContours, worldContours, type BooleanOp } from './vector';
+import { isPlainRect, newOutline, OUTLINES } from './outline';
 
 export const FIELD = 'field';
 
@@ -548,7 +549,34 @@ export function useStudio(initial: StudioDoc) {
       setSelectionState([FIELD]);
     },
 
-    setRatio: (ratio: [number, number]) => update((d) => ({ ...d, ratio })),
+    setRatio: (ratio: [number, number], opts?: Opts) => update((d) => ({ ...d, ratio }), opts),
+
+    /** Cuts the flag to an outline; some bring the ratio they're flown at. */
+    setFlagOutline(kind: FlagOutlineKind) {
+      update((d) => {
+        if (kind === 'rect' && !d.outline?.trim) return { ...d, outline: null };
+        return { ...d, outline: newOutline(kind, d.outline), ratio: OUTLINES[kind].ratio ?? d.ratio };
+      });
+    },
+    setFlagOutlineParam: (key: string, value: number, opts?: Opts) =>
+      update((d) => (d.outline ? { ...d, outline: { ...d.outline, params: { ...d.outline.params, [key]: value } } } : d), opts),
+    setFlagTrim: (trim: { color: string; width: number } | null, opts?: Opts) =>
+      update((d) => {
+        const outline = { ...(d.outline ?? newOutline('rect')), trim };
+        return { ...d, outline: isPlainRect(outline) ? null : outline };
+      }, opts),
+    /** Cuts the flag to a shape layer's outline, where it is, and removes the layer. */
+    useAsFlagOutline(id: string) {
+      const layer = design.layers.find((l) => l.id === id);
+      if (!layer || !canEditPoints(layer)) return;
+      const contours = mapContours(worldContours(layer, W), scaling(1 / W, 1));
+      update((d) => ({
+        ...d,
+        outline: { kind: 'custom', params: {}, contours, trim: d.outline?.trim ?? null },
+        layers: d.layers.filter((l) => l.id !== id),
+      }));
+      setSelectionState([]);
+    },
 
     /** Applies a palette to the field, then pulls the emblems onto it. */
     applyPalette(colors: string[]) {

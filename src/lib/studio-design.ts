@@ -186,10 +186,28 @@ export type StudioLayer = {
   locked?: boolean;
 };
 
+export type FlagOutlineKind = 'rect' | 'rounded' | 'swallowtail' | 'tongued' | 'pennant' | 'burgee' | 'nepal' | 'custom';
+
+/**
+ * The flag's own outline, when it isn't a plain rectangle: everything outside it is cut away.
+ * It's drawn inside the flag's box, so it stretches with the ratio.
+ */
+export type FlagOutline = {
+  kind: FlagOutlineKind;
+  /** The kind's settings, like how deep a swallowtail's cut goes. */
+  params: Record<string, number>;
+  /** A custom outline, as fractions of the flag's width (x) and height (y). */
+  contours?: PathContour[];
+  /** A band just inside the outline, like Nepal's border; width as a fraction of flag height. */
+  trim?: { color: string; width: number } | null;
+};
+
 export type StudioDesign = {
   version: 2;
   /** Height : width, e.g. [1, 2]. */
   ratio: [number, number];
+  /** Absent for a plain rectangle. */
+  outline?: FlagOutline | null;
   field: StudioField;
   layers: StudioLayer[];
 };

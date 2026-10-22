@@ -36,6 +36,7 @@ import {
   Copy,
   Eye,
   EyeSlash,
+  FlagTriangleRight,
   ExcludeShapes,
   FlipHorizontal,
   FlipVertical,
@@ -630,6 +631,11 @@ export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Stud
         {selectedLayers.some((l) => canEditPoints(l) && l.shape!.kind !== 'path') && (
           <DropdownMenuItem onSelect={actions.convertToPath}>
             <BezierCurve /> Convert to path
+          </DropdownMenuItem>
+        )}
+        {single && canEditPoints(single) && (
+          <DropdownMenuItem onSelect={() => actions.useAsFlagOutline(single.id)}>
+            <FlagTriangleRight /> Use as flag shape
           </DropdownMenuItem>
         )}
         {selectedLayers.some((l) => l.stretch) && (

@@ -5,6 +5,7 @@ import type { PathContour, PathNode, StudioLayer } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import type { DrawSettings } from './draw';
 import { layerShownAt } from './clip';
+import { insideOutline, outlineD } from './outline';
 import { FlagArt } from './FlagArt';
 import { divisionGeometry, fieldAnchors, fieldPartAt, type FieldPart } from './divisions';
 import { type Anchor } from './layouts';
@@ -260,12 +261,12 @@ export function StudioCanvas({
     for (let i = design.layers.length - 1; i >= 0; i--) {
       const layer = design.layers[i];
       if (layer.hidden || layer.locked || !hitsLayer(layer, W, u, v, 5 / scale)) continue;
-      if (selection.includes(layer.id) || layerShownAt(design, layer, u, v)) return layer;
+      if (selection.includes(layer.id) || (onFlag(u, v) && layerShownAt(design, layer, u, v))) return layer;
     }
     return null;
   };
 
-  const onFlag = (u: number, v: number) => u >= 0 && u <= W && v >= 0 && v <= 1;
+  const onFlag = (u: number, v: number) => insideOutline(design, u, v);
   /** Selects what's under a point on the field: an unlocked division, or the field itself. */
   const fieldSelection = (u: number, v: number) => {
     const part = fieldPartAt(design, u, v);
@@ -1076,9 +1077,19 @@ export function StudioCanvas({
             strokeLinejoin='round'
           />
         )}
-        {fieldSelected && selecting && selectedLayers.length === 0 && (
+        {fieldSelected && selecting && selectedLayers.length === 0 && (design.outline && design.outline.kind !== 'rect' ? (
+          <path
+            d={outlineD(design.outline, W)}
+            transform={`translate(${ox} ${oy}) scale(${scale})`}
+            fill='none'
+            stroke='var(--main)'
+            strokeWidth={2}
+            strokeLinejoin='round'
+            vectorEffect='non-scaling-stroke'
+          />
+        ) : (
           <rect x={ox - 1} y={oy - 1} width={W * scale + 2} height={scale + 2} fill='none' stroke='var(--main)' strokeWidth={2} rx={1} />
-        )}
+        ))}
         {selectedDivision && !selectedDivision.hidden && selecting && selectedLayers.length === 0 && (() => {
           const geometry = divisionGeometry(selectedDivision, W);
           const c = geometry.clip;

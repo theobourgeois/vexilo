@@ -15,7 +15,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { EMBLEM_CATEGORIES, emblemSearchScore, mixEmblemCategories } from '@/lib/emblem-search';
-import type { EdgeStyle, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
+import type { EdgeStyle, FlagOutline, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
 import { clipBaseIndex, clipsBelow, clipTargets, partLabel } from './clip';
 import { luminance, PALETTE_GROUPS, PALETTES } from './colors';
 import { FlagArt, PartPreview } from './FlagArt';
@@ -24,6 +24,7 @@ import { DIVISION_KINDS, DIVISIONS, divisionLabel, divisionParams, divisionParts
 import { divisionFor, LAYOUT_TEMPLATES, PART_TEMPLATES, sameShape, templateField, type FieldTemplate, type StackField } from './field';
 import { useRecolored } from './images';
 import { documentColors, layerColors, layerWidth, type StudioEmblem } from './model';
+import { newOutline, OUTLINE_KINDS, outlineD, outlineParams, OUTLINES } from './outline';
 import { shapePath } from './shapes';
 import { EMBLEM_MIME } from './StudioCanvas';
 import { ClipChoiceArt, ColorButton } from './tools';
@@ -322,7 +323,10 @@ function DivisionsEditor({ studio, field, columns }: { studio: Studio; field: St
     rows.map((d) => d.id),
     actions.moveDivision,
   );
-  const baseSelected = !selectedDivision;
+  // The shape row is picked here; picking a division moves off it.
+  const [shapePicked, setShapePicked] = React.useState(false);
+  const shapeSelected = shapePicked && !selectedDivision;
+  const baseSelected = !selectedDivision && !shapePicked;
   return (
     <>
       <div className='flex flex-col gap-0.5 pt-1'>
@@ -336,7 +340,7 @@ function DivisionsEditor({ studio, field, columns }: { studio: Studio; field: St
             <div
               key={division.id}
               {...reorder.rowProps(division.id, row)}
-              onClick={() => actions.selectDivision(division.id)}
+              onClick={() => (setShapePicked(false), actions.selectDivision(division.id))}
               className={cn(
                 'group relative flex h-10 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
                 active ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
@@ -365,7 +369,7 @@ function DivisionsEditor({ studio, field, columns }: { studio: Studio; field: St
           );
         })}
         <div
-          onClick={() => actions.selectDivision(null)}
+          onClick={() => (setShapePicked(false), actions.selectDivision(null))}
           className={cn(
             'flex h-10 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
             baseSelected ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
@@ -374,16 +378,122 @@ function DivisionsEditor({ studio, field, columns }: { studio: Studio; field: St
           <span className='h-5 w-8 shrink-0 rounded-[3px] shadow-[0_0_0_1px_rgb(0_0_0/0.15)]' style={{ background: field.color }} />
           <span className='flex-1'>Base</span>
         </div>
+        <div
+          onClick={() => (setShapePicked(true), actions.selectDivision(null))}
+          className={cn(
+            'flex h-10 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
+            shapeSelected ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
+          )}
+        >
+          <span className='flex h-5 w-8 shrink-0 items-center justify-center'>
+            <OutlineIcon outline={design.outline} ratio={design.ratio} className='max-h-5 max-w-8 text-foreground/70' />
+          </span>
+          <span className='flex-1'>Shape</span>
+          <span className='text-[12px] text-muted-foreground'>{OUTLINES[design.outline?.kind ?? 'rect'].label}</span>
+        </div>
       </div>
       <div className='flex flex-col gap-3.5 border-t border-line pt-4'>
         {selectedDivision ? (
           <DivisionSettings key={selectedDivision.id} studio={studio} division={selectedDivision} />
+        ) : shapeSelected ? (
+          <OutlineSettings studio={studio} />
         ) : (
           <Setting label='Base colour'>
             <div className='flex'>
               <ColorButton color={field.color} studio={studio} side='right' size={26} label='Base colour' onChange={(color, transient) => actions.setBaseColor(color, { transient })} />
             </div>
           </Setting>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** A flag outline as a silhouette, at the ratio it'd be flown at. */
+function OutlineIcon({ outline, ratio, className }: { outline: FlagOutline | null | undefined; ratio: [number, number]; className?: string }) {
+  const W = ratio[1] / ratio[0];
+  return (
+    <svg viewBox={`-0.02 -0.02 ${W + 0.04} 1.04`} aria-hidden className={cn('block h-5 w-auto', className)} style={{ aspectRatio: `${W + 0.04} / 1.04` }}>
+      <path d={outlineD(outline, W)} fill='currentColor' fillRule='evenodd' />
+    </svg>
+  );
+}
+
+function OutlineSettings({ studio }: { studio: Studio }) {
+  const { design, actions, history } = studio;
+  const outline = design.outline ?? null;
+  const kind = outline?.kind ?? 'rect';
+  const params = outline ? outlineParams(outline) : {};
+  const trim = outline?.trim ?? null;
+  const kinds = kind === 'custom' ? [...OUTLINE_KINDS, kind] : OUTLINE_KINDS;
+  const transient = { transient: true };
+  return (
+    <>
+      <Setting label='Shape'>
+        <div className='grid grid-cols-4 gap-1.5'>
+          {kinds.map((k) => {
+            const preview = k === 'custom' ? outline : newOutline(k, outline);
+            return (
+              <button
+                key={k}
+                type='button'
+                aria-pressed={k === kind}
+                onClick={() => k !== kind && actions.setFlagOutline(k)}
+                className={cn(
+                  'flex min-w-0 cursor-pointer flex-col items-center gap-1 rounded-[8px] px-1 pb-1 pt-2 text-[11.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                  k === kind ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
+                )}
+              >
+                <span className='flex h-6 items-center'>
+                  <OutlineIcon outline={preview} ratio={OUTLINES[k].ratio ?? design.ratio} className='h-6 max-w-12' />
+                </span>
+                <span className='w-full truncate text-center'>{OUTLINES[k].label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Setting>
+      {OUTLINES[kind].params.map((param) => (
+        <Setting key={param.key} label={param.label} value={formatParam(params[param.key], param.step)}>
+          <Slider
+            label={param.label}
+            min={param.min}
+            max={param.max}
+            step={param.step}
+            value={params[param.key]}
+            onChange={(value) => actions.setFlagOutlineParam(param.key, value, transient)}
+            onCommit={history.commit}
+          />
+        </Setting>
+      ))}
+      <p className='text-[12px] leading-snug text-muted-foreground'>
+        For any other shape, draw it with the pen, then right-click it and choose Use as flag shape.
+      </p>
+      <div className='flex flex-col gap-3 border-t border-line pt-3.5'>
+        <label className='flex items-center justify-between text-[12.5px] text-subtle'>
+          Trim
+          <Switch checked={Boolean(trim)} onCheckedChange={(on) => actions.setFlagTrim(on ? { color: '#003893', width: 0.04 } : null)} />
+        </label>
+        {trim && (
+          <div className='flex items-center gap-2.5'>
+            <ColorButton
+              color={trim.color}
+              studio={studio}
+              side='right'
+              size={26}
+              label='Trim colour'
+              onChange={(color, t) => actions.setFlagTrim({ ...trim, color }, { transient: t })}
+            />
+            <Slider
+              label='Trim width'
+              min={0.005}
+              max={0.2}
+              step={0.005}
+              value={trim.width}
+              onChange={(width) => actions.setFlagTrim({ ...trim, width }, transient)}
+              onCommit={history.commit}
+            />
+          </div>
         )}
       </div>
     </>

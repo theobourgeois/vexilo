@@ -45,7 +45,9 @@ import {
   Plus,
   ClipMask,
   ClippedBelow,
+  FlagTriangleRight,
 } from '@/components/icons';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/utils';
 import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@/lib/studio-design';
@@ -57,6 +59,7 @@ import { EXPORT_WIDTH, flagWidth, RATIOS, type StudioDoc } from './model';
 import type { View } from './StudioCanvas';
 import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
+import { canEditPoints } from './vector';
 
 export type Remix = { id: string; name: string } | null;
 
@@ -286,21 +289,104 @@ export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Stud
 // ───────────────────────── Dock & glance ─────────────────────────
 
 const ratioKey = (r: [number, number]) => `${r[0]}:${r[1]}`;
+const sameRatio = (a: [number, number], b: [number, number]) => Math.abs(a[1] / a[0] - b[1] / b[0]) < 1e-6;
+
+/** Ratios real flags fly at, beyond the four in the dock. */
+const MORE_RATIOS: { ratio: [number, number]; flag: string }[] = [
+  { ratio: [10, 19], flag: 'United States' },
+  { ratio: [5, 8], flag: 'Sweden' },
+  { ratio: [8, 11], flag: 'Norway' },
+  { ratio: [28, 37], flag: 'Denmark' },
+  { ratio: [13, 15], flag: 'Belgium' },
+  { ratio: [7, 10], flag: 'Brazil' },
+  { ratio: [11, 28], flag: 'Qatar' },
+  { ratio: [3, 4], flag: 'Bermuda' },
+  { ratio: [4, 7], flag: 'Ivory Coast' },
+];
 
 export function RatioControl({ studio, className }: { studio: Studio; className?: string }) {
   const current = studio.design.ratio;
-  const known = RATIOS.some((r) => r[1] / r[0] === current[1] / current[0]);
+  const known = RATIOS.find((r) => sameRatio(r, current));
+  const [open, setOpen] = React.useState(false);
   return (
-    <Segmented
-      aria-label='Ratio'
-      className={className}
-      value={known ? ratioKey(RATIOS.find((r) => r[1] / r[0] === current[1] / current[0])!) : 'custom'}
-      onChange={(value) => {
-        const ratio = RATIOS.find((r) => ratioKey(r) === value);
-        if (ratio) studio.actions.setRatio(ratio);
-      }}
-      options={RATIOS.map((r) => ({ value: ratioKey(r), label: ratioKey(r) }))}
-    />
+    <Popover open={open} onOpenChange={(next) => (setOpen(next), !next && studio.history.commit())}>
+      <PopoverAnchor asChild>
+        <div className='inline-flex'>
+          <Segmented
+            aria-label='Ratio'
+            className={className}
+            value={known ? ratioKey(known) : 'custom'}
+            onChange={(value) => {
+              const ratio = RATIOS.find((r) => ratioKey(r) === value);
+              if (ratio) studio.actions.setRatio(ratio);
+              else setOpen(true);
+            }}
+            options={[
+              ...RATIOS.map((r) => ({ value: ratioKey(r), label: ratioKey(r) })),
+              { value: 'custom', label: known ? 'Custom' : ratioKey(current) },
+            ]}
+          />
+        </div>
+      </PopoverAnchor>
+      <PopoverContent side='top' align='end' sideOffset={12} className='w-[264px] p-3'>
+        <CustomRatio studio={studio} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+const trimNumber = (n: number) => String(Math.round(n * 1000) / 1000);
+
+function CustomRatio({ studio }: { studio: Studio }) {
+  const current = studio.design.ratio;
+  const [text, setText] = React.useState(() => current.map(trimNumber) as [string, string]);
+  const edit = (i: 0 | 1, value: string) => {
+    const next: [string, string] = i === 0 ? [value, text[1]] : [text[0], value];
+    setText(next);
+    const ratio = next.map(Number) as [number, number];
+    if (ratio.every((n) => n > 0 && n <= 20)) studio.actions.setRatio(ratio, { transient: true });
+  };
+  const input = (i: 0 | 1, label: string) => (
+    <label className='flex min-w-0 flex-1 flex-col gap-1 text-[12px] text-subtle'>
+      {label}
+      <Input
+        type='number'
+        inputMode='decimal'
+        min={0.1}
+        max={20}
+        step='any'
+        value={text[i]}
+        onChange={(e) => edit(i, e.target.value)}
+        onBlur={studio.history.commit}
+        className='h-8 tabular-nums'
+      />
+    </label>
+  );
+  return (
+    <div className='flex flex-col gap-3'>
+      <div className='flex items-end gap-2'>
+        {input(0, 'Height')}
+        <span className='pb-1.5 text-subtle'>:</span>
+        {input(1, 'Width')}
+      </div>
+      <div className='grid grid-cols-3 gap-1'>
+        {MORE_RATIOS.map(({ ratio, flag }) => (
+          <button
+            key={flag}
+            type='button'
+            title={flag}
+            onClick={() => (setText(ratio.map(trimNumber) as [string, string]), studio.actions.setRatio(ratio))}
+            className={cn(
+              'flex cursor-pointer flex-col items-center rounded-[8px] px-1 py-1.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+              sameRatio(ratio, current) ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
+            )}
+          >
+            <span className='text-[13px] font-medium tabular-nums'>{ratioKey(ratio)}</span>
+            <span className='w-full truncate text-center text-[11px] text-muted-foreground'>{flag}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -435,6 +521,7 @@ export function ContextMenu({
               {!clipsBelow(single) &&
                 item('Clip to layer below', <ClippedBelow />, actions.toggleClipBelow, studio.design.layers[0]?.id === single.id)}
               {clip && item('Release clip', <ClipMask />, () => actions.setClip(null))}
+              {canEditPoints(single) && item('Use as flag shape', <FlagTriangleRight />, () => actions.useAsFlagOutline(single.id))}
             </>
           )}
           <div className='my-1 h-px bg-line' />

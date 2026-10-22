@@ -7,6 +7,7 @@ import { layerImage } from './cutout';
 import { divisionGeometry } from './divisions';
 import { useRecolored } from './images';
 import { flagWidth, layerBounds, layerCopies, layerWidth } from './model';
+import { outlineD } from './outline';
 import { shapePath } from './shapes';
 
 type Hrefs = { field?: string; layers?: Record<string, string> };
@@ -34,6 +35,8 @@ export function FlagArt({
   const W = flagWidth(design);
   const id = React.useId().replace(/[^a-zA-Z0-9]/g, '');
   const outlined = design.layers.filter((layer) => layer.outline && !layer.hidden);
+  const edge = outlineD(design.outline, W);
+  const trim = design.outline?.trim?.width ? design.outline.trim : null;
   const ghosted = ghosts?.length ? design.layers.filter((layer) => layer.clip && !layer.hidden && ghosts.includes(layer.id)) : [];
   return (
     <svg
@@ -46,7 +49,7 @@ export function FlagArt({
     >
       <defs>
         <clipPath id={`${id}-clip`}>
-          <rect width={W} height={1} />
+          {design.outline && design.outline.kind !== 'rect' ? <path d={edge} clipRule='evenodd' /> : <rect width={W} height={1} />}
         </clipPath>
         {outlined.map((layer) => {
           // Blur the shape's alpha and cut it off sharply: a round, even outline, unlike a
@@ -87,6 +90,8 @@ export function FlagArt({
           <ClipGroup key={group[0].id} group={group} field={design.field} W={W} hrefs={hrefs} id={id} />
         ))}
         {ghosted.length > 0 && <g opacity={0.35}>{ghosted.map((layer) => layerArt(layer, W, id, hrefs))}</g>}
+        {/* Twice as wide as it shows: the outside half is clipped away. */}
+        {trim && <path d={edge} fill='none' stroke={trim.color} strokeWidth={trim.width * 2} strokeLinejoin='miter' strokeMiterlimit={32} />}
       </g>
     </svg>
   );
