@@ -155,6 +155,36 @@ export type StudioShape = {
    * number of times, there's a hole.
    */
   contours?: PathContour[];
+  /** Fills where outlines overlap too, as text needs where letters touch; otherwise overlaps are holes. */
+  nonzero?: boolean;
+};
+
+export type TextFont = 'inter' | 'garamond' | 'cinzel' | 'oswald' | 'slab' | 'fraktur' | 'script' | 'cairo';
+
+/**
+ * What a text layer says and how it's set. The layer is a path of the letters' outlines, so it
+ * draws and exports like any shape; this is what sets them again when the text changes.
+ */
+export type StudioText = {
+  content: string;
+  font: TextFont;
+  bold?: boolean;
+  italic?: boolean;
+  /** Extra space after each letter, in ems. */
+  spacing: number;
+  /** From one line's baseline to the next, in ems. */
+  leading: number;
+  align: 'left' | 'center' | 'right';
+  /**
+   * How far the text bends: the degrees of a circle its longest line runs around. Positive arches
+   * it, negative bows it, and 360 runs it all the way round.
+   */
+  curve: number;
+  /**
+   * Where the outlines sit, in ems from the first line's baseline at its alignment point: x, y,
+   * width and height. It keeps the letters their size, and the text in place, as it changes.
+   */
+  ink: [number, number, number, number];
 };
 
 export type StudioLayer = {
@@ -166,6 +196,8 @@ export type StudioLayer = {
   cutout?: StudioCutout;
   /** Drawn in the editor instead of loaded from `src`. */
   shape?: StudioShape;
+  /** Set for text, whose shape is its letters. */
+  text?: StudioText;
   /** Width / height of the emblem image. */
   aspect: number;
   /** The emblem's own colours, and what each is currently painted as. */
@@ -184,6 +216,16 @@ export type StudioLayer = {
   clip?: StudioClip | null;
   hidden?: boolean;
   locked?: boolean;
+  /** The group it belongs to; a group's layers sit together in the stack. */
+  group?: string;
+};
+
+/** Layers that move, recolour and repeat as one, like the parts of a coat of arms. */
+export type StudioGroup = {
+  id: string;
+  name: string;
+  /** The whole group, copied around its centre; spacing works as for a layer the group's size. */
+  repeat: StudioRepeat | null;
 };
 
 export type FlagOutlineKind = 'rect' | 'rounded' | 'swallowtail' | 'tongued' | 'pennant' | 'burgee' | 'nepal' | 'custom';
@@ -210,6 +252,7 @@ export type StudioDesign = {
   outline?: FlagOutline | null;
   field: StudioField;
   layers: StudioLayer[];
+  groups?: StudioGroup[];
 };
 
 /** The first version, whose field was one of a fixed set of layouts. Still stored and shared. */

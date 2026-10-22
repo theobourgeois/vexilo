@@ -5,8 +5,14 @@ import { shapeContours } from './shapes';
 
 const MIN_SIDE = 0.002;
 
-/** Whether a layer's outline can be edited point by point: any shape but a brush stroke. */
-export const canEditPoints = (layer: StudioLayer) => Boolean(layer.shape && layer.shape.kind !== 'brush');
+/**
+ * Whether a layer's outline can be edited point by point: any shape but a brush stroke. Text has
+ * to be turned into a path first, as editing its letters would lose the text.
+ */
+export const canEditPoints = (layer: StudioLayer) => Boolean(layer.shape && layer.shape.kind !== 'brush' && !layer.text);
+
+/** Whether a layer is an outline that can be combined with others: any shape or text but a brush stroke. */
+export const isOutline = (layer: StudioLayer) => Boolean(layer.shape && layer.shape.kind !== 'brush');
 
 /** From a layer's own box (centred, before turning and flipping) to flag units, for one copy. */
 export function layerAffine(layer: StudioLayer, W: number, copy: Copy = layerCopies(layer, W)[0]): Affine {
@@ -33,13 +39,14 @@ export function withContours(layer: StudioLayer, contours: PathContour[], W: num
     size: h,
     aspect: w / h,
     stretch: undefined,
-    shape: { kind: 'path', fill: shape.fill, stroke: shape.stroke, contours: fit.contours },
+    text: undefined,
+    shape: { kind: 'path', fill: shape.fill, stroke: shape.stroke, contours: fit.contours, ...(shape.nonzero && { nonzero: true }) },
   };
 }
 
-/** The same shape, as a path whose points can be moved. */
+/** The same shape, as a path whose points can be moved; text becomes its letters' outlines. */
 export const toPath = (layer: StudioLayer, W: number) =>
-  layer.shape?.kind === 'path' ? layer : withContours(layer, localContours(layer), W);
+  layer.text ? { ...layer, text: undefined } : layer.shape?.kind === 'path' ? layer : withContours(layer, localContours(layer), W);
 
 /** Every copy of a shape layer's outline, in flag units. */
 export function worldContours(layer: StudioLayer, W: number): PathContour[] {
@@ -79,7 +86,7 @@ const SCALE = 1000;
  */
 export async function combineContours(layers: StudioLayer[], op: BooleanOp, W: number): Promise<PathContour[]> {
   const paper = await loadPaper();
-  const toPaper = (contours: PathContour[]) => {
+  const toPaper = (contours: PathContour[], nonzero?: boolean) => {
     const item = new paper.CompoundPath({
       children: contours.map(
         (c) =>
@@ -97,10 +104,11 @@ export async function combineContours(layers: StudioLayer[], op: BooleanOp, W: n
           }),
       ),
     });
-    item.fillRule = 'evenodd';
+    item.fillRule = nonzero ? 'nonzero' : 'evenodd';
     return item;
   };
-  const items = layers.map((l) => toPaper(worldContours(l, W)));
+  // Paper resolves each one by its own fill rule first, so overlapping letters count once.
+  const items = layers.map((l) => toPaper(worldContours(l, W), l.shape?.nonzero));
   let result: paper.PathItem = items[0];
   if (op === 'subtract') {
     const cutter = items.slice(2).reduce<paper.PathItem>((a, b) => a.unite(b), items[1]);

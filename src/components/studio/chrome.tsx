@@ -27,6 +27,7 @@ import {
   Fit,
   Flag,
   FlipHorizontal,
+  GroupIcon,
   GoogleLogo,
   History,
   Link as LinkIcon,
@@ -35,6 +36,7 @@ import {
   Send,
   Shuffle,
   Trash2,
+  Ungroup,
   Undo,
   WandSparkles,
   Wind,
@@ -57,6 +59,7 @@ import { clipsBelow, clipTargets, samePart } from './clip';
 import { fieldPartAt } from './divisions';
 import { EXPORT_WIDTH, flagWidth, RATIOS, type StudioDoc } from './model';
 import type { View } from './StudioCanvas';
+import { canGroup } from './tools';
 import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
 import { canEditPoints } from './vector';
@@ -509,6 +512,8 @@ export function ContextMenu({
           {item('Duplicate', <Plus />, () => actions.duplicateSelected())}
           {item('Match palette', <WandSparkles />, actions.matchPalette)}
           {item('Flip', <FlipHorizontal />, () => actions.flip('x'))}
+          {canGroup(studio) && item('Group', <GroupIcon />, actions.group)}
+          {selectedLayers.some((l) => l.group) && item('Ungroup', <Ungroup />, actions.ungroup)}
           <div className='my-1 h-px bg-line' />
           {item('Bring to front', <BringForward />, () => actions.arrange('front'))}
           {item('Send to back', <SendBackward />, () => actions.arrange('back'))}

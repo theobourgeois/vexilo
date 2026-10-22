@@ -196,7 +196,8 @@ export function hitsLayer(layer: StudioLayer, W: number, px: number, py: number,
     const ly = dx * Math.sin(a) + dy * Math.cos(a);
     const own: [number, number] = [layer.flipX ? -lx : lx, layer.flipY ? -ly : ly];
     if (layer.shape?.kind === 'brush') return hitsBrush(layer.shape, w, h, own, reach);
-    if (layer.shape?.kind === 'path') return hitsPath(layer.shape, w, h, own, reach);
+    // Text is picked up anywhere in its box, not only on its thin letters.
+    if (layer.shape?.kind === 'path' && !layer.text) return hitsPath(layer.shape, w, h, own, reach);
     return Math.abs(lx) <= Math.max(w / 2, reach) && Math.abs(ly) <= Math.max(h / 2, reach);
   });
 }

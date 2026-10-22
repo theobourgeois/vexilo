@@ -1,6 +1,7 @@
 import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
 import { divisionGeometry, fieldAnchors, fieldPartAt } from './divisions';
-import { flagWidth, layerBounds, unionBox, type Box } from './model';
+import { placedBounds } from './groups';
+import { flagWidth, unionBox, type Box } from './model';
 
 /** A part of the field an emblem can sit in, like a canton, a band or a quarter. */
 export type Region = Box & { label: string };
@@ -144,7 +145,7 @@ export type AlignScope = { id: 'selection' | 'region' | 'flag'; label: string; b
 export function alignScopes(design: StudioDesign, layers: StudioLayer[]): AlignScope[] {
   const guides = fieldGuides(design);
   const flag = guides.regions[0];
-  const group = layers.length ? unionBox(layers.map((l) => layerBounds(l, flagWidth(design)))) : null;
+  const group = layers.length ? unionBox(layers.map((l) => placedBounds(design, l, flagWidth(design)))) : null;
   const region = group ? guides.containerAt((group.x0 + group.x1) / 2, (group.y0 + group.y1) / 2) : flag;
   return [
     ...(layers.length > 1 ? [{ id: 'selection' as const, label: 'Selection', box: null }] : []),

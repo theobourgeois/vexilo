@@ -1,11 +1,35 @@
 'use client';
 
 import React from 'react';
-import type { DivisionKind, FlagOutlineKind, PathContour, StudioClip, StudioDesign, StudioDivision, StudioLayer, StudioOutline, StudioRepeat, StudioShape } from '@/lib/studio-design';
+import type {
+  DivisionKind,
+  FlagOutlineKind,
+  PathContour,
+  StudioClip,
+  StudioDesign,
+  StudioDivision,
+  StudioGroup,
+  StudioLayer,
+  StudioOutline,
+  StudioRepeat,
+  StudioShape,
+  StudioText,
+} from '@/lib/studio-design';
 import { clipsBelow } from './clip';
 import { contrastRatio, luminance, matchToPalette, sameColor } from './colors';
 import { fieldAnchors, type FieldPart } from './divisions';
 import { divisionFor, recolorStack, stackColors, swapStackColor, templateField, type FieldTemplate, type StackField } from './field';
+import {
+  defaultGroupRepeat,
+  enteredGroup,
+  membersBox,
+  membersOf,
+  placedBounds,
+  stackUnits,
+  tidyGroups,
+  wholeGroup,
+  withWholeGroups,
+} from './groups';
 import { useHistory } from './history';
 import {
   clamp,
@@ -14,7 +38,6 @@ import {
   fieldColors,
   fitSize,
   flagWidth,
-  layerBounds,
   newLayer,
   REPEAT_SIZE,
   replaceColor,
@@ -26,9 +49,10 @@ import {
   type StudioEmblem,
 } from './model';
 import { applyVector, invert, mapContours, removeNodes, scaling } from './paths';
-import { applyPoses, poseOf, scalePoses } from './transform';
-import { canEditPoints, combinedLayer, combineContours, layerAffine, localContours, toPath, withContours, worldContours, type BooleanOp } from './vector';
+import { applyPoses, boxCentre, poseOf, rotatePoses, scalePoses } from './transform';
+import { canEditPoints, combinedLayer, isOutline, combineContours, layerAffine, localContours, toPath, withContours, worldContours, type BooleanOp } from './vector';
 import { isPlainRect, newOutline, OUTLINES } from './outline';
+import { DEFAULT_TEXT, loadTextFont, newTextLayer, retypeset, textReady } from './text';
 
 export const FIELD = 'field';
 
@@ -43,8 +67,103 @@ const FIT_FILL = 0.8;
 
 type Opts = { transient?: boolean };
 
-let clipboard: StudioLayer[] = [];
+let clipboard: { layers: StudioLayer[]; groups: StudioGroup[] } = { layers: [], groups: [] };
 let pasteCount = 0;
+
+type Arrange = 1 | -1 | 'front' | 'back';
+
+/** Moves the items `moving` picks through a stack, bottom first. */
+function reorder<T>(items: T[], moving: (item: T) => boolean, to: Arrange): T[] {
+  if (to === 'front') return [...items.filter((i) => !moving(i)), ...items.filter(moving)];
+  if (to === 'back') return [...items.filter(moving), ...items.filter((i) => !moving(i))];
+  const next = [...items];
+  const order = to === 1 ? [...next.keys()].reverse() : [...next.keys()];
+  for (const i of order) {
+    const j = i + to;
+    if (!moving(next[i]) || j < 0 || j >= next.length || moving(next[j])) continue;
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
+}
+
+/**
+ * Copies of layers with new ids. A group they make up whole (by `whole`) is copied with them;
+ * a layer copied out of a group on its own stays in it.
+ */
+function cloneLayers(sources: StudioLayer[], groups: StudioGroup[], whole: (groupId: string) => boolean) {
+  const copied = new Map<string, StudioGroup>();
+  const layers = sources.map((l) => {
+    const copy = { ...l, id: uid(), locked: false };
+    if (!l.group || !whole(l.group)) return copy;
+    let group = copied.get(l.group);
+    if (!group) {
+      group = { ...(groups.find((g) => g.id === l.group) ?? { name: 'Group', repeat: null }), id: uid() };
+      copied.set(l.group, group);
+    }
+    return { ...copy, group: group.id };
+  });
+  return { layers, groups: [...copied.values()] };
+}
+
+const withGroups = (d: StudioDesign, groups: StudioGroup[]): StudioDesign => (groups.length ? { ...d, groups: [...(d.groups ?? []), ...groups] } : d);
+
+/** Where a colour is used: one of a layer's colours, or its outline at index -1. */
+export type ColorSlot = { id: string; index: number };
+export type SelectionColor = { color: string; slots: ColorSlot[] };
+
+/** The colours the layers show, each once, with every slot it's in. */
+function selectionPalette(layers: StudioLayer[]): SelectionColor[] {
+  const palette: SelectionColor[] = [];
+  const add = (id: string, index: number, color: string | undefined) => {
+    if (!color) return;
+    const same = palette.find((p) => sameColor(p.color, color));
+    if (same) same.slots.push({ id, index });
+    else palette.push({ color, slots: [{ id, index }] });
+  };
+  for (const l of layers) {
+    if (l.shape) {
+      if (l.shape.fill) add(l.id, 0, l.colors[0]);
+      if (l.shape.stroke > 0) add(l.id, 1, l.colors[1] ?? l.colors[0]);
+    } else l.colors.forEach((c, i) => add(l.id, i, c));
+    if (l.outline) add(l.id, -1, l.outline.color);
+  }
+  return palette;
+}
+
+/** The first "Group N" no group is called yet. */
+function nextGroupName(groups: StudioGroup[] = []) {
+  let i = 1;
+  while (groups.some((g) => g.name === `Group ${i}`)) i++;
+  return `Group ${i}`;
+}
+
+/**
+ * Layers in the units they move in: each group whose shown, unlocked layers are all there
+ * together, and each other layer alone.
+ */
+function selectionUnits(design: StudioDesign, layers: StudioLayer[]) {
+  const ids = new Set(layers.map((l) => l.id));
+  const units = new Map<string, { group: string | null; layers: StudioLayer[] }>();
+  for (const layer of layers) {
+    const whole = layer.group && membersOf(design.layers, layer.group).every((m) => m.hidden || m.locked || ids.has(m.id));
+    const key = whole ? `group:${layer.group}` : layer.id;
+    const unit = units.get(key);
+    if (unit) unit.layers.push(layer);
+    else units.set(key, { group: whole ? layer.group! : null, layers: [layer] });
+  }
+  return [...units.values()];
+}
+
+/** Grows or shrinks the radius of the groups' rings and arcs, which is in flag units. */
+function scaleGroupRepeats(design: StudioDesign, groupIds: Set<string>, k: number): StudioDesign {
+  if (!design.groups || groupIds.size === 0 || k === 1) return design;
+  return {
+    ...design,
+    groups: design.groups.map((g) =>
+      groupIds.has(g.id) && g.repeat && (g.repeat.mode === 'ring' || g.repeat.mode === 'arc') ? { ...g, repeat: { ...g.repeat, spacing: g.repeat.spacing * k } } : g,
+    ),
+  };
+}
 
 export function useStudio(initial: StudioDoc) {
   const history = useHistory<StudioDoc>(initial);
@@ -64,6 +183,10 @@ export function useStudio(initial: StudioDoc) {
     [selection, ids],
   );
   const selectedLayers = design.layers.filter((l) => liveSelection.includes(l.id));
+  /** The group selected whole, which then moves, recolours and repeats as one. */
+  const selectedGroup = wholeGroup(design, liveSelection);
+  /** The group the selection is inside, so clicks pick its layers one by one. */
+  const entered = enteredGroup(design, liveSelection);
   const selectedDivision = divisions.find((d) => liveSelection.includes(divisionKey(d.id))) ?? null;
   /** The field or one of its divisions. */
   const fieldSelected = liveSelection.some((id) => id === FIELD || DIVISION.test(id));
@@ -76,10 +199,28 @@ export function useStudio(initial: StudioDoc) {
     ? design.layers.find((l) => l.id === pathEditState.id)
     : undefined;
   const pathEdit =
-    editingLayer?.shape?.kind === 'path' && !editingLayer.locked && !editingLayer.hidden ? { ...pathEditState!, layer: editingLayer } : null;
+    editingLayer?.shape?.kind === 'path' && !editingLayer.text && !editingLayer.locked && !editingLayer.hidden ? { ...pathEditState!, layer: editingLayer } : null;
+
+  // Typing: the text layer whose words are open. It ends once that layer isn't the selection.
+  const [textEditId, setTextEdit] = React.useState<string | null>(null);
+  const textEdit =
+    textEditId && liveSelection.length === 1 && liveSelection[0] === textEditId
+      ? (design.layers.find((l) => l.id === textEditId && l.text && !l.locked) ?? null)
+      : null;
+  // Changes to text waiting on a font: the latest wins, carrying any earlier ones with it.
+  const pendingText = React.useRef<{ patch: Partial<StudioText>; seq: number }>({ patch: {}, seq: 0 });
+  // Text left empty when typing ends some other way, by selecting something else, goes.
+  const leftText = textEditId && !textEdit ? design.layers.find((l) => l.id === textEditId) : undefined;
+  React.useEffect(() => {
+    if (!textEditId || textEdit) return;
+    setTextEdit(null);
+    if (leftText?.text && !leftText.text.content.trim()) {
+      history.set((d) => ({ ...d, design: { ...d.design, layers: d.design.layers.filter((l) => l.id !== leftText.id) } }));
+    }
+  }, [textEditId, textEdit, leftText, history]);
 
   const update = React.useCallback(
-    (fn: (d: StudioDesign) => StudioDesign, opts?: Opts) => history.set((d) => ({ ...d, design: fn(d.design) }), opts),
+    (fn: (d: StudioDesign) => StudioDesign, opts?: Opts) => history.set((d) => ({ ...d, design: tidyGroups(fn(d.design)) }), opts),
     [history],
   );
 
@@ -90,6 +231,13 @@ export function useStudio(initial: StudioDoc) {
   );
 
   const editable = selectedLayers.filter((l) => !l.locked).map((l) => l.id);
+  const updateGroup = React.useCallback(
+    (id: string, fn: (group: StudioGroup) => StudioGroup, opts?: Opts) =>
+      update((d) => ({ ...d, groups: d.groups?.map((g) => (g.id === id ? fn(g) : g)) }), opts),
+    [update],
+  );
+  /** Every colour the selected layers show, outlines included, each once with where it's used. */
+  const selectionColors = selectionPalette(selectedLayers);
 
   const updateStack = React.useCallback(
     (fn: (field: StackField) => StackField, opts?: Opts) =>
@@ -139,6 +287,59 @@ export function useStudio(initial: StudioDoc) {
     addLayer(layer: StudioLayer, opts?: Opts & { select?: boolean }) {
       update((d) => ({ ...d, layers: [...d.layers, layer] }), opts);
       if (opts?.select !== false) setSelectionState([layer.id]);
+    },
+
+    /**
+     * Adds text with its origin at a point (flag units), selected and open for typing. A colour
+     * that would vanish into the field there, or none, gives white or black, whichever shows.
+     */
+    async addText(at: { x: number; y: number }, color?: string, fontSize = 0.12, spec?: Partial<Omit<StudioText, 'ink'>>) {
+      const text = { ...DEFAULT_TEXT, ...spec };
+      const behind = fieldColorAt(design, at.x, at.y);
+      if (!color || contrastRatio(color, behind) < 1.6) {
+        color = contrastRatio('#FFFFFF', behind) >= contrastRatio('#000000', behind) ? '#FFFFFF' : '#000000';
+      }
+      await loadTextFont(text);
+      const layer = newTextLayer(text, at, fontSize, color, W);
+      update((d) => ({ ...d, layers: [...d.layers, layer] }));
+      setSelectionState([layer.id]);
+      setTextEdit(layer.id);
+      return layer.id;
+    },
+    /** Sets the selected text again with changes, once any new font has loaded. */
+    setText(patch: Partial<StudioText>, opts?: Opts) {
+      const targets = selectedLayers.filter((l) => l.text && !l.locked);
+      if (targets.length === 0) return;
+      const pending = pendingText.current;
+      pending.patch = { ...pending.patch, ...patch };
+      const seq = ++pending.seq;
+      const apply = () => {
+        if (seq !== pending.seq) return;
+        const next = pending.patch;
+        pending.patch = {};
+        updateLayers(
+          targets.map((l) => l.id),
+          (l) => retypeset(l, next, W),
+          opts,
+        );
+      };
+      const specs = targets.map((l) => ({ ...l.text!, ...pending.patch }));
+      if (specs.every(textReady)) apply();
+      else Promise.all(specs.map(loadTextFont)).then(apply, () => (pending.patch = {}));
+    },
+    editText(id = selectedLayers.length === 1 ? selectedLayers[0].id : undefined) {
+      const layer = design.layers.find((l) => l.id === id);
+      if (!layer?.text || layer.locked) return;
+      setSelectionState([layer.id]);
+      setTextEdit(layer.id);
+    },
+    /** Done typing: text left empty goes. */
+    stopEditingText() {
+      setTextEdit(null);
+      if (textEdit && !textEdit.text!.content.trim()) {
+        update((d) => ({ ...d, layers: d.layers.filter((l) => l.id !== textEdit.id) }));
+        setSelectionState([]);
+      } else history.commit();
     },
 
     /** Changes the selected shapes; a brush stroke is never filled. */
@@ -203,18 +404,20 @@ export function useStudio(initial: StudioDoc) {
     },
 
     /** The selected shapes as paths, so their points can be moved. */
-    convertToPath: () => updateLayers(editable, (l) => (canEditPoints(l) ? toPath(l, W) : l)),
+    convertToPath: () => updateLayers(editable, (l) => (isOutline(l) ? toPath(l, W) : l)),
 
     /**
      * Combines the selected shapes into one path, where the bottom one was. Returns false when
      * nothing would be left, as with an intersection of shapes that don't touch.
      */
     async combine(op: BooleanOp) {
-      const layers = design.layers.filter((l) => editable.includes(l.id) && canEditPoints(l) && !l.hidden);
+      const layers = design.layers.filter((l) => editable.includes(l.id) && isOutline(l) && !l.hidden);
       if (layers.length < 2) return false;
       const contours = await combineContours(layers, op, W);
       if (contours.length === 0) return false;
       const combined = combinedLayer(layers[0], contours, op, W);
+      // Shapes all from one group stay in it.
+      if (layers[0].group && layers.every((l) => l.group === layers[0].group)) combined.group = layers[0].group;
       const ids = new Set(layers.map((l) => l.id));
       update((d) => {
         const at = d.layers.findIndex((l) => l.id === layers[0].id);
@@ -240,12 +443,14 @@ export function useStudio(initial: StudioDoc) {
     duplicateSelected(offset = 0.04) {
       const sources = selectedLayers;
       if (sources.length === 0) return [];
-      const copies = sources.map((l) => ({ ...l, id: uid(), x: clamp(l.x + offset / W, 0, 1), y: clamp(l.y + offset, 0, 1), locked: false }));
+      const ids = new Set(sources.map((l) => l.id));
+      const cloned = cloneLayers(sources, design.groups ?? [], (g) => membersOf(design.layers, g).every((m) => ids.has(m.id)));
+      const copies = cloned.layers.map((l) => ({ ...l, x: clamp(l.x + offset / W, 0, 1), y: clamp(l.y + offset, 0, 1) }));
       update((d) => {
         const layers = [...d.layers];
         const top = Math.max(...sources.map((s) => layers.findIndex((l) => l.id === s.id)));
         layers.splice(top + 1, 0, ...copies);
-        return { ...d, layers };
+        return withGroups({ ...d, layers }, cloned.groups);
       });
       setSelectionState(copies.map((c) => c.id));
       return copies.map((c) => c.id);
@@ -254,12 +459,13 @@ export function useStudio(initial: StudioDoc) {
     /** Copies in place for alt-drag; the drag then moves them. */
     duplicateInPlace(targets: string[]) {
       const sources = design.layers.filter((l) => targets.includes(l.id) && !l.locked);
-      const copies = sources.map((l) => ({ ...l, id: uid() }));
+      const ids = new Set(sources.map((l) => l.id));
+      const { layers: copies, groups } = cloneLayers(sources, design.groups ?? [], (g) => membersOf(design.layers, g).every((m) => ids.has(m.id)));
       update((d) => {
         const layers = [...d.layers];
         const top = Math.max(...sources.map((s) => layers.findIndex((l) => l.id === s.id)));
         layers.splice(top + 1, 0, ...copies);
-        return { ...d, layers };
+        return withGroups({ ...d, layers }, groups);
       }, { transient: true });
       setSelectionState(copies.map((c) => c.id));
       return copies;
@@ -267,7 +473,13 @@ export function useStudio(initial: StudioDoc) {
 
     copy() {
       if (selectedLayers.length === 0) return;
-      clipboard = selectedLayers.map((l) => ({ ...l }));
+      const ids = new Set(selectedLayers.map((l) => l.id));
+      // Only groups copied whole come along; a layer copied out of one pastes on its own.
+      const groups = (design.groups ?? []).filter((g) => membersOf(design.layers, g.id).every((m) => ids.has(m.id)));
+      clipboard = {
+        layers: selectedLayers.map((l) => (l.group && !groups.some((g) => g.id === l.group) ? { ...l, group: undefined } : { ...l })),
+        groups,
+      };
       pasteCount = 0;
     },
     cut() {
@@ -276,14 +488,15 @@ export function useStudio(initial: StudioDoc) {
       actions.deleteSelected();
     },
     paste() {
-      if (clipboard.length === 0) return;
+      if (clipboard.layers.length === 0) return;
       pasteCount += 1;
       const shift = 0.03 * pasteCount;
-      const copies = clipboard.map((l) => ({ ...l, id: uid(), x: clamp(l.x + shift / W, 0, 1), y: clamp(l.y + shift, 0, 1), locked: false }));
-      update((d) => ({ ...d, layers: [...d.layers, ...copies] }));
+      const cloned = cloneLayers(clipboard.layers, clipboard.groups, () => true);
+      const copies = cloned.layers.map((l) => ({ ...l, x: clamp(l.x + shift / W, 0, 1), y: clamp(l.y + shift, 0, 1) }));
+      update((d) => withGroups({ ...d, layers: [...d.layers, ...copies] }, cloned.groups));
       setSelectionState(copies.map((c) => c.id));
     },
-    canPaste: () => clipboard.length > 0,
+    canPaste: () => clipboard.layers.length > 0,
 
     selectAll: () => setSelectionState(design.layers.filter((l) => !l.hidden && !l.locked).map((l) => l.id)),
     selectNext(direction: 1 | -1) {
@@ -298,47 +511,83 @@ export function useStudio(initial: StudioDoc) {
       updateLayers(editable, (l) => ({ ...l, x: l.x + dx / W, y: l.y + dy }));
     },
 
-    /** Layer order: +1 forward, -1 backward, 'front', 'back'. */
-    arrange(to: 1 | -1 | 'front' | 'back') {
+    /**
+     * Layer order: +1 forward, -1 backward, 'front', 'back'. Inside a group, layers move among its
+     * own; otherwise groups move whole.
+     */
+    arrange(to: Arrange) {
       const targets = new Set(editable);
       if (targets.size === 0) return;
       update((d) => {
-        const moving = d.layers.filter((l) => targets.has(l.id));
-        const rest = d.layers.filter((l) => !targets.has(l.id));
-        if (to === 'front') return { ...d, layers: [...rest, ...moving] };
-        if (to === 'back') return { ...d, layers: [...moving, ...rest] };
-        const layers = [...d.layers];
-        const order = to === 1 ? [...layers.keys()].reverse() : [...layers.keys()];
-        for (const i of order) {
-          const j = i + to;
-          if (!targets.has(layers[i].id) || j < 0 || j >= layers.length || targets.has(layers[j].id)) continue;
-          [layers[i], layers[j]] = [layers[j], layers[i]];
+        if (entered) {
+          const members = membersOf(d.layers, entered);
+          const layers = [...d.layers];
+          layers.splice(layers.indexOf(members[0]), members.length, ...reorder(members, (l) => targets.has(l.id), to));
+          return { ...d, layers };
         }
-        return { ...d, layers };
+        return { ...d, layers: reorder(stackUnits(d.layers), (unit) => unit.some((l) => targets.has(l.id)), to).flat() };
       });
     },
 
-    move(id: string, toIndex: number) {
+    /**
+     * Moves layers to sit just above `anchor`, or just below it, joining the group named (or
+     * leaving any group). Without an anchor they go to the bottom.
+     */
+    moveLayers(ids: string[], anchor: string | null, above: boolean, group: string | null) {
       update((d) => {
-        const layers = [...d.layers];
-        const from = layers.findIndex((l) => l.id === id);
-        if (from < 0) return d;
-        const [layer] = layers.splice(from, 1);
-        layers.splice(clamp(toIndex, 0, layers.length), 0, layer);
+        const moving = d.layers.filter((l) => ids.includes(l.id)).map((l) => {
+          const next = { ...l, group: group ?? undefined };
+          if (!group) delete next.group;
+          return next;
+        });
+        const layers = d.layers.filter((l) => !ids.includes(l.id));
+        const at = anchor ? layers.findIndex((l) => l.id === anchor) : -1;
+        layers.splice(at < 0 ? 0 : at + (above ? 1 : 0), 0, ...moving);
         return { ...d, layers };
       });
     },
 
-    flip: (axis: 'x' | 'y') =>
-      updateLayers(editable, (l) => (axis === 'x' ? { ...l, flipX: !l.flipX } : { ...l, flipY: !l.flipY })),
-    rotateBy: (degrees: number) => updateLayers(editable, (l) => ({ ...l, rotation: ((l.rotation + degrees + 540) % 360) - 180 })),
-    scaleBy: (factor: number) =>
-      updateLayers(editable, (l) => ({
-        ...l,
-        size: clamp(l.size * factor, 0.015, 3),
-        repeat: l.repeat && (l.repeat.mode === 'ring' || l.repeat.mode === 'arc') ? { ...l.repeat, spacing: l.repeat.spacing * factor } : l.repeat,
-        ...(l.shape && { shape: { ...l.shape, stroke: l.shape.stroke * factor } }),
-      })),
+    /** Flips each layer in place; a group selected whole mirrors across its middle. */
+    flip(axis: 'x' | 'y') {
+      const groups = selectionUnits(design, selectedLayers.filter((l) => !l.locked)).filter((u) => u.group);
+      const centres = new Map(groups.map((u) => [u.group!, boxCentre(membersBox(u.layers, W)!)]));
+      updateLayers(editable, (l) => {
+        const centre = l.group && centres.get(l.group);
+        if (!centre) return axis === 'x' ? { ...l, flipX: !l.flipX } : { ...l, flipY: !l.flipY };
+        // Mirroring a turned layer turns it the other way.
+        return axis === 'x'
+          ? { ...l, flipX: !l.flipX, rotation: -l.rotation, x: (2 * centre[0] - l.x * W) / W }
+          : { ...l, flipY: !l.flipY, rotation: -l.rotation, y: 2 * centre[1] - l.y };
+      });
+    },
+    /** Turns each layer in place; a group selected whole turns about its middle. */
+    rotateBy(degrees: number) {
+      const units = selectionUnits(design, selectedLayers.filter((l) => !l.locked));
+      const poses = units.flatMap((u) =>
+        u.group
+          ? rotatePoses(u.layers.map(poseOf), boxCentre(membersBox(u.layers, W)!), degrees, W)
+          : u.layers.map((l) => ({ ...poseOf(l), rotation: ((l.rotation + degrees + 540) % 360) - 180 })),
+      );
+      update((d) => ({ ...d, layers: applyPoses(d.layers, poses) }));
+    },
+    /** Grows each layer in place; a group selected whole grows about its middle. */
+    scaleBy(factor: number) {
+      const units = selectionUnits(design, selectedLayers.filter((l) => !l.locked));
+      const poses = units.flatMap((u) => {
+        if (!u.group) {
+          return u.layers.map((l) => ({
+            ...poseOf(l),
+            size: clamp(l.size * factor, 0.015, 3),
+            repeat: l.repeat && (l.repeat.mode === 'ring' || l.repeat.mode === 'arc') ? { ...l.repeat, spacing: l.repeat.spacing * factor } : l.repeat,
+            ...(l.shape && { shape: { ...l.shape, stroke: l.shape.stroke * factor } }),
+          }));
+        }
+        const [cx, cy] = boxCentre(membersBox(u.layers, W)!);
+        return scalePoses(u.layers.map(poseOf), { cx, cy, w: 1, h: 1, rotation: 0 }, [0, 0], factor, factor, W);
+      });
+      const groups = new Set(units.flatMap((u) => (u.group ? [u.group] : [])));
+      update((d) => scaleGroupRepeats({ ...d, layers: applyPoses(d.layers, poses) }, groups, factor));
+    },
 
     /**
      * Lines the selection up with a box. Without one, each emblem lines up with the selection's
@@ -347,8 +596,10 @@ export function useStudio(initial: StudioDoc) {
     align(edge: AlignEdge, target: Box | null) {
       const layers = design.layers.filter((l) => editable.includes(l.id) && !l.hidden);
       if (layers.length === 0) return;
-      const bounds = new Map(layers.map((l) => [l.id, layerBounds(l, W)]));
-      const group = unionBox([...bounds.values()]);
+      // A group selected whole lines up as one.
+      const units = selectionUnits(design, layers).map((u) => ({ ...u, box: unionBox(u.layers.map((l) => placedBounds(design, l, W))) }));
+      const bounds = new Map(units.flatMap((u) => u.layers.map((l) => [l.id, u.box] as const)));
+      const group = unionBox(units.map((u) => u.box));
       const into = target ?? group;
       const shift = (b: Box): [number, number] => {
         switch (edge) {
@@ -378,10 +629,10 @@ export function useStudio(initial: StudioDoc) {
 
     /** Spaces three or more emblems evenly between the outermost two. */
     distribute(axis: 'x' | 'y') {
-      const items = design.layers
-        .filter((l) => editable.includes(l.id) && !l.hidden)
-        .map((l) => ({ id: l.id, box: layerBounds(l, W) }))
-        .map(({ id, box }) => ({ id, start: axis === 'x' ? box.x0 : box.y0, end: axis === 'x' ? box.x1 : box.y1 }))
+      const layers = design.layers.filter((l) => editable.includes(l.id) && !l.hidden);
+      const items = selectionUnits(design, layers)
+        .map((u) => ({ ids: u.layers.map((l) => l.id), box: unionBox(u.layers.map((l) => placedBounds(design, l, W))) }))
+        .map(({ ids, box }) => ({ ids, start: axis === 'x' ? box.x0 : box.y0, end: axis === 'x' ? box.x1 : box.y1 }))
         .sort((a, b) => a.start + a.end - b.start - b.end);
       if (items.length < 3) return;
       const span = items[items.length - 1].end - items[0].start;
@@ -389,7 +640,7 @@ export function useStudio(initial: StudioDoc) {
       const shifts = new Map<string, number>();
       let at = items[0].start;
       for (const item of items) {
-        shifts.set(item.id, at - item.start);
+        for (const id of item.ids) shifts.set(id, at - item.start);
         at += item.end - item.start + gap;
       }
       updateLayers([...shifts.keys()], (l) =>
@@ -401,13 +652,14 @@ export function useStudio(initial: StudioDoc) {
     fitTo(target: Box) {
       const layers = design.layers.filter((l) => editable.includes(l.id) && !l.hidden);
       if (layers.length === 0) return;
-      const group = unionBox(layers.map((l) => layerBounds(l, W)));
+      const group = unionBox(layers.map((l) => placedBounds(design, l, W)));
       const [w, h] = [group.x1 - group.x0, group.y1 - group.y0];
       const k = Math.min(((target.x1 - target.x0) * FIT_FILL) / w, ((target.y1 - target.y0) * FIT_FILL) / h);
       const frame = { cx: (group.x0 + group.x1) / 2, cy: (group.y0 + group.y1) / 2, w, h, rotation: 0 };
       const [dx, dy] = [(target.x0 + target.x1) / 2 - frame.cx, (target.y0 + target.y1) / 2 - frame.cy];
       const poses = scalePoses(layers.map(poseOf), frame, [0, 0], k, k, W).map((p) => ({ ...p, x: p.x + dx / W, y: p.y + dy }));
-      update((d) => ({ ...d, layers: applyPoses(d.layers, poses) }));
+      const groups = new Set(selectionUnits(design, layers).flatMap((u) => (u.group ? [u.group] : [])));
+      update((d) => scaleGroupRepeats({ ...d, layers: applyPoses(d.layers, poses) }, groups, k));
     },
 
     /** Puts stretched emblems back in their own proportions, keeping their height. */
@@ -451,7 +703,16 @@ export function useStudio(initial: StudioDoc) {
       updateLayers(editable, (l) => ({ ...l, clip: on ? { kind: 'below' } : null }));
     },
 
+    /** Repeats the selected layers, or the group selected whole. */
     setRepeatMode(mode: StudioRepeat['mode'] | null) {
+      if (selectedGroup) {
+        const box = membersBox(membersOf(design.layers, selectedGroup.id), W);
+        if (!box) return;
+        return updateGroup(selectedGroup.id, (g) => {
+          if (mode === null) return { ...g, repeat: null };
+          return g.repeat?.mode === mode ? g : { ...g, repeat: defaultGroupRepeat(mode, box, g.repeat?.facing) };
+        });
+      }
       updateLayers(editable, (l) => {
         if (mode === null) return { ...l, repeat: null };
         if (l.repeat?.mode === mode) return l;
@@ -459,12 +720,94 @@ export function useStudio(initial: StudioDoc) {
         return { ...l, size: Math.min(l.size, REPEAT_SIZE[mode]), repeat: { ...defaultRepeat(mode, l), facing: l.repeat?.facing ?? false } };
       });
     },
-    setRepeat: (patch: Partial<StudioRepeat>, opts?: Opts) =>
-      updateLayers(editable, (l) => (l.repeat ? { ...l, repeat: { ...l.repeat, ...patch } } : l), opts),
+    setRepeat(patch: Partial<StudioRepeat>, opts?: Opts) {
+      if (selectedGroup) return updateGroup(selectedGroup.id, (g) => (g.repeat ? { ...g, repeat: { ...g.repeat, ...patch } } : g), opts);
+      updateLayers(editable, (l) => (l.repeat ? { ...l, repeat: { ...l.repeat, ...patch } } : l), opts);
+    },
 
     setLayerColor: (id: string, index: number, color: string, opts?: Opts) =>
       updateLayers([id], (l) => ({ ...l, colors: l.colors.map((c, i) => (i === index ? color : c)) }), opts),
     resetLayerColors: (targets: string[]) => updateLayers(targets, (l) => ({ ...l, colors: [...l.palette] })),
+
+    /**
+     * Repaints the slots one of `selectionColors` was in. Held for a whole edit, so dragging
+     * through another of the selection's colours doesn't merge the two.
+     */
+    setSelectionColor(slots: ColorSlot[], color: string, opts?: Opts) {
+      const ids = editable.filter((id) => slots.some((s) => s.id === id));
+      updateLayers(
+        ids,
+        (l) => {
+          const colors = [...l.colors];
+          let outline = l.outline;
+          for (const slot of slots) {
+            if (slot.id !== l.id) continue;
+            if (slot.index < 0) outline = outline && { ...outline, color };
+            else colors[slot.index] = color;
+          }
+          return { ...l, colors, outline };
+        },
+        opts,
+      );
+    },
+
+    // —— Groups ——
+
+    /** Groups the selection, where its top layer was. Groups in it are taken apart first. */
+    group() {
+      const ids = withWholeGroups(design, editable);
+      if (ids.length < 2) return;
+      const group: StudioGroup = { id: uid(), name: nextGroupName(design.groups), repeat: null };
+      update((d) => {
+        const top = Math.max(...ids.map((id) => d.layers.findIndex((l) => l.id === id)));
+        const members = d.layers.filter((l) => ids.includes(l.id));
+        const gone = new Set(members.map((l) => l.group));
+        return {
+          ...d,
+          layers: [
+            ...d.layers.slice(0, top + 1).filter((l) => !ids.includes(l.id)),
+            ...members.map((l) => ({ ...l, group: group.id })),
+            ...d.layers.slice(top + 1),
+          ],
+          groups: [...(d.groups ?? []).filter((g) => !gone.has(g.id)), group],
+        };
+      });
+      setSelectionState(ids);
+    },
+    /** Takes apart every group the selection is in, leaving its layers where they are. */
+    ungroup() {
+      const groups = new Set(selectedLayers.flatMap((l) => (l.group ? [l.group] : [])));
+      if (groups.size === 0) return;
+      update((d) => ({
+        ...d,
+        layers: d.layers.map((l) => {
+          if (!l.group || !groups.has(l.group)) return l;
+          const next = { ...l };
+          delete next.group;
+          return next;
+        }),
+        groups: d.groups?.filter((g) => !groups.has(g.id)),
+      }));
+    },
+    selectGroup: (id: string) => setSelectionState(membersOf(design.layers, id).map((l) => l.id)),
+    renameGroup: (id: string, name: string) => updateGroup(id, (g) => ({ ...g, name: name.trim() || g.name })),
+    /** Hides or shows all of a group's layers: hides them unless they all already are. */
+    toggleGroupHidden(id: string) {
+      const members = membersOf(design.layers, id);
+      const hidden = members.some((l) => !l.hidden);
+      updateLayers(
+        members.map((l) => l.id),
+        (l) => ({ ...l, hidden }),
+      );
+    },
+    toggleGroupLocked(id: string) {
+      const members = membersOf(design.layers, id);
+      const locked = members.some((l) => !l.locked);
+      updateLayers(
+        members.map((l) => l.id),
+        (l) => ({ ...l, locked }),
+      );
+    },
 
     toggleHidden: (id: string) => updateLayers([id], (l) => ({ ...l, hidden: !l.hidden })),
     toggleLocked: (id: string) => updateLayers([id], (l) => ({ ...l, locked: !l.locked })),
@@ -629,7 +972,11 @@ export function useStudio(initial: StudioDoc) {
     W,
     selection: liveSelection,
     selectedLayers,
+    selectedGroup,
+    entered,
+    selectionColors,
     pathEdit,
+    textEdit,
     selectedDivision,
     fieldSelected,
     setSelection,

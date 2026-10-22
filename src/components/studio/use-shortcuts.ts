@@ -12,7 +12,7 @@ const PANELS: Panel[] = ['layout', 'emblems', 'colors', 'layers'];
 
 /**
  * Design-tool keyboard shortcuts: undo/redo, clipboard, duplicate, delete, nudge, arrange,
- * flip, resize, zoom, select all, cycle selection, tools, point editing and panel switching.
+ * flip, resize, zoom, select all, cycle selection, grouping, tools, point editing and panel switching.
  */
 export function useShortcuts(
   studio: Studio,
@@ -61,6 +61,7 @@ export function useShortcuts(
       if (mod) {
         // ⌥⌘G, by its key since Option changes the letter on a Mac.
         if (e.altKey && e.code === 'KeyG') return studio.selectedLayers.length ? run(actions.toggleClipBelow) : undefined;
+        if (key === 'g') return run(e.shiftKey ? actions.ungroup : actions.group);
         if (key === 'z') return run(e.shiftKey ? history.redo : history.undo);
         if (key === 'y') return run(history.redo);
         if (key === 'c') return run(actions.copy);
@@ -93,10 +94,20 @@ export function useShortcuts(
         }
       }
       if (key === 'backspace' || key === 'delete') return run(actions.deleteSelected);
+      if (key === 'enter' && studio.selectedLayers.length === 1 && studio.selectedLayers[0].text) return run(() => actions.editText());
       if (key === 'enter' && studio.selectedLayers.length === 1 && canEditPoints(studio.selectedLayers[0])) return run(() => actions.editPoints());
-      if (key === 'escape') return run(() => (options.tool && options.tool !== 'select' ? options.setTool?.('select') : studio.setSelection([])));
+      if (key === 'escape') {
+        // Out of a group a step at a time: to the group selected whole, then to nothing.
+        return run(() =>
+          options.tool && options.tool !== 'select'
+            ? options.setTool?.('select')
+            : studio.entered
+              ? actions.selectGroup(studio.entered)
+              : studio.setSelection([]),
+        );
+      }
       if (options.setTool && !e.shiftKey && !e.altKey) {
-        const tool = ({ v: 'select', u: 'shape', b: 'brush', p: 'pen' } as const)[key as 'v'];
+        const tool = ({ v: 'select', u: 'shape', b: 'brush', p: 'pen', t: 'text' } as const)[key as 'v'];
         if (tool) return run(() => options.setTool!(tool));
       }
       if (key === 'tab') return run(() => actions.selectNext(e.shiftKey ? -1 : 1));

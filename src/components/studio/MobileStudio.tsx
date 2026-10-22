@@ -10,6 +10,7 @@ import {
   Copy,
   Emblems,
   FlipHorizontal,
+  GroupIcon,
   Layers,
   MoreHorizontal,
   Outline,
@@ -18,7 +19,9 @@ import {
   RotateQuarter,
   SquaresFour,
   SwapColors,
+  Text,
   Trash2,
+  Ungroup,
   WandSparkles,
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -27,7 +30,21 @@ import type { StudioEmblem } from './model';
 import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
-import { AlignControls, FieldSwatches, LayerMoreMenu, LayerSwatches, OutlineControls, PathControls, PointEditBar, RepeatControls, ShapeControls } from './tools';
+import {
+  AlignControls,
+  FieldSwatches,
+  LayerMoreMenu,
+  LayerSwatches,
+  OutlineControls,
+  PathControls,
+  PointEditBar,
+  RepeatControls,
+  SelectionSwatches,
+  ShapeControls,
+  TextControls,
+  canGroup,
+  selectionRepeat,
+} from './tools';
 import type { Panel } from './use-shortcuts';
 import type { Studio } from './use-studio';
 
@@ -106,6 +123,8 @@ export function MobileStudio({
   const { selectedLayers, fieldSelected, actions } = studio;
   const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
   const allShapes = selectedLayers.length > 0 && selectedLayers.every((l) => l.shape);
+  const allText = selectedLayers.length > 0 && selectedLayers.every((l) => l.text);
+  const repeat = selectionRepeat(studio);
   const importImages = useImageImport(studio);
 
   return (
@@ -153,16 +172,19 @@ export function MobileStudio({
               <>
                 {allShapes ? (
                   <div className='flex shrink-0 items-center px-1'>
+                    {allText && <TextControls studio={studio} layers={selectedLayers} />}
                     <ShapeControls studio={studio} layers={selectedLayers} />
                     <PathControls studio={studio} />
                   </div>
                 ) : (
                   <>
-                    {single && (
-                      <div className='flex shrink-0 items-center gap-1.5 px-2'>
+                    <div className='flex shrink-0 items-center gap-1.5 px-2'>
+                      {single && !studio.selectedGroup ? (
                         <LayerSwatches studio={studio} layer={single} size={30} />
-                      </div>
-                    )}
+                      ) : (
+                        <SelectionSwatches studio={studio} size={30} />
+                      )}
+                    </div>
                     <Action label='Match' onClick={actions.matchPalette}>
                       <WandSparkles />
                     </Action>
@@ -177,10 +199,21 @@ export function MobileStudio({
                 <Action label='Align' onClick={() => setTool('align')}>
                   <AlignCentre />
                 </Action>
-                {single && (
-                  <Action label='Repeat' active={Boolean(single.repeat)} onClick={() => setTool('repeat')}>
+                {repeat && (
+                  <Action label='Repeat' active={Boolean(repeat.repeat)} onClick={() => setTool('repeat')}>
                     <Repeat />
                   </Action>
+                )}
+                {studio.selectedGroup ? (
+                  <Action label='Ungroup' onClick={actions.ungroup}>
+                    <Ungroup />
+                  </Action>
+                ) : (
+                  canGroup(studio) && (
+                    <Action label='Group' onClick={actions.group}>
+                      <GroupIcon />
+                    </Action>
+                  )
                 )}
                 {!selectedLayers.some((l) => l.shape) && <Action
                   label='Outline'
@@ -223,9 +256,22 @@ export function MobileStudio({
 
       <nav className='flex shrink-0 justify-around border-t border-line bg-background/95 px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5'>
         {TABS.map(({ panel: id, label, icon }) => (
-          <Action key={id} label={label} active={panel === id} onClick={() => setPanel(id)}>
-            {icon}
-          </Action>
+          <React.Fragment key={id}>
+            <Action label={label} active={panel === id} onClick={() => setPanel(id)}>
+              {icon}
+            </Action>
+            {id === 'emblems' && (
+              <Action
+                label='Text'
+                onClick={() => {
+                  setMode('flat');
+                  void actions.addText({ x: studio.W / 2, y: 0.5 + 0.12 * 0.35 });
+                }}
+              >
+                <Text />
+              </Action>
+            )}
+          </React.Fragment>
         ))}
       </nav>
 
@@ -262,19 +308,19 @@ export function MobileStudio({
         )}
         {panel === 'layers' && (
           <div className='pb-4'>
-            <LayersPanel studio={studio} />
+            <LayersPanel studio={studio} onOpenField={() => setPanel('layout')} />
           </div>
         )}
       </Sheet>
 
       <Sheet
-        open={tool === 'align' ? selectedLayers.length > 0 : tool !== null && Boolean(single)}
+        open={tool === 'align' ? selectedLayers.length > 0 : tool === 'repeat' ? Boolean(repeat) : tool !== null && Boolean(single)}
         onOpenChange={(open) => !open && (studio.history.commit(), setTool(null))}
         title={tool === 'repeat' ? 'Repeat' : tool === 'align' ? 'Align' : 'Outline'}
       >
         <div className='flex justify-center pb-5'>
           {tool === 'align' && <AlignControls studio={studio} />}
-          {single && tool === 'repeat' && <RepeatControls studio={studio} layer={single} />}
+          {repeat && tool === 'repeat' && <RepeatControls studio={studio} />}
           {single && tool === 'outline' && (
             <div className='flex w-[248px] flex-col gap-3'>
               <OutlineControls studio={studio} layer={single} />

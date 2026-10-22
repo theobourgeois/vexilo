@@ -2,10 +2,39 @@
 
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronDown, ClipMask, ClippedBelow, Copy, Dice, Eye, EyeSlash, Lock, Minus, NoClip, Plus, Search, Trash2, Unlock, Upload, X } from '@/components/icons';
+import {
+  ChevronDown,
+  ChevronRight,
+  BringForward,
+  ClipboardIcon,
+  ClipMask,
+  ClippedBelow,
+  Copy,
+  Dice,
+  Edit,
+  Eye,
+  EyeSlash,
+  Folder,
+  GroupIcon,
+  Lock,
+  Minus,
+  NoClip,
+  Plus,
+  Search,
+  SelectAll,
+  SendBackward,
+  Shuffle,
+  SquaresFour,
+  Trash2,
+  Ungroup,
+  Unlock,
+  Upload,
+  X,
+} from '@/components/icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -15,19 +44,20 @@ import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { EMBLEM_CATEGORIES, emblemSearchScore, mixEmblemCategories } from '@/lib/emblem-search';
-import type { EdgeStyle, FlagOutline, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
+import type { EdgeStyle, FlagOutline, StudioDesign, StudioDivision, StudioField, StudioGroup, StudioLayer } from '@/lib/studio-design';
 import { clipBaseIndex, clipsBelow, clipTargets, partLabel } from './clip';
 import { luminance, PALETTE_GROUPS, PALETTES } from './colors';
 import { FlagArt, PartPreview } from './FlagArt';
 import { layerImage } from './cutout';
 import { DIVISION_KINDS, DIVISIONS, divisionLabel, divisionParams, divisionParts } from './divisions';
 import { divisionFor, LAYOUT_TEMPLATES, PART_TEMPLATES, sameShape, templateField, type FieldTemplate, type StackField } from './field';
+import { membersBox, membersOf, stackUnits } from './groups';
 import { useRecolored } from './images';
-import { documentColors, layerColors, layerWidth, type StudioEmblem } from './model';
+import { documentColors, flagWidth, layerColors, layerWidth, type StudioEmblem } from './model';
 import { newOutline, OUTLINE_KINDS, outlineD, outlineParams, OUTLINES } from './outline';
 import { shapePath } from './shapes';
 import { EMBLEM_MIME } from './StudioCanvas';
-import { ClipChoiceArt, ColorButton } from './tools';
+import { canGroup, ClipChoiceArt, ClipSubmenu, ColorButton } from './tools';
 import { ColorPicker, Slider, Swatch } from './ui';
 import { FIELD, type Studio } from './use-studio';
 
@@ -920,13 +950,22 @@ function ImageThumb({ layer }: { layer: StudioLayer }) {
   );
 }
 
-function LayerName({ layer, onRename }: { layer: StudioLayer; onRename: (name: string) => void }) {
-  const [editing, setEditing] = React.useState(false);
+function LayerName({
+  name,
+  editing,
+  setEditing,
+  onRename,
+}: {
+  name: string;
+  editing: boolean;
+  setEditing: (editing: boolean) => void;
+  onRename: (name: string) => void;
+}) {
   if (editing)
     return (
       <input
         autoFocus
-        defaultValue={layer.name}
+        defaultValue={name}
         onBlur={(e) => (onRename(e.target.value), setEditing(false))}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -939,57 +978,196 @@ function LayerName({ layer, onRename }: { layer: StudioLayer; onRename: (name: s
     );
   return (
     <span className='min-w-0 flex-1 truncate' onDoubleClick={() => setEditing(true)}>
-      {layer.name}
+      {name}
     </span>
   );
 }
 
-export function LayersPanel({ studio }: { studio: Studio }) {
-  const { design, selection, setSelection, actions } = studio;
-  const ordered = [...design.layers].reverse();
-  const reorder = useReorder(
-    ordered.map((l) => l.id),
-    actions.move,
-  );
-  const fieldDesign: StudioDesign = { ...design, layers: [] };
+type LayerRow =
+  | { kind: 'group'; group: StudioGroup; members: StudioLayer[] }
+  | { kind: 'layer'; layer: StudioLayer; inGroup: boolean };
 
-  const select = (id: string, additive: boolean) =>
-    setSelection(
-      additive
-        ? selection.includes(id)
-          ? selection.filter((s) => s !== id)
-          : [...selection.filter((s) => design.layers.some((l) => l.id === s)), id]
-        : [id],
+/** Where a dragged row would land: a line on a row's edge, and the move it makes. */
+type LayerDrop = { row: number; edge: 'top' | 'bottom'; indent: boolean; anchor: string | null; above: boolean; group: string | null };
+
+export function LayersPanel({ studio, onOpenField }: { studio: Studio; onOpenField?: () => void }) {
+  const { design, selection, setSelection, actions } = studio;
+  const fieldDesign: StudioDesign = { ...design, layers: [] };
+  const [open, setOpen] = React.useState<string[]>([]);
+  const expanded = (id: string) => open.includes(id) || studio.entered === id;
+  const [renaming, setRenaming] = React.useState<string | null>(null);
+  const naming = (id: string) => ({ editing: renaming === id, setEditing: (on: boolean) => setRenaming(on ? id : null) });
+  const [menu, setMenu] = React.useState<RowMenuAt | null>(null);
+
+  // Top-down: each group's row, then its layers when it's open.
+  const rows: LayerRow[] = [];
+  for (const unit of stackUnits(design.layers).reverse()) {
+    const group = unit[0].group ? design.groups?.find((g) => g.id === unit[0].group) : null;
+    if (group) rows.push({ kind: 'group', group, members: unit });
+    if (!group || expanded(group.id)) rows.push(...[...unit].reverse().map((layer) => ({ kind: 'layer' as const, layer, inGroup: Boolean(group) })));
+  }
+
+  const [dragging, setDragging] = React.useState<{ kind: 'layer' | 'group'; id: string } | null>(null);
+  const [drop, setDrop] = React.useState<LayerDrop | null>(null);
+  const endDrag = () => (setDragging(null), setDrop(null));
+  const unitOf = (row: LayerRow) => (row.kind === 'group' ? row.members : row.inGroup ? membersOf(design.layers, row.layer.group!) : [row.layer]);
+  const rowsOf = (unit: StudioLayer[]) => {
+    const inUnit = (row: LayerRow) => unitOf(row)[0].id === unit[0].id;
+    return [rows.findIndex(inUnit), rows.findLastIndex(inUnit)];
+  };
+
+  /** A group moves whole, above or below the row's own group or layer; a layer can go into a group or out of one. */
+  function dropAt(row: number, top: boolean): LayerDrop | null {
+    if (!dragging) return null;
+    const r = rows[row];
+    if (dragging.kind === 'group') {
+      const unit = unitOf(r);
+      if (unit[0].group === dragging.id) return null;
+      const [first, last] = rowsOf(unit);
+      return top
+        ? { row: first, edge: 'top', indent: false, anchor: unit.at(-1)!.id, above: true, group: dragging.id }
+        : { row: last, edge: 'bottom', indent: false, anchor: unit[0].id, above: false, group: dragging.id };
+    }
+    let place: LayerDrop;
+    if (r.kind === 'group') {
+      const into = !top && expanded(r.group.id);
+      place = top
+        ? { row, edge: 'top', indent: false, anchor: r.members.at(-1)!.id, above: true, group: null }
+        : into
+          ? { row, edge: 'bottom', indent: true, anchor: r.members.at(-1)!.id, above: true, group: r.group.id }
+          : { row, edge: 'bottom', indent: false, anchor: r.members[0].id, above: false, group: null };
+    } else {
+      place = { row, edge: top ? 'top' : 'bottom', indent: r.inGroup, anchor: r.layer.id, above: top, group: r.layer.group ?? null };
+    }
+    return place.anchor === dragging.id ? null : place;
+  }
+
+  const dragProps = (row: number, kind: 'layer' | 'group', id: string) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.stopPropagation();
+      setDragging({ kind, id });
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', id);
+    },
+    onDragEnd: endDrag,
+    onDragOver: (e: React.DragEvent<HTMLElement>) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const r = e.currentTarget.getBoundingClientRect();
+      setDrop(dropAt(row, e.clientY < r.top + r.height / 2));
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (dragging && drop) {
+        const ids = dragging.kind === 'group' ? membersOf(design.layers, dragging.id).map((l) => l.id) : [dragging.id];
+        actions.moveLayers(ids, drop.anchor, drop.above, drop.group);
+      }
+      endDrag();
+    },
+  });
+  const marker = (row: number) =>
+    drop?.row === row && (
+      <span className={cn('absolute right-2 h-0.5 rounded bg-main', drop.edge === 'top' ? '-top-px' : '-bottom-px', drop.indent ? 'left-8' : 'left-2')} />
+    );
+
+  const select = (ids: string[], additive: boolean) => {
+    if (!additive) return setSelection(ids);
+    const layers = selection.filter((s) => design.layers.some((l) => l.id === s));
+    setSelection(ids.every((id) => layers.includes(id)) ? layers.filter((id) => !ids.includes(id)) : [...layers.filter((id) => !ids.includes(id)), ...ids]);
+  };
+
+  /** Right-click picks the row, unless it's already part of the selection, then opens its menu. */
+  const openMenu = (e: React.MouseEvent, at: Omit<RowMenuAt, 'x' | 'y' | 'open'>, ids: string[]) => {
+    e.preventDefault();
+    if (!ids.every((id) => selection.includes(id))) setSelection(ids);
+    setMenu({ ...at, x: e.clientX, y: e.clientY, open: true });
+  };
+
+  const rowClass = (active: boolean, hidden: boolean | undefined, dragged: boolean) =>
+    cn(
+      'group relative flex h-11 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
+      active ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
+      hidden && 'opacity-50',
+      dragged && 'opacity-40',
     );
 
   return (
     <div className='flex min-h-0 flex-1 flex-col overflow-y-auto'>
       <div className='flex flex-col gap-0.5'>
-        {ordered.map((layer, row) => {
-          const active = selection.includes(layer.id);
-          const index = design.layers.length - 1 - row;
+        {rows.map((r, row) => {
+          if (r.kind === 'group') {
+            const { group, members } = r;
+            const ids = members.map((l) => l.id);
+            const hidden = members.every((l) => l.hidden);
+            const locked = members.every((l) => l.locked);
+            const isOpen = expanded(group.id);
+            return (
+              <div
+                key={`group-${group.id}`}
+                {...dragProps(row, 'group', group.id)}
+                onClick={(e) => select(ids, e.shiftKey || e.metaKey)}
+                onContextMenu={(e) => openMenu(e, { kind: 'group', id: group.id }, ids)}
+                className={rowClass(studio.selectedGroup?.id === group.id, hidden, dragging?.id === group.id)}
+              >
+                {marker(row)}
+                <button
+                  type='button'
+                  aria-label={isOpen ? 'Collapse group' : 'Expand group'}
+                  aria-expanded={isOpen}
+                  onClick={(e) => (e.stopPropagation(), setOpen((o) => (o.includes(group.id) ? o.filter((id) => id !== group.id) : [...o, group.id])))}
+                  className='-mr-1.5 grid size-5 shrink-0 cursor-pointer place-items-center rounded-[5px] text-muted-foreground hover:bg-foreground/[0.07] hover:text-foreground'
+                >
+                  {isOpen ? <ChevronDown className='size-3' /> : <ChevronRight className='size-3' />}
+                </button>
+                <GroupThumb design={design} members={members} />
+                <LayerName name={group.name} {...naming(group.id)} onRename={(name) => actions.renameGroup(group.id, name)} />
+                {group.repeat && group.repeat.count > 1 && <span className='shrink-0 text-[11.5px] tabular-nums text-muted-foreground'>×{group.repeat.count}</span>}
+                <button
+                  type='button'
+                  aria-label={locked ? 'Unlock group' : 'Lock group'}
+                  onClick={(e) => (e.stopPropagation(), actions.toggleGroupLocked(group.id))}
+                  className={cn('grid size-7 cursor-pointer place-items-center rounded-[7px] hover:bg-foreground/[0.07]', !locked && 'opacity-0 group-hover:opacity-70')}
+                >
+                  {locked ? <Lock className='size-3.5' /> : <Unlock className='size-3.5' />}
+                </button>
+                <button
+                  type='button'
+                  aria-label={hidden ? 'Show group' : 'Hide group'}
+                  onClick={(e) => (e.stopPropagation(), actions.toggleGroupHidden(group.id))}
+                  className={cn('grid size-7 cursor-pointer place-items-center rounded-[7px] hover:bg-foreground/[0.07]', !hidden && 'opacity-0 group-hover:opacity-70')}
+                >
+                  {hidden ? <EyeSlash className='size-3.5' /> : <Eye className='size-3.5' />}
+                </button>
+              </div>
+            );
+          }
+          const { layer, inGroup } = r;
+          const index = design.layers.indexOf(layer);
+          // A group selected whole shows on its own row; its layers are only lightly marked.
+          const active = selection.includes(layer.id) && !(inGroup && studio.selectedGroup?.id === layer.group);
           const clippedBelow = clipsBelow(layer) && clipBaseIndex(design.layers, index) >= 0;
           const clippedTo = layer.clip?.kind === 'part' ? partLabel(design, layer.clip) : null;
           return (
             <div
               key={layer.id}
-              {...reorder.rowProps(layer.id, row)}
-              onClick={(e) => select(layer.id, e.shiftKey || e.metaKey)}
+              {...dragProps(row, 'layer', layer.id)}
+              onClick={(e) => select([layer.id], e.shiftKey || e.metaKey)}
+              onContextMenu={(e) => openMenu(e, { kind: 'layer', id: layer.id }, [layer.id])}
               className={cn(
-                'group relative flex h-11 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
-                active ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
-                layer.hidden && 'opacity-50',
-                reorder.dragging === layer.id && 'opacity-40',
+                rowClass(active, layer.hidden, dragging?.id === layer.id),
+                inGroup && 'pl-8',
+                inGroup && !active && selection.includes(layer.id) && 'bg-main-soft/40',
               )}
             >
-              {reorder.marker(row)}
+              {marker(row)}
               {clippedBelow && (
                 <span title='Clipped to the layer below' className='-mr-1 shrink-0 text-muted-foreground'>
                   <ClippedBelow className='size-3.5' />
                 </span>
               )}
               <LayerThumb layer={layer} />
-              <LayerName layer={layer} onRename={(name) => actions.rename(layer.id, name)} />
+              <LayerName name={layer.name} {...naming(layer.id)} onRename={(name) => actions.rename(layer.id, name)} />
               {clippedTo && (
                 <span title={`Clipped to ${clippedTo}`} className='shrink-0 text-muted-foreground'>
                   <ClipMask className='size-3.5' />
@@ -1016,6 +1194,21 @@ export function LayersPanel({ studio }: { studio: Studio }) {
         })}
         <div
           onClick={() => setSelection([FIELD])}
+          onContextMenu={(e) => openMenu(e, { kind: 'field', id: FIELD }, [FIELD])}
+          onDragOver={(e) => {
+            if (!dragging) return;
+            e.preventDefault();
+            // Dropped on the field: the very bottom of the stack.
+            setDrop({ row: rows.length - 1, edge: 'bottom', indent: false, anchor: null, above: false, group: dragging.kind === 'group' ? dragging.id : null });
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragging && drop) {
+              const ids = dragging.kind === 'group' ? membersOf(design.layers, dragging.id).map((l) => l.id) : [dragging.id];
+              actions.moveLayers(ids, drop.anchor, drop.above, drop.group);
+            }
+            endDrag();
+          }}
           className={cn(
             'flex h-11 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
             studio.fieldSelected ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
@@ -1025,6 +1218,139 @@ export function LayersPanel({ studio }: { studio: Studio }) {
           <span className='flex-1'>Field</span>
         </div>
       </div>
+      {menu && (
+        <LayerRowMenu
+          studio={studio}
+          at={menu}
+          onClose={() => setMenu((m) => m && { ...m, open: false })}
+          onRename={() => setRenaming(menu.id)}
+          onOpenField={onOpenField}
+        />
+      )}
     </div>
+  );
+}
+
+type RowMenuAt = { kind: 'layer' | 'group' | 'field'; id: string; x: number; y: number; open: boolean };
+
+const Shortcut = ({ children }: { children: React.ReactNode }) => <span className='ml-auto pl-3 text-xs text-muted-foreground'>{children}</span>;
+
+/** What a right-click on a row in the layers panel offers, for the selection it picked. */
+function LayerRowMenu({
+  studio,
+  at,
+  onClose,
+  onRename,
+  onOpenField,
+}: {
+  studio: Studio;
+  at: RowMenuAt;
+  onClose: () => void;
+  onRename: () => void;
+  onOpenField?: () => void;
+}) {
+  const { actions, design, selectedLayers } = studio;
+  const group = at.kind === 'group' ? design.groups?.find((g) => g.id === at.id) : null;
+  const members = group ? membersOf(design.layers, group.id) : [];
+  const layer = at.kind === 'layer' && selectedLayers.length === 1 ? selectedLayers[0] : null;
+  const locked = group ? members.every((l) => l.locked) : layer?.locked;
+  const hidden = group ? members.every((l) => l.hidden) : layer?.hidden;
+  return (
+    <DropdownMenu open={at.open} onOpenChange={(open) => !open && onClose()} modal={false}>
+      {/* The menu opens where the click was. */}
+      <DropdownMenuTrigger asChild>
+        <span aria-hidden className='pointer-events-none fixed size-0' style={{ left: at.x, top: at.y }} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='start' sideOffset={2} className='w-56' onCloseAutoFocus={(e) => e.preventDefault()}>
+        {at.kind === 'field' ? (
+          <>
+            {onOpenField && (
+              <DropdownMenuItem onSelect={onOpenField}>
+                <SquaresFour /> Edit field
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={actions.cycleFieldColors}>
+              <Shuffle /> Shuffle colours
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={actions.paste} disabled={!actions.canPaste()}>
+              <ClipboardIcon /> Paste <Shortcut>⌘V</Shortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={actions.selectAll} disabled={design.layers.length === 0}>
+              <SelectAll /> Select all layers <Shortcut>⌘A</Shortcut>
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            {(group || layer) && (
+              // After the menu has let go of focus, so the name field keeps it.
+              <DropdownMenuItem onSelect={() => setTimeout(onRename)}>
+                <Edit /> Rename
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => actions.duplicateSelected()}>
+              <Plus /> Duplicate <Shortcut>⌘D</Shortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={actions.copy}>
+              <Copy /> Copy <Shortcut>⌘C</Shortcut>
+            </DropdownMenuItem>
+            {canGroup(studio) && (
+              <DropdownMenuItem onSelect={actions.group}>
+                <GroupIcon /> Group <Shortcut>⌘G</Shortcut>
+              </DropdownMenuItem>
+            )}
+            {selectedLayers.some((l) => l.group) && (
+              <DropdownMenuItem onSelect={actions.ungroup}>
+                <Ungroup /> Ungroup <Shortcut>⇧⌘G</Shortcut>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => actions.arrange('front')}>
+              <BringForward /> Bring to front <Shortcut>⇧⌘]</Shortcut>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => actions.arrange('back')}>
+              <SendBackward /> Send to back <Shortcut>⇧⌘[</Shortcut>
+            </DropdownMenuItem>
+            <ClipSubmenu studio={studio} />
+            {(group || layer) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => (group ? actions.toggleGroupLocked(group.id) : actions.toggleLocked(layer!.id))}>
+                  {locked ? <Unlock /> : <Lock />} {locked ? 'Unlock' : 'Lock'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => (group ? actions.toggleGroupHidden(group.id) : actions.toggleHidden(layer!.id))}>
+                  {hidden ? <Eye /> : <EyeSlash />} {hidden ? 'Show' : 'Hide'}
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={actions.deleteSelected}>
+              <Trash2 /> Delete <Shortcut>⌫</Shortcut>
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** A group's layers on their own, framed to fit. */
+function GroupThumb({ design, members }: { design: StudioDesign; members: StudioLayer[] }) {
+  const W = flagWidth(design);
+  const box = membersBox(members, W);
+  const view = box && { x: box.x0, y: box.y0, w: Math.max(box.x1 - box.x0, 0.01), h: Math.max(box.y1 - box.y0, 0.01) };
+  const side = view && Math.max(view.w, view.h) * 1.15;
+  return (
+    <span className={cn('relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[7px]', tileTone(members.flatMap(layerColors)))}>
+      {view && side ? (
+        <FlagArt
+          design={{ ...design, outline: null, field: { kind: 'stack', color: 'transparent', divisions: [] }, layers: members.map((l) => ({ ...l, clip: l.clip?.kind === 'part' ? null : l.clip })), groups: [] }}
+          view={{ x: view.x + view.w / 2 - side / 2, y: view.y + view.h / 2 - side / 2, w: side, h: side }}
+          className='size-[78%]'
+        />
+      ) : (
+        <Folder className='size-4 text-muted-foreground' />
+      )}
+    </span>
   );
 }

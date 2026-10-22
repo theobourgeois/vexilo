@@ -61,7 +61,7 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        "flex cursor-default select-none items-center rounded-lg px-2.5 py-2 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-[state=open]:bg-foreground/[0.06] gap-2 data-[inset=true]:pl-8 [&_svg]:pointer-events-none [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 ",
+        "flex cursor-pointer select-none items-center rounded-lg px-2.5 py-2 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-highlighted:bg-foreground/[0.06] data-[state=open]:bg-foreground/[0.06] gap-2 data-[inset=true]:pl-8 [&_svg]:pointer-events-none [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 ",
         className,
       )}
       {...props}
@@ -121,7 +121,7 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-inset={inset}
       className={cn(
-        "relative gap-2 [&_svg]:pointer-events-none [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 flex cursor-default select-none items-center rounded-lg data-[inset=true]:pl-8 px-2.5 py-2 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50 ",
+        "relative gap-2 [&_svg]:pointer-events-none [&_svg]:w-4 [&_svg]:h-4 [&_svg]:shrink-0 flex cursor-pointer select-none items-center rounded-lg data-[inset=true]:pl-8 px-2.5 py-2 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-highlighted:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50 ",
         className,
       )}
       {...props}
@@ -138,7 +138,7 @@ function DropdownMenuCheckboxItem({
   return (
     <DropdownMenuPrimitive.CheckboxItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-lg gap-2 py-2 pl-8 pr-2.5 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex cursor-pointer select-none items-center rounded-lg gap-2 py-2 pl-8 pr-2.5 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-highlighted:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       checked={checked}
@@ -162,7 +162,7 @@ function DropdownMenuRadioItem({
   return (
     <DropdownMenuPrimitive.RadioItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-lg gap-2 py-2 pl-8 pr-2.5 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50",
+        "relative flex cursor-pointer select-none items-center rounded-lg gap-2 py-2 pl-8 pr-2.5 text-sm font-medium outline-hidden transition-colors focus:bg-foreground/[0.06] data-highlighted:bg-foreground/[0.06] data-disabled:pointer-events-none data-disabled:opacity-50",
         className,
       )}
       {...props}

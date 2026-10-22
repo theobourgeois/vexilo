@@ -9,13 +9,14 @@ export const clipsBelow = (layer: StudioLayer) => layer.clip?.kind === 'below';
 
 /**
  * The layers bottom first, in runs: a layer, then the ones above it clipped to the layer below,
- * which only show inside it. A clipped layer at the very bottom has nothing to clip to, so it
- * starts its own run.
+ * which only show inside it. A clipped layer at the very bottom, or of its group, has nothing to
+ * clip to, so it starts its own run.
  */
 export function clipGroups(layers: StudioLayer[]) {
   const groups: StudioLayer[][] = [];
   for (const layer of layers) {
-    if (clipsBelow(layer) && groups.length) groups.at(-1)!.push(layer);
+    const last = groups.at(-1);
+    if (clipsBelow(layer) && last && last[0].group === layer.group) last.push(layer);
     else groups.push([layer]);
   }
   return groups;
@@ -23,13 +24,20 @@ export function clipGroups(layers: StudioLayer[]) {
 
 /** Where the layer a layer clipped to the one below shows inside is; -1 when there's none. */
 export function clipBaseIndex(layers: StudioLayer[], index: number) {
+  const group = layers[index]?.group;
+  const sameGroup = (k: number) => k >= 0 && layers[k].group === group;
+  if (!sameGroup(index - 1)) return -1;
   let k = index - 1;
-  while (k > 0 && clipsBelow(layers[k])) k--;
+  while (clipsBelow(layers[k]) && sameGroup(k - 1)) k--;
   return k;
 }
 
-/** Whether a layer's clip lets a point (flag units) show. */
-export function layerShownAt(design: StudioDesign, layer: StudioLayer, px: number, py: number): boolean {
+/**
+ * Whether a layer's clip lets a point show. A field part clips where it is on the flag (px, py);
+ * the layer below clips where the layer itself is drawn from (lx, ly), which differ only in a
+ * repeated group's copies.
+ */
+export function layerShownAt(design: StudioDesign, layer: StudioLayer, px: number, py: number, lx = px, ly = py): boolean {
   const clip = layer.clip;
   if (!clip) return true;
   const W = flagWidth(design);
@@ -37,7 +45,7 @@ export function layerShownAt(design: StudioDesign, layer: StudioLayer, px: numbe
   const k = clipBaseIndex(design.layers, design.layers.indexOf(layer));
   if (k < 0) return true;
   const base = design.layers[k];
-  return !base.hidden && hitsLayer(base, W, px, py) && layerShownAt(design, base, px, py);
+  return !base.hidden && hitsLayer(base, W, lx, ly) && layerShownAt(design, base, px, py, lx, ly);
 }
 
 export const samePart = (a: FieldPartRef | null | undefined, b: FieldPartRef | null | undefined) =>

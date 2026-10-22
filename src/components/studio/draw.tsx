@@ -2,15 +2,18 @@
 
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { Cursor, PaintBrush, PenNib, Shapes } from '@/components/icons';
+import { ChevronDown, Cursor, PaintBrush, PenNib, Shapes, Text } from '@/components/icons';
+import type { TextFont } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import { documentColors, EXPORT_WIDTH } from './model';
 import { isLinear, SHAPE_PRESETS, shapePath, type ShapePreset, type ShapeStyle } from './shapes';
+import { fontChoice, FONTS, previewFamily } from './text';
 import { ColorPicker, Slider, ToolButton, ToolDivider } from './ui';
 import type { Studio } from './use-studio';
 
-export type ToolKind = 'select' | 'shape' | 'brush' | 'pen';
+export type ToolKind = 'select' | 'shape' | 'brush' | 'pen' | 'text';
 
 /** The tool in hand, and how it paints. */
 export type DrawSettings = ShapeStyle & {
@@ -20,6 +23,8 @@ export type DrawSettings = ShapeStyle & {
   brushColor: string;
   /** Fraction of flag height. */
   brushSize: number;
+  font: TextFont;
+  textColor: string;
 };
 
 export const DEFAULT_DRAW: DrawSettings = {
@@ -31,12 +36,15 @@ export const DEFAULT_DRAW: DrawSettings = {
   strokeWidth: 0,
   brushColor: '#FFFFFF',
   brushSize: 0.012,
+  font: 'inter',
+  textColor: '#FFFFFF',
 };
 
 const TOOLS: { tool: ToolKind; label: string; icon: React.ReactNode }[] = [
   { tool: 'select', label: 'Select (V)', icon: <Cursor /> },
   { tool: 'shape', label: 'Shapes (U)', icon: <Shapes /> },
   { tool: 'pen', label: 'Pen (P)', icon: <PenNib /> },
+  { tool: 'text', label: 'Text (T)', icon: <Text /> },
   { tool: 'brush', label: 'Brush (B)', icon: <PaintBrush /> },
 ];
 
@@ -142,6 +150,41 @@ export function PaintButton({
   );
 }
 
+/** A font menu, each name shown in its own face. */
+export function FontPicker({ value, onChange, side = 'bottom' }: { value: TextFont; onChange: (font: TextFont) => void; side?: 'top' | 'bottom' }) {
+  const [open, setOpen] = React.useState(false);
+  const current = fontChoice(value);
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type='button'
+          aria-label='Font'
+          className={cn(
+            'inline-flex h-8 w-[132px] shrink-0 cursor-pointer items-center justify-between gap-1 rounded-[9px] px-2 text-[13px] font-medium text-subtle outline-none transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+            open && 'bg-foreground/[0.06] text-foreground',
+          )}
+        >
+          <span className='truncate'>{current.label}</span>
+          <ChevronDown className='size-3 shrink-0' />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side={side} sideOffset={10} align='start' className='w-56'>
+        <DropdownMenuRadioGroup value={value} onValueChange={(id) => onChange(id as TextFont)}>
+          {FONTS.map((f) => (
+            <DropdownMenuRadioItem key={f.id} value={f.id} className='justify-between'>
+              <span className='text-[16px]' style={{ fontFamily: open ? `${previewFamily(f.id)}, var(--font-sans)` : undefined }}>
+                {f.id === 'cairo' ? 'عربي' : f.label}
+              </span>
+              <span className='text-[12px] text-muted-foreground'>{f.id === 'cairo' ? f.label : f.hint}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /** A width in flag units, shown in export pixels. */
 export function WidthSlider({
   studio,
@@ -192,7 +235,7 @@ function StrokeButton({ studio, draw, onChange }: { studio: Studio; draw: DrawSe
   );
 }
 
-/** What the shape, pen or brush tool will paint with, under the toolbar. */
+/** What the shape, pen, brush or text tool will paint with, under the toolbar. */
 export function ToolOptions({
   studio,
   draw,
@@ -211,7 +254,14 @@ export function ToolOptions({
   const linear = isLinear(preset.shape.kind);
   return (
     <div className={cn('flex h-11 items-center gap-0.5 rounded-[13px] bg-surface p-[5px] shadow-pop', className)} style={style}>
-      {draw.tool === 'pen' ? (
+      {draw.tool === 'text' ? (
+        <>
+          <FontPicker value={draw.font} onChange={(font) => onChange({ font })} />
+          <ToolDivider />
+          <PaintButton studio={studio} label='Colour' color={draw.textColor} on onColor={(textColor) => onChange({ textColor })} />
+          <span className='px-2 text-[12.5px] text-muted-foreground'>Click the flag to type</span>
+        </>
+      ) : draw.tool === 'pen' ? (
         <>
           <PaintButton
             studio={studio}

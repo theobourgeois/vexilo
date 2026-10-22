@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import {
   AlignBottom,
   AlignCentre,
@@ -41,6 +42,7 @@ import {
   FlipHorizontal,
   FlipVertical,
   GridIcon,
+  GroupIcon,
   IntersectShapes,
   Lock,
   MergeShapes,
@@ -56,25 +58,33 @@ import {
   SquaresFour,
   SubtractShapes,
   SwapColors,
+  Text,
+  TextAlignCenter,
+  TextAlignLeft,
+  TextAlignRight,
+  TextBold,
+  TextItalic,
   Trash2,
+  Ungroup,
   Unlock,
   WandSparkles,
   X,
   ChevronDown,
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import type { FieldPartRef, StudioClip, StudioDesign, StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import type { FieldPartRef, StudioClip, StudioDesign, StudioLayer, StudioRepeat, StudioText } from '@/lib/studio-design';
 import { clipTargets } from './clip';
 import { DIVISIONS, divisionParts } from './divisions';
-import { PaintButton, WidthSlider } from './draw';
+import { FontPicker, PaintButton, WidthSlider } from './draw';
 import { PartPreview } from './FlagArt';
 import { documentColors, fieldColors, layerWidth } from './model';
 import { alignScopes, type AlignScope } from './regions';
 import { defaultStroke, isLinear, naturalAspect } from './shapes';
 import { ColorPicker, Slider, Swatch, ToolButton, ToolDivider } from './ui';
 import type { Rect } from './StudioCanvas';
-import type { AlignEdge, Studio } from './use-studio';
-import { BOOLEAN_LABELS, canEditPoints, type BooleanOp } from './vector';
+import type { AlignEdge, ColorSlot, SelectionColor, Studio } from './use-studio';
+import { fontChoice } from './text';
+import { BOOLEAN_LABELS, canEditPoints, isOutline, type BooleanOp } from './vector';
 
 /** A colour swatch that opens the picker. `onChange` is live; the popover closing commits. */
 export function ColorButton({
@@ -142,6 +152,45 @@ export function LayerSwatches({ studio, layer, size, side }: { studio: Studio; l
   );
 }
 
+/** The colours across everything selected; changing one repaints it wherever the selection uses it. */
+export function SelectionSwatches({ studio, size, side }: { studio: Studio; size?: number; side?: 'top' | 'bottom' }) {
+  return (
+    <>
+      {studio.selectionColors.slice(0, MAX_SWATCHES).map((entry, i) => (
+        <SelectionSwatch key={`${entry.slots[0].id}:${entry.slots[0].index}`} studio={studio} entry={entry} label={`Colour ${i + 1}`} size={size} side={side} />
+      ))}
+    </>
+  );
+}
+
+function SelectionSwatch({
+  studio,
+  entry,
+  label,
+  size,
+  side,
+}: {
+  studio: Studio;
+  entry: SelectionColor;
+  label: string;
+  size?: number;
+  side?: 'top' | 'bottom';
+}) {
+  // The slots it was in when the picker opened, kept while it's open.
+  const held = React.useRef<ColorSlot[] | null>(null);
+  return (
+    <ColorButton
+      color={entry.color}
+      studio={studio}
+      size={size}
+      side={side}
+      label={label}
+      onOpenChange={(open) => (held.current = open ? entry.slots : null)}
+      onChange={(next, transient) => studio.actions.setSelectionColor(held.current ?? entry.slots, next, { transient })}
+    />
+  );
+}
+
 /** The selected division's colours, or every colour the field shows. */
 export function FieldSwatches({ studio, size, side }: { studio: Studio; size?: number; side?: 'top' | 'bottom' }) {
   const division = studio.selectedDivision;
@@ -201,8 +250,14 @@ const REPEAT_MODES: { mode: StudioRepeat['mode'] | null; label: string; icon: Re
   { mode: 'arc', label: 'Arc', icon: <ArcIcon /> },
 ];
 
-export function RepeatControls({ studio, layer }: { studio: Studio; layer: StudioLayer }) {
-  const repeat = layer.repeat;
+/** The repeat the toolbar edits: the whole group's when one is selected, else the one layer's. */
+export function selectionRepeat(studio: Studio): { repeat: StudioRepeat | null } | null {
+  if (studio.selectedGroup) return { repeat: studio.selectedGroup.repeat };
+  return studio.selectedLayers.length === 1 ? { repeat: studio.selectedLayers[0].repeat ?? null } : null;
+}
+
+export function RepeatControls({ studio }: { studio: Studio }) {
+  const repeat = selectionRepeat(studio)?.repeat ?? null;
   const radial = repeat && (repeat.mode === 'ring' || repeat.mode === 'arc');
   return (
     <div className='flex w-[248px] flex-col gap-3.5'>
@@ -345,8 +400,9 @@ const BOOLEANS: { op: BooleanOp; hint: string; icon: React.ReactNode }[] = [
  * Brush strokes are left out.
  */
 export function PathControls({ studio, side = 'top' }: { studio: Studio; side?: 'top' | 'bottom' }) {
-  const shapes = studio.selectedLayers.filter((l) => canEditPoints(l) && !l.locked && !l.hidden);
+  const shapes = studio.selectedLayers.filter((l) => isOutline(l) && !l.locked && !l.hidden);
   if (shapes.length === 1 && studio.selectedLayers.length === 1) {
+    if (!canEditPoints(shapes[0])) return null;
     return (
       <ToolButton label='Edit points (Enter)' side={side} onClick={() => studio.actions.editPoints(shapes[0].id)}>
         <BezierCurve />
@@ -365,6 +421,103 @@ export function PathControls({ studio, side = 'top' }: { studio: Studio; side?: 
         </ToolButton>
       ))}
     </>
+  );
+}
+
+const TEXT_ALIGN: { align: StudioText['align']; label: string; icon: React.ReactNode }[] = [
+  { align: 'left', label: 'Align left', icon: <TextAlignLeft /> },
+  { align: 'center', label: 'Centre', icon: <TextAlignCenter /> },
+  { align: 'right', label: 'Align right', icon: <TextAlignRight /> },
+];
+
+/** The words, face and setting of selected text. */
+export function TextControls({ studio, layers, side = 'top' }: { studio: Studio; layers: StudioLayer[]; side?: 'top' | 'bottom' }) {
+  const { actions, history } = studio;
+  const text = layers[0].text!;
+  const font = fontChoice(text.font);
+  const live = (patch: Partial<StudioText>) => actions.setText(patch, { transient: true });
+  return (
+    <>
+      {layers.length === 1 && <TextEditButton studio={studio} layer={layers[0]} side={side} />}
+      <FontPicker value={text.font} side={side} onChange={(f) => actions.setText({ font: f })} />
+      <ToolButton label='Bold' side={side} active={Boolean(text.bold && font.bold)} disabled={!font.bold} onClick={() => actions.setText({ bold: !text.bold })}>
+        <TextBold />
+      </ToolButton>
+      <ToolButton
+        label='Italic'
+        side={side}
+        active={Boolean(text.italic && font.italic)}
+        disabled={!font.italic}
+        onClick={() => actions.setText({ italic: !text.italic })}
+      >
+        <TextItalic />
+      </ToolButton>
+      <ToolPopover label='Text settings' icon={<SlidersHorizontal />} iconOnly side={side} onClose={history.commit}>
+        <div className='flex w-[248px] flex-col gap-3'>
+          <div className='flex items-center gap-0.5'>
+            {TEXT_ALIGN.map((a) => (
+              <ToolButton key={a.align} label={a.label} active={text.align === a.align} onClick={() => actions.setText({ align: a.align })}>
+                {a.icon}
+              </ToolButton>
+            ))}
+          </div>
+          <Field label='Letter spacing' value={`${Math.round(text.spacing * 100)}%`}>
+            <Slider label='Letter spacing' min={-0.2} max={1} step={0.01} value={text.spacing} onChange={(spacing) => live({ spacing })} onCommit={history.commit} />
+          </Field>
+          {text.content.includes('\n') && (
+            <Field label='Line height' value={text.leading.toFixed(2)}>
+              <Slider label='Line height' min={0.6} max={3} step={0.05} value={text.leading} onChange={(leading) => live({ leading })} onCommit={history.commit} />
+            </Field>
+          )}
+          <Field label='Curve' value={`${Math.round(text.curve)}°`}>
+            <Slider label='Curve' min={-360} max={360} step={1} value={text.curve} onChange={(curve) => live({ curve })} onCommit={history.commit} />
+          </Field>
+          <span className='-mt-1 text-[12px] text-muted-foreground'>Bend it up into an arch, or down into a smile. 360° goes all the way round.</span>
+        </div>
+      </ToolPopover>
+    </>
+  );
+}
+
+/** The words themselves, open while the text is being typed. */
+function TextEditButton({ studio, layer, side }: { studio: Studio; layer: StudioLayer; side: 'top' | 'bottom' }) {
+  const { actions } = studio;
+  const open = studio.textEdit?.id === layer.id;
+  // Kept here so typing runs ahead of a font still loading.
+  const [value, setValue] = React.useState(layer.text!.content);
+  React.useEffect(() => {
+    if (!open) setValue(layer.text!.content);
+  }, [open, layer.text]);
+  return (
+    <Popover open={open} onOpenChange={(next) => (next ? actions.editText(layer.id) : actions.stopEditingText())}>
+      <PopoverTrigger asChild>
+        <ToolButton label='Edit text (Enter)' side={side} active={open}>
+          <Text />
+          <span>Edit</span>
+        </ToolButton>
+      </PopoverTrigger>
+      <PopoverContent side={side} sideOffset={10} className='w-auto p-2'>
+        <Textarea
+          autoFocus
+          dir='auto'
+          aria-label='Text'
+          className='min-h-[72px] w-[280px] resize-none text-[15px]'
+          value={value}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => {
+            setValue(e.target.value);
+            actions.setText({ content: e.target.value }, { transient: true });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              actions.stopEditingText();
+            }
+          }}
+        />
+        <p className='px-1 pt-1.5 text-[12px] text-muted-foreground'>Enter for a new line · ⌘Enter when done</p>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -529,24 +682,28 @@ function ToolPopover({
   icon,
   active,
   iconOnly,
+  side = 'top',
+  onClose,
   children,
 }: {
   label: string;
   icon: React.ReactNode;
   active?: boolean;
   iconOnly?: boolean;
+  side?: 'top' | 'bottom';
+  onClose?: () => void;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(next) => (setOpen(next), !next && onClose?.())}>
       <PopoverTrigger asChild>
-        <ToolButton label={label} active={active || open}>
+        <ToolButton label={label} side={side} active={active || open}>
           {icon}
           {!iconOnly && <span>{label}</span>}
         </ToolButton>
       </PopoverTrigger>
-      <PopoverContent side='top' sideOffset={10} className='w-auto p-3.5' onOpenAutoFocus={(e) => e.preventDefault()}>
+      <PopoverContent side={side} sideOffset={10} className='w-auto p-3.5' onOpenAutoFocus={(e) => e.preventDefault()}>
         {children}
       </PopoverContent>
     </Popover>
@@ -556,7 +713,6 @@ function ToolPopover({
 const clipKey = (clip: StudioClip | null | undefined) =>
   !clip ? 'none' : clip.kind === 'below' ? 'below' : `part:${clip.divisionId}:${clip.part}`;
 
-/** What the selection only shows inside: nothing, the layer under it, or a part of the field. */
 /** What a clip choice shows before its name, in one column: the part on the flag, or an icon. */
 export function ClipChoiceArt({ design, part, icon }: { design: StudioDesign; part?: FieldPartRef; icon?: React.ReactNode }) {
   return (
@@ -566,7 +722,8 @@ export function ClipChoiceArt({ design, part, icon }: { design: StudioDesign; pa
   );
 }
 
-function ClipSubmenu({ studio }: { studio: Studio }) {
+/** What the selection only shows inside: nothing, the layer under it, or a part of the field. */
+export function ClipSubmenu({ studio }: { studio: Studio }) {
   const { actions, selectedLayers, design } = studio;
   const keys = new Set(selectedLayers.map((l) => clipKey(l.clip)));
   const value = keys.size === 1 ? [...keys][0] : '';
@@ -607,6 +764,9 @@ function ClipSubmenu({ studio }: { studio: Studio }) {
   );
 }
 
+/** Whether the selection is more than one thing that could become a group. */
+export const canGroup = (studio: Studio) => !studio.selectedGroup && studio.selectedLayers.filter((l) => !l.locked).length > 1;
+
 export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Studio; children: React.ReactNode; side?: 'top' | 'bottom' }) {
   const { actions, selectedLayers } = studio;
   const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
@@ -624,11 +784,21 @@ export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Stud
           <SendBackward /> Send to back
         </DropdownMenuItem>
         <ClipSubmenu studio={studio} />
+        {canGroup(studio) && (
+          <DropdownMenuItem onSelect={actions.group}>
+            <GroupIcon /> Group <span className='ml-auto pl-3 text-xs text-muted-foreground'>⌘G</span>
+          </DropdownMenuItem>
+        )}
+        {selectedLayers.some((l) => l.group) && (
+          <DropdownMenuItem onSelect={actions.ungroup}>
+            <Ungroup /> Ungroup <span className='ml-auto pl-3 text-xs text-muted-foreground'>⇧⌘G</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => actions.resetLayerColors(selectedLayers.map((l) => l.id))}>
           <SwapColors /> Original colours
         </DropdownMenuItem>
-        {selectedLayers.some((l) => canEditPoints(l) && l.shape!.kind !== 'path') && (
+        {selectedLayers.some((l) => l.text || (canEditPoints(l) && l.shape!.kind !== 'path')) && (
           <DropdownMenuItem onSelect={actions.convertToPath}>
             <BezierCurve /> Convert to path
           </DropdownMenuItem>
@@ -684,7 +854,9 @@ export function ContextToolbar({
   const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
   const anyOutline = selectedLayers.some((l) => l.outline);
   const allShapes = selectedLayers.length > 0 && selectedLayers.every((l) => l.shape);
+  const allText = selectedLayers.length > 0 && selectedLayers.every((l) => l.text);
   const anyShape = selectedLayers.some((l) => l.shape);
+  const repeat = selectionRepeat(studio);
 
   // Clear the rotate handle above the selection.
   const lift = 58 + (selectedLayers.some((l) => !l.locked && !l.hidden) && !studio.pathEdit ? 30 : 0);
@@ -700,16 +872,20 @@ export function ContextToolbar({
       <>
         {allShapes ? (
           <>
+            {allText && (
+              <>
+                <TextControls studio={studio} layers={selectedLayers} />
+                <ToolDivider />
+              </>
+            )}
             <ShapeControls studio={studio} layers={selectedLayers} />
             <PathControls studio={studio} />
           </>
         ) : (
           <>
-            {single && (
-              <div className='flex items-center gap-1.5 px-1.5'>
-                <LayerSwatches studio={studio} layer={single} />
-              </div>
-            )}
+            <div className='flex items-center gap-1.5 px-1.5'>
+              {single && !studio.selectedGroup ? <LayerSwatches studio={studio} layer={single} /> : <SelectionSwatches studio={studio} />}
+            </div>
             <ToolButton label='Match palette' onClick={actions.matchPalette}>
               <WandSparkles />
               <span>Match palette</span>
@@ -727,11 +903,23 @@ export function ContextToolbar({
           <AlignControls studio={studio} />
         </ToolPopover>
         <ToolDivider />
-        {single ? (
-          <ToolPopover label='Repeat' icon={<Repeat />} active={Boolean(single.repeat)}>
-            <RepeatControls studio={studio} layer={single} />
+        {repeat && (
+          <ToolPopover label='Repeat' icon={<Repeat />} active={Boolean(repeat.repeat)}>
+            <RepeatControls studio={studio} />
           </ToolPopover>
-        ) : null}
+        )}
+        {studio.selectedGroup ? (
+          <ToolButton label='Ungroup (⇧⌘G)' onClick={actions.ungroup}>
+            <Ungroup />
+          </ToolButton>
+        ) : (
+          canGroup(studio) && (
+            <ToolButton label='Group (⌘G)' onClick={actions.group}>
+              <GroupIcon />
+              <span>Group</span>
+            </ToolButton>
+          )
+        )}
         {/* Shapes have their own stroke. */}
         {!anyShape && <OutlineButton studio={studio} active={anyOutline} />}
         <ToolDivider />
@@ -791,7 +979,10 @@ export function ContextToolbar({
   return (
     <div
       ref={ref}
+      // Its menus and popovers are portaled but still bubble here through React: keep them off the canvas.
       onPointerDown={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.stopPropagation()}
       className='absolute z-20 flex items-center gap-0.5 rounded-[13px] bg-surface p-[5px] shadow-pop'

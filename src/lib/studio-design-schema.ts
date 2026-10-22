@@ -90,7 +90,8 @@ const field = z.discriminatedUnion('kind', [
 
 const handle = z.tuple([z.number().min(-1000).max(1000), z.number().min(-1000).max(1000)]);
 const pathNode = z.object({ x: unit, y: unit, in: handle.optional(), out: handle.optional() });
-const contours = z.array(z.object({ nodes: z.array(pathNode).min(1).max(2000), closed: z.boolean() })).max(400);
+// Text can run to many letters, each a few outlines.
+const contours = z.array(z.object({ nodes: z.array(pathNode).min(1).max(2000), closed: z.boolean() })).max(2000);
 
 const shape = z.object({
   kind: z.enum(['rect', 'ellipse', 'triangle', 'diamond', 'star', 'polygon', 'cross', 'crescent', 'heart', 'line', 'arrow', 'brush', 'path']),
@@ -101,6 +102,26 @@ const shape = z.object({
   corner: z.number().min(0).max(1).optional(),
   path: z.array(z.tuple([unit, unit])).max(2000).optional(),
   contours: contours.optional(),
+  nonzero: z.boolean().optional(),
+});
+
+const text = z.object({
+  content: z.string().max(500),
+  font: z.enum(['inter', 'garamond', 'cinzel', 'oswald', 'slab', 'fraktur', 'script', 'cairo']),
+  bold: z.boolean().optional(),
+  italic: z.boolean().optional(),
+  spacing: z.number().min(-0.5).max(2),
+  leading: z.number().min(0.5).max(4),
+  align: z.enum(['left', 'center', 'right']),
+  curve: z.number().min(-360).max(360),
+  ink: z.tuple([unit, unit, z.number().nonnegative(), z.number().positive()]),
+});
+
+const repeat = z.object({
+  mode: z.enum(['row', 'column', 'ring', 'arc', 'grid']),
+  count: z.number().int().min(1).max(64),
+  spacing: z.number().min(-1).max(5),
+  facing: z.boolean(),
 });
 
 const layer = z.object({
@@ -109,6 +130,7 @@ const layer = z.object({
   name: z.string().max(120),
   src: z.union([z.string().url().max(1000), z.literal('')]),
   shape: shape.optional(),
+  text: text.optional(),
   cutout: z
     .object({
       box: z.tuple([unit, unit, unit, unit]),
@@ -127,21 +149,16 @@ const layer = z.object({
   flipX: z.boolean(),
   flipY: z.boolean(),
   outline: z.object({ color: hex, width: z.number().min(0).max(0.2) }).nullable(),
-  repeat: z
-    .object({
-      mode: z.enum(['row', 'column', 'ring', 'arc', 'grid']),
-      count: z.number().int().min(1).max(64),
-      spacing: z.number().min(-1).max(5),
-      facing: z.boolean(),
-    })
-    .nullable(),
+  repeat: repeat.nullable(),
   clip: z
     .discriminatedUnion('kind', [z.object({ kind: z.literal('below') }), z.object({ kind: z.literal('part'), ...partRef })])
     .nullable()
     .optional(),
   hidden: z.boolean().optional(),
   locked: z.boolean().optional(),
+  group: z.string().max(40).optional(),
 });
+const groups = z.array(z.object({ id: z.string().max(40), name: z.string().max(120), repeat: repeat.nullable() })).max(100);
 
 const ratio = z.tuple([z.number().positive().max(20), z.number().positive().max(20)]);
 const outline = z.object({
@@ -155,6 +172,6 @@ const layers = z.array(layer).max(200);
 
 /** Either version of a design; open one in the flag maker with `migrateDesign`. */
 export const studioDesignSchema: z.ZodType<StoredStudioDesign> = z.union([
-  z.object({ version: z.literal(2), ratio, outline: outline.nullable().optional(), field, layers }),
+  z.object({ version: z.literal(2), ratio, outline: outline.nullable().optional(), field, layers, groups: groups.optional() }),
   z.object({ version: z.literal(1), ratio, field: fieldV1, layers }),
 ]);

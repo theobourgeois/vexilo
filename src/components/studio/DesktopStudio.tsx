@@ -155,7 +155,7 @@ export function DesktopStudio({
           {panel === 'emblems' && <EmblemsPanel emblems={emblems} onAdd={(emblem) => addEmblem(emblem)} onUpload={(files) => importImages(files)} />}
           {panel === 'layout' && <LayoutPanel studio={studio} />}
           {panel === 'colors' && <ColoursPanel studio={studio} />}
-          {panel === 'layers' && <LayersPanel studio={studio} />}
+          {panel === 'layers' && <LayersPanel studio={studio} onOpenField={() => setPanel('layout')} />}
         </aside>
       )}
 

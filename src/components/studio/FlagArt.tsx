@@ -5,6 +5,7 @@ import type { FieldPartRef, StudioDesign, StudioDivision, StudioField, StudioLay
 import { clipGroups } from './clip';
 import { layerImage } from './cutout';
 import { divisionGeometry } from './divisions';
+import { groupPlacements, layerPlacements, placementTransform, stackUnits } from './groups';
 import { useRecolored } from './images';
 import { flagWidth, layerBounds, layerCopies, layerWidth } from './model';
 import { outlineD } from './outline';
@@ -86,10 +87,36 @@ export function FlagArt({
       </defs>
       <g clipPath={`url(#${id}-clip)`}>
         <FieldArt field={design.field} W={W} href={hrefs?.field} id={id} />
-        {clipGroups(design.layers).map((group) => (
-          <ClipGroup key={group[0].id} group={group} field={design.field} W={W} hrefs={hrefs} id={id} />
-        ))}
-        {ghosted.length > 0 && <g opacity={0.35}>{ghosted.map((layer) => layerArt(layer, W, id, hrefs))}</g>}
+        {/* A repeated group draws whole, once per copy. */}
+        {stackUnits(clipGroups(design.layers).map((run) => ({ group: run[0].group, run }))).map((unit) =>
+          (unit[0].group ? groupPlacements(design, unit[0].group, W) : [null]).map((placement, i) => (
+            <React.Fragment key={`${unit[0].run[0].id}-${i}`}>
+              {unit.map(({ run }) => (
+                <ClipGroup
+                  key={run[0].id}
+                  group={run}
+                  field={design.field}
+                  W={W}
+                  hrefs={hrefs}
+                  id={id}
+                  scope={i ? `${id}-${i}` : id}
+                  transform={placement ? placementTransform(placement) : undefined}
+                />
+              ))}
+            </React.Fragment>
+          )),
+        )}
+        {ghosted.length > 0 && (
+          <g opacity={0.35}>
+            {ghosted.flatMap((layer) =>
+              layerPlacements(design, layer, W).map((placement, i) => (
+                <g key={`${layer.id}-${i}`} transform={placementTransform(placement)}>
+                  {layerArt(layer, W, id, hrefs)}
+                </g>
+              )),
+            )}
+          </g>
+        )}
         {/* Twice as wide as it shows: the outside half is clipped away. */}
         {trim && <path d={edge} fill='none' stroke={trim.color} strokeWidth={trim.width * 2} strokeLinejoin='miter' strokeMiterlimit={32} />}
       </g>
@@ -101,23 +128,44 @@ export function FlagArt({
  * A layer and the layers clipped to it, which only show where it does. Hiding it hides them too.
  * The mask draws it again without its outline, so they stay inside its own edge.
  */
-function ClipGroup({ group, field, W, hrefs, id }: { group: StudioLayer[]; field: StudioField; W: number; hrefs?: Hrefs; id: string }) {
+function ClipGroup({
+  group,
+  field,
+  W,
+  hrefs,
+  id,
+  scope,
+  transform,
+}: {
+  group: StudioLayer[];
+  field: StudioField;
+  W: number;
+  hrefs?: Hrefs;
+  id: string;
+  /** Prefixes the ids it defines, so each copy of a group has its own. */
+  scope: string;
+  /** Where a group's copy puts it; a field part still clips where it is on the flag. */
+  transform?: string;
+}) {
   const [base, ...rest] = group;
   if (base.hidden) return null;
   const art = (layer: StudioLayer, outline = true) => layerArt(layer, W, id, hrefs, outline);
   const clipped = rest.filter((layer) => !layer.hidden);
-  const maskId = `${id}-m-${base.id}`;
+  const maskId = `${scope}-m-${base.id}`;
   return (
-    <PartClip target={partTarget(field, base.clip?.kind === 'part' ? base.clip : null)} W={W} id={`${id}-c-${base.id}`}>
-      {art(base)}
-      {clipped.length > 0 && (
-        <>
-          <mask id={maskId} maskUnits='userSpaceOnUse' x={0} y={0} width={W} height={1} style={{ maskType: 'alpha' }}>
-            {art(base, false)}
-          </mask>
-          <g mask={`url(#${maskId})`}>{clipped.map((layer) => art(layer))}</g>
-        </>
-      )}
+    <PartClip target={partTarget(field, base.clip?.kind === 'part' ? base.clip : null)} W={W} id={`${scope}-c-${base.id}`}>
+      <g transform={transform}>
+        {art(base)}
+        {clipped.length > 0 && (
+          <>
+            {/* Larger than the flag: a group's layers can sit off it, with only its copies on it. */}
+            <mask id={maskId} maskUnits='userSpaceOnUse' x={-W} y={-1} width={W * 3} height={3} style={{ maskType: 'alpha' }}>
+              {art(base, false)}
+            </mask>
+            <g mask={`url(#${maskId})`}>{clipped.map((layer) => art(layer))}</g>
+          </>
+        )}
+      </g>
     </PartClip>
   );
 }
@@ -303,6 +351,7 @@ export const ShapeArt = React.memo(function ShapeArt({ layer, W, filter }: { lay
   const w = layerWidth(layer);
   const d = shapePath(shape, w, h);
   const brush = shape.kind === 'brush';
+  const round = brush || Boolean(layer.text);
   return (
     <g filter={filter}>
       {layerCopies(layer, W).map((copy, i) => (
@@ -310,11 +359,11 @@ export const ShapeArt = React.memo(function ShapeArt({ layer, W, filter }: { lay
           key={i}
           d={d}
           fill={shape.fill ? layer.colors[0] : 'none'}
-          fillRule='evenodd'
+          fillRule={shape.nonzero ? 'nonzero' : 'evenodd'}
           stroke={shape.stroke > 0 ? (layer.colors[1] ?? layer.colors[0]) : 'none'}
           strokeWidth={shape.stroke}
           strokeLinecap={brush ? 'round' : 'butt'}
-          strokeLinejoin={brush ? 'round' : 'miter'}
+          strokeLinejoin={round ? 'round' : 'miter'}
           transform={`translate(${copy.cx} ${copy.cy}) rotate(${copy.rot}) scale(${layer.flipX ? -1 : 1} ${layer.flipY ? -1 : 1})`}
         />
       ))}

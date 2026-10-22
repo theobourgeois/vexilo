@@ -1,15 +1,15 @@
 'use client';
 
 import React from 'react';
-import type { PathContour, PathNode, StudioLayer } from '@/lib/studio-design';
+import type { PathContour, PathNode, StudioGroup, StudioLayer } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import type { DrawSettings } from './draw';
-import { layerShownAt } from './clip';
 import { insideOutline, outlineD } from './outline';
 import { FlagArt } from './FlagArt';
 import { divisionGeometry, fieldAnchors, fieldPartAt, type FieldPart } from './divisions';
 import { type Anchor } from './layouts';
-import { clamp, hitsLayer, layerBounds, pixelSize, unionBox, type Box } from './model';
+import { layerAt, membersOf, placedBounds, ringGroups, scaleRings, stackUnits } from './groups';
+import { clamp, hitsLayer, pixelSize, unionBox, type Box } from './model';
 import {
   isLinear,
   LINE_WEIGHT,
@@ -80,11 +80,11 @@ type Targets = { x: Target[]; y: Target[] };
 
 type Gesture =
   | { kind: 'move'; ids: string[]; start: [number, number]; origin: Map<string, [number, number]>; box: Box; targets: Targets; moved: boolean }
-  | { kind: 'transform'; handle: number; frame: Frame; poses: LayerPose[]; targets: Targets }
+  | { kind: 'transform'; handle: number; frame: Frame; poses: LayerPose[]; rings: StudioGroup[]; targets: Targets }
   | { kind: 'rotate'; poses: LayerPose[]; centre: [number, number]; centreScreen: [number, number]; startAngle: number; rotation: number }
   | { kind: 'pan'; start: [number, number]; origin: View }
   | { kind: 'marquee'; start: [number, number]; current: [number, number]; additive: boolean; onFlag: boolean; points?: boolean }
-  | { kind: 'pinch'; poses: LayerPose[]; centre: [number, number]; startDist: number; startAngle: number; startMid: [number, number]; origin: View }
+  | { kind: 'pinch'; poses: LayerPose[]; rings: StudioGroup[]; centre: [number, number]; startDist: number; startAngle: number; startMid: [number, number]; origin: View }
   | { kind: 'shape'; preset: ShapePreset; start: [number, number]; id: string | null }
   | { kind: 'brush'; points: [number, number][] }
   /** Pulling handles out of the pen's newest node. */
@@ -258,13 +258,17 @@ export function StudioCanvas({
 
   // A selected layer can be grabbed where its clip hides it, so one clipped out of sight can still be moved back.
   const hitTest = (u: number, v: number) => {
+    const reach = 5 / scale;
     for (let i = design.layers.length - 1; i >= 0; i--) {
       const layer = design.layers[i];
-      if (layer.hidden || layer.locked || !hitsLayer(layer, W, u, v, 5 / scale)) continue;
-      if (selection.includes(layer.id) || (onFlag(u, v) && layerShownAt(design, layer, u, v))) return layer;
+      if (layer.hidden || layer.locked) continue;
+      if (selection.includes(layer.id) ? layerAt(design, layer, W, u, v, reach, false) : onFlag(u, v) && layerAt(design, layer, W, u, v, reach)) return layer;
     }
     return null;
   };
+  /** What a click on a layer picks: its whole group, unless the selection is already inside that group. */
+  const unitOf = (layer: StudioLayer) =>
+    layer.group && studio.entered !== layer.group ? membersOf(design.layers, layer.group).map((l) => l.id) : [layer.id];
 
   const onFlag = (u: number, v: number) => insideOutline(design, u, v);
   /** Selects what's under a point on the field: an unlocked division, or the field itself. */
@@ -290,7 +294,7 @@ export function StudioCanvas({
       x.push({ at: a.x, centreOnly: true });
       y.push({ at: a.y, centreOnly: true });
     }
-    const others = design.layers.filter((l) => !exclude.includes(l.id) && !l.hidden).map((l) => layerBounds(l, W));
+    const others = design.layers.filter((l) => !exclude.includes(l.id) && !l.hidden).map((l) => placedBounds(design, l, W));
     for (const b of others) {
       x.push({ at: b.x0 }, { at: (b.x0 + b.x1) / 2 }, { at: b.x1 });
       y.push({ at: b.y0 }, { at: (b.y0 + b.y1) / 2 }, { at: b.y1 });
@@ -356,7 +360,7 @@ export function StudioCanvas({
 
   // Handles act on every selected emblem that can move, while selecting.
   const transformable = selecting && !editing ? selectedLayers.filter((l) => !l.locked && !l.hidden) : [];
-  const frame = selectionFrame(transformable, W);
+  const frame = selectionFrame(design, transformable, W);
 
   /** Ends the pen's path as a new layer, unless it's too short to draw anything. */
   function finishPen(nodes: PathNode[] | null, closed: boolean, { keepTool = false } = {}) {
@@ -456,10 +460,11 @@ export function StudioCanvas({
       const [a, b] = [...pointers.current.values()];
       // A pinch that began as a drag picks up from where the drag left the emblems.
       const poses = studio.design.layers.filter((l) => transformable.some((t) => t.id === l.id)).map(poseOf);
-      const start = selectionFrame(studio.design.layers.filter((l) => poses.some((p) => p.id === l.id)), W);
+      const start = selectionFrame(studio.design, studio.design.layers.filter((l) => poses.some((p) => p.id === l.id)), W);
       begin({
         kind: 'pinch',
         poses,
+        rings: ringGroups(studio.design, poses.map((p) => p.id)),
         centre: start ? [start.cx, start.cy] : [W / 2, 0.5],
         startDist: Math.hypot(b[0] - a[0], b[1] - a[1]),
         startAngle: Math.atan2(b[1] - a[1], b[0] - a[0]),
@@ -477,6 +482,18 @@ export function StudioCanvas({
     if (draw && tool === 'shape') {
       const preset = SHAPE_PRESETS.find((p) => p.id === draw.preset) ?? SHAPE_PRESETS[0];
       begin({ kind: 'shape', preset, start: toPixel(toUnits(point)), id: null });
+      return;
+    }
+    if (draw && tool === 'text') {
+      const [u, v] = toUnits(point);
+      const hit = hitTest(u, v);
+      if (hit?.text) studio.actions.editText(hit.id);
+      else if (onFlag(u, v)) {
+        // The click lands in the middle of the capitals, not on their baseline.
+        const fontSize = 0.12;
+        void studio.actions.addText({ x: u, y: v + fontSize * 0.35 }, draw.textColor, fontSize, { font: draw.font });
+      } else return;
+      onShapeDrawn?.();
       return;
     }
     if (draw && tool === 'brush') {
@@ -548,7 +565,7 @@ export function StudioCanvas({
           rotation: frame.rotation,
         });
       } else {
-        begin({ kind: 'transform', handle: Number(handle), frame, poses, targets: snapTargets(poses.map((p) => p.id)) });
+        begin({ kind: 'transform', handle: Number(handle), frame, poses, rings: ringGroups(design, poses.map((p) => p.id)), targets: snapTargets(poses.map((p) => p.id)) });
       }
       return;
     }
@@ -556,21 +573,24 @@ export function StudioCanvas({
     const [u, v] = toUnits(point);
     const hit = hitTest(u, v);
     if (hit) {
+      const unit = unitOf(hit);
       if (e.shiftKey) {
-        setSelection(selection.includes(hit.id) ? selection.filter((id) => id !== hit.id) : [...layerSelection(), hit.id]);
+        const rest = layerSelection().filter((id) => !unit.includes(id));
+        setSelection(selection.includes(hit.id) ? rest : [...rest, ...unit]);
         return;
       }
-      const ids = selection.includes(hit.id) ? selectedLayers.filter((l) => !l.locked).map((l) => l.id) : [hit.id];
-      if (!selection.includes(hit.id)) setSelection([hit.id]);
+      const ids = selection.includes(hit.id) ? selection : unit;
+      if (!selection.includes(hit.id)) setSelection(unit);
+      const picked = design.layers.filter((l) => ids.includes(l.id) && !l.locked);
       // Alt-drag leaves the originals behind and drags copies.
-      const moving = e.altKey ? studio.actions.duplicateInPlace(ids) : design.layers.filter((l) => ids.includes(l.id));
+      const moving = e.altKey ? studio.actions.duplicateInPlace(picked.map((l) => l.id)) : picked;
       if (moving.length === 0) return;
       begin({
         kind: 'move',
         ids: moving.map((l) => l.id),
         start: point,
         origin: new Map(moving.map((l) => [l.id, [l.x, l.y]])),
-        box: unionBox(moving.map((l) => layerBounds(l, W))),
+        box: unionBox(moving.map((l) => placedBounds(studio.design, l, W))),
         targets: snapTargets(moving.map((l) => l.id)),
         moved: false,
       });
@@ -715,7 +735,10 @@ export function StudioCanvas({
         const region = field.containerAt(...fromLocal(f, [about[0] * (1 - fx), about[1] * (1 - fy)]));
         if (region !== field.regions[0]) next.region = region;
         setGuides(next);
-        update((d) => ({ ...d, layers: applyPoses(d.layers, scalePoses(g.poses, f, about, fx, fy, W)) }), { transient: true });
+        update(
+          (d) => ({ ...d, layers: applyPoses(d.layers, scalePoses(g.poses, f, about, fx, fy, W)), groups: scaleRings(d.groups, g.rings, Math.sqrt(fx * fy)) }),
+          { transient: true },
+        );
         return;
       }
       case 'rotate': {
@@ -742,7 +765,7 @@ export function StudioCanvas({
           const du = (mid[0] - g.startMid[0]) / scale;
           const dv = (mid[1] - g.startMid[1]) / scale;
           const moved = turned.map((pose) => ({ ...pose, x: pose.x + du / W, y: pose.y + dv }));
-          update((d) => ({ ...d, layers: applyPoses(d.layers, moved) }), { transient: true });
+          update((d) => ({ ...d, layers: applyPoses(d.layers, moved), groups: scaleRings(d.groups, g.rings, k) }), { transient: true });
         } else {
           const zoom = clamp(g.origin.zoom * k, 0.3, MAX_ZOOM);
           setView({ zoom, panX: g.origin.panX + mid[0] - g.startMid[0], panY: g.origin.panY + mid[1] - g.startMid[1] });
@@ -858,13 +881,18 @@ export function StudioCanvas({
       } else {
         const [u0, v0] = toUnits([x0, y0]);
         const [u1, v1] = toUnits([x1, y1]);
-        const inside = design.layers
-          .filter((l) => !l.hidden && !l.locked)
-          .filter((l) => {
-            const b = layerBounds(l, W);
-            return b.x1 >= u0 && b.x0 <= u1 && b.y1 >= v0 && b.y0 <= v1;
-          })
-          .map((l) => l.id);
+        // Groups are picked whole.
+        const inside = [
+          ...new Set(
+            design.layers
+              .filter((l) => !l.hidden && !l.locked)
+              .filter((l) => {
+                const b = placedBounds(design, l, W);
+                return b.x1 >= u0 && b.x0 <= u1 && b.y1 >= v0 && b.y0 <= v1;
+              })
+              .flatMap(unitOf),
+          ),
+        ];
         setSelection(g.additive ? [...new Set([...layerSelection(), ...inside])] : inside);
       }
     }
@@ -898,7 +926,10 @@ export function StudioCanvas({
     }
     const [u, v] = toUnits(point);
     const hit = hitTest(u, v);
-    if (hit?.shape?.kind === 'path') studio.actions.editPoints(hit.id);
+    // The first double-click on a group goes inside it, to the layer clicked.
+    if (hit?.group && studio.entered !== hit.group) setSelection([hit.id]);
+    else if (hit?.text) studio.actions.editText(hit.id);
+    else if (hit?.shape?.kind === 'path') studio.actions.editPoints(hit.id);
     else if (hit) onDoubleClickLayer?.(hit.id, { x: e.clientX, y: e.clientY });
     else if (onFlag(u, v)) {
       setSelection(fieldSelection(u, v));
@@ -911,7 +942,7 @@ export function StudioCanvas({
     e.preventDefault();
     const [u, v] = toUnits(local(e));
     const hit = hitTest(u, v);
-    if (hit && !selection.includes(hit.id)) setSelection([hit.id]);
+    if (hit && !selection.includes(hit.id)) setSelection(unitOf(hit));
     if (!hit && onFlag(u, v) && selection.length === 0) setSelection(fieldSelection(u, v));
     onContextMenu?.({ x: e.clientX, y: e.clientY, onLayer: Boolean(hit) });
   }
@@ -945,7 +976,9 @@ export function StudioCanvas({
   // ---- overlay geometry (screen space) ----
   const busy = gesture !== null && gesture.kind !== 'marquee' && gesture.kind !== 'pan';
   const visibleSelected = selecting ? selectedLayers.filter((l) => !l.hidden) : [];
-  const selBox: Box | null = visibleSelected.length ? unionBox(visibleSelected.map((l) => layerBounds(l, W))) : null;
+  // Each group selected whole gets one box; a layer picked inside a group gets its own.
+  const selectedUnits = stackUnits(visibleSelected.map((l) => (studio.entered ? { ...l, group: undefined } : l)));
+  const selBox: Box | null = visibleSelected.length ? unionBox(visibleSelected.map((l) => placedBounds(design, l, W))) : null;
   const selectionRect: Rect | null = selBox
     ? (() => {
         const [x0, y0] = toScreen(selBox.x0, selBox.y0);
@@ -958,7 +991,7 @@ export function StudioCanvas({
   const flagRect = { x: ox, y: oy, w: W * scale, h: scale };
   const handleSize = touch ? 18 : 10;
   // The box drawn around the selection; locked emblems get it without handles.
-  const shownFrame = editing ? null : (frame ?? selectionFrame(visibleSelected, W));
+  const shownFrame = editing ? null : (frame ?? selectionFrame(design, visibleSelected, W));
   const corners = shownFrame ? HANDLES.slice(0, 4).map((h) => toScreen(...handlePoint(shownFrame, h))) : [];
   const edges = frame
     ? HANDLES.slice(4).map((h, i) => {
@@ -973,7 +1006,9 @@ export function StudioCanvas({
     const out = touch ? 34 : 24;
     return { from: mid, to: [mid[0] + Math.sin(a) * out, mid[1] - Math.cos(a) * out] };
   })();
-  const hovered = selecting && hover && !selection.includes(hover) ? design.layers.find((l) => l.id === hover) : null;
+  const hoverLayer = selecting && hover && !selection.includes(hover) ? design.layers.find((l) => l.id === hover) : null;
+  /** What a click would pick: a whole group, or one layer. */
+  const hovered = hoverLayer ? unitOf(hoverLayer) : null;
   const marquee = gesture?.kind === 'marquee' ? gesture : null;
   const cursor =
     gesture?.kind === 'pan' || space.current
@@ -982,6 +1017,8 @@ export function StudioCanvas({
         ? 'none'
         : tool === 'shape' || tool === 'pen'
           ? 'crosshair'
+          : tool === 'text'
+            ? 'text'
           : gesture?.kind === 'move' || gesture?.kind === 'nodes' || gesture?.kind === 'handle'
             ? 'move'
             : edit && pointHover
@@ -1109,7 +1146,7 @@ export function StudioCanvas({
           );
         })()}
         {hovered && (() => {
-          const b = layerBounds(hovered, W);
+          const b = unionBox(design.layers.filter((l) => hovered.includes(l.id) && !l.hidden).map((l) => placedBounds(design, l, W)));
           const [x0, y0] = toScreen(b.x0, b.y0);
           const [x1, y1] = toScreen(b.x1, b.y1);
           return <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill='none' stroke='var(--main)' strokeWidth={1} opacity={0.6} />;
@@ -1120,12 +1157,12 @@ export function StudioCanvas({
           const [x1, y1] = toScreen(r.x1, r.y1);
           return <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill='rgb(255 79 163 / 0.06)' stroke='#ff4fa3' strokeWidth={1} strokeDasharray='5 4' />;
         })()}
-        {visibleSelected.length > 1 &&
-          visibleSelected.map((l) => {
-            const b = layerBounds(l, W);
+        {selectedUnits.length > 1 &&
+          selectedUnits.map((unit) => {
+            const b = unionBox(unit.map((l) => placedBounds(design, l, W)));
             const [x0, y0] = toScreen(b.x0, b.y0);
             const [x1, y1] = toScreen(b.x1, b.y1);
-            return <rect key={l.id} x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill='none' stroke='var(--main)' strokeWidth={1} strokeDasharray='3 3' />;
+            return <rect key={unit[0].id} x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill='none' stroke='var(--main)' strokeWidth={1} strokeDasharray='3 3' />;
           })}
         {corners.length === 4 && (
           <g>
