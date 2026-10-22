@@ -159,7 +159,8 @@ export type PathContour = { nodes: PathNode[]; closed: boolean };
 
 /**
  * A shape or brush stroke drawn in the editor, filling the layer's box. It's painted in the
- * layer's colours: colors[0] fills it, colors[1] strokes it. A brush stroke is only a stroke.
+ * layer's colours: colors[0] fills it, colors[1] strokes it, and colors[2] is where a gradient
+ * fill ends. A brush stroke is only a stroke.
  */
 export type StudioShape = {
   kind: ShapeKind;
@@ -181,7 +182,14 @@ export type StudioShape = {
   contours?: PathContour[];
   /** Fills where outlines overlap too, as text needs where letters touch; otherwise overlaps are holes. */
   nonzero?: boolean;
+  /** A fill that runs from colors[0] to colors[2]: across the shape at an angle, or out from its middle. */
+  gradient?: ShapeGradient | null;
+  /** How the stroke is drawn; absent is solid. */
+  strokeStyle?: StrokeStyle;
 };
+
+export type ShapeGradient = { kind: 'linear' | 'radial'; /** Degrees clockwise from left to right. */ angle: number };
+export type StrokeStyle = 'dashed' | 'dotted' | 'double';
 
 export type TextFont = 'inter' | 'garamond' | 'cinzel' | 'oswald' | 'slab' | 'fraktur' | 'script' | 'cairo';
 
@@ -240,6 +248,8 @@ export type StudioLayer = {
   clip?: StudioClip | null;
   hidden?: boolean;
   locked?: boolean;
+  /** How opaque it's drawn, 0 to 1; absent is fully. */
+  opacity?: number;
   /** The group it belongs to; a group's layers sit together in the stack. */
   group?: string;
 };

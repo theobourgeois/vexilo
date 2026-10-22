@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { FieldPartRef, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
+import type { FieldPartRef, ShapeGradient, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
 import { clipGroups } from './clip';
 import { layerImage } from './cutout';
 import { divisionGeometry } from './divisions';
@@ -170,12 +170,21 @@ function ClipGroup({
   );
 }
 
+/** A layer as it's drawn; without its outline, it's the shape a clip cuts to, at full strength. */
 function layerArt(layer: StudioLayer, W: number, id: string, hrefs?: Hrefs, outline = true) {
   const filter = outline && layer.outline ? `url(#${id}-o-${layer.id})` : undefined;
-  return layer.shape ? (
-    <ShapeArt key={layer.id} layer={layer} W={W} filter={filter} />
+  const art = layer.shape ? (
+    <ShapeArt key={layer.id} layer={layer} W={W} filter={filter} id={`${id}-s-${layer.id}${outline ? '' : '-m'}`} />
   ) : (
     <LayerArt key={layer.id} layer={layer} W={W} filter={filter} href={hrefs?.layers?.[layer.id]} />
+  );
+  const opacity = layer.opacity ?? 1;
+  return outline && opacity < 1 ? (
+    <g key={layer.id} opacity={opacity}>
+      {art}
+    </g>
+  ) : (
+    art
   );
 }
 
@@ -345,28 +354,89 @@ const LayerArt = React.memo(function LayerArt({
 });
 
 /** A shape or brush stroke, drawn at its box's size so strokes keep their width when stretched. */
-export const ShapeArt = React.memo(function ShapeArt({ layer, W, filter }: { layer: StudioLayer; W: number; filter?: string }) {
+export const ShapeArt = React.memo(function ShapeArt({ layer, W, filter, id }: { layer: StudioLayer; W: number; filter?: string; id: string }) {
   const shape = layer.shape!;
   const h = layer.size;
   const w = layerWidth(layer);
   const d = shapePath(shape, w, h);
   const brush = shape.kind === 'brush';
   const round = brush || Boolean(layer.text);
+  const s = shape.stroke;
+  const style = s > 0 ? shape.strokeStyle : undefined;
+  const gradient = shape.fill && shape.gradient ? shape.gradient : null;
+  const fill = !shape.fill ? 'none' : gradient ? `url(#${id}-g)` : layer.colors[0];
+  const stroke = s > 0 ? (layer.colors[1] ?? layer.colors[0]) : 'none';
+  // A double stroke is the whole stroke with its middle third cut out, so it's drawn apart from the fill.
+  const double = style === 'double';
+  const line = {
+    stroke,
+    strokeWidth: s,
+    strokeLinecap: brush || style === 'dotted' ? ('round' as const) : ('butt' as const),
+    strokeLinejoin: round ? ('round' as const) : ('miter' as const),
+    strokeDasharray: style === 'dashed' ? `${s * 3} ${s * 2}` : style === 'dotted' ? `0 ${s * 2}` : undefined,
+  };
   return (
     <g filter={filter}>
-      {layerCopies(layer, W).map((copy, i) => (
-        <path
-          key={i}
-          d={d}
-          fill={shape.fill ? layer.colors[0] : 'none'}
-          fillRule={shape.nonzero ? 'nonzero' : 'evenodd'}
-          stroke={shape.stroke > 0 ? (layer.colors[1] ?? layer.colors[0]) : 'none'}
-          strokeWidth={shape.stroke}
-          strokeLinecap={brush ? 'round' : 'butt'}
-          strokeLinejoin={round ? 'round' : 'miter'}
-          transform={`translate(${copy.cx} ${copy.cy}) rotate(${copy.rot}) scale(${layer.flipX ? -1 : 1} ${layer.flipY ? -1 : 1})`}
-        />
-      ))}
+      {(gradient || double) && (
+        <defs>
+          {gradient && <Gradient id={`${id}-g`} gradient={gradient} w={w} h={h} from={layer.colors[0]} to={layer.colors[2] ?? layer.colors[0]} />}
+          {double && (
+            // In each copy's own space, as the gradient is.
+            <mask id={`${id}-d`} maskUnits='userSpaceOnUse' x={-w} y={-h} width={w * 2} height={h * 2}>
+              <path d={d} fill='none' stroke='#fff' strokeWidth={s} strokeLinejoin={line.strokeLinejoin} strokeLinecap={line.strokeLinecap} />
+              <path d={d} fill='none' stroke='#000' strokeWidth={s / 3} strokeLinejoin={line.strokeLinejoin} strokeLinecap={line.strokeLinecap} />
+            </mask>
+          )}
+          {double && shape.fill && (
+            // The gap between the lines shows what's behind, not the fill.
+            <mask id={`${id}-f`} maskUnits='userSpaceOnUse' x={-w} y={-h} width={w * 2} height={h * 2}>
+              <rect x={-w} y={-h} width={w * 2} height={h * 2} fill='#fff' />
+              <path d={d} fill='none' stroke='#000' strokeWidth={s / 3} strokeLinejoin={line.strokeLinejoin} />
+            </mask>
+          )}
+        </defs>
+      )}
+      {layerCopies(layer, W).map((copy, i) => {
+        const transform = `translate(${copy.cx} ${copy.cy}) rotate(${copy.rot}) scale(${layer.flipX ? -1 : 1} ${layer.flipY ? -1 : 1})`;
+        const fillRule = shape.nonzero ? ('nonzero' as const) : ('evenodd' as const);
+        return double ? (
+          <React.Fragment key={i}>
+            {shape.fill && <path d={d} fill={fill} fillRule={fillRule} mask={`url(#${id}-f)`} transform={transform} />}
+            <path d={d} fill='none' {...line} mask={`url(#${id}-d)`} transform={transform} />
+          </React.Fragment>
+        ) : (
+          <path key={i} d={d} fill={fill} fillRule={fillRule} {...line} transform={transform} />
+        );
+      })}
     </g>
   );
 });
+
+/**
+ * A gradient fill, in a shape's own space: a linear one runs corner to corner of its box at its
+ * angle, a radial one out to the box's edges.
+ */
+function Gradient({ id, gradient, w, h, from, to }: { id: string; gradient: ShapeGradient; w: number; h: number; from: string; to: string }) {
+  const stops = (
+    <>
+      <stop offset={0} stopColor={from} />
+      <stop offset={1} stopColor={to} />
+    </>
+  );
+  if (gradient.kind === 'radial') {
+    return (
+      <radialGradient id={id} cx={0.5} cy={0.5} r={0.5}>
+        {stops}
+      </radialGradient>
+    );
+  }
+  const a = (gradient.angle * Math.PI) / 180;
+  const [cos, sin] = [Math.cos(a), Math.sin(a)];
+  // Far enough each way that the box's corners fall at the ends.
+  const L = Math.abs((w / 2) * cos) + Math.abs((h / 2) * sin);
+  return (
+    <linearGradient id={id} gradientUnits='userSpaceOnUse' x1={-L * cos} y1={-L * sin} x2={L * cos} y2={L * sin}>
+      {stops}
+    </linearGradient>
+  );
+}

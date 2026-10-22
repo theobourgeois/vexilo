@@ -129,6 +129,7 @@ export const FlipVertical = bold(Ph.FlipVertical, 'FlipVertical');
 export const RotateQuarter = bold(Ph.ArrowsClockwise, 'RotateQuarter');
 export const Repeat = bold(Ph.CirclesThree, 'Repeat');
 export const Outline = bold(Ph.CircleDashed, 'Outline');
+export const Opacity = bold(Ph.CircleHalf, 'Opacity');
 export const Layers = bold(Ph.Stack, 'Layers');
 export const Emblems = bold(Ph.ShieldStar, 'Emblems');
 export const Wind = bold(Ph.Wind, 'Wind');

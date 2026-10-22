@@ -4,7 +4,7 @@ import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
-import { ChevronDown, Cursor, PaintBrush, PenNib, Shapes, Text } from '@/components/icons';
+import { ChevronDown, Cursor, PaintBrush, PenNib, Shapes, SwapColors, Text } from '@/components/icons';
 import type { TextFont } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import { documentColors, EXPORT_WIDTH } from './model';
@@ -76,11 +76,12 @@ export function ShapeIcon({ preset, className }: { preset: ShapePreset; classNam
 }
 
 /** A fill or stroke as a chip: solid for a fill, a ring for a stroke, struck through when off. */
-function PaintChip({ color, on, ring }: { color: string; on: boolean; ring?: boolean }) {
+/** A paint's chip: its colour, or `paint` (a CSS background, for a gradient) in its place. */
+function PaintChip({ color, paint, on, ring }: { color: string; paint?: string; on: boolean; ring?: boolean }) {
   return (
     <span
       className='relative size-[18px] shrink-0 overflow-hidden rounded-[5px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.18)]'
-      style={on ? (ring ? { boxShadow: `inset 0 0 0 4px ${color}, inset 0 0 0 5px rgb(0 0 0 / 0.18)` } : { background: color }) : undefined}
+      style={on ? (ring ? { boxShadow: `inset 0 0 0 4px ${color}, inset 0 0 0 5px rgb(0 0 0 / 0.18)` } : { background: paint ?? color }) : undefined}
     >
       {!on && <span className='absolute left-1/2 top-1/2 h-px w-[140%] -translate-x-1/2 -translate-y-1/2 -rotate-45 bg-[#e5484d]' />}
     </span>
@@ -95,6 +96,7 @@ export function PaintButton({
   studio,
   label,
   color,
+  paint,
   on,
   ring,
   onToggle,
@@ -104,7 +106,10 @@ export function PaintButton({
 }: {
   studio: Studio;
   label: string;
+  /** The colour the picker edits. */
   color: string;
+  /** What the chip shows instead, as a CSS background. */
+  paint?: string;
   on: boolean;
   ring?: boolean;
   /** Absent when it can't be turned off. */
@@ -125,7 +130,7 @@ export function PaintButton({
             open && 'bg-foreground/[0.06] text-foreground',
           )}
         >
-          <PaintChip color={color} on={on} ring={ring} />
+          <PaintChip color={color} paint={paint} on={on} ring={ring} />
           {label}
         </button>
       </PopoverTrigger>
@@ -147,6 +152,56 @@ export function PaintButton({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** A row of choices, one of them picked. */
+export function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void }) {
+  return (
+    <div role='radiogroup' aria-label={label} className='flex gap-0.5 rounded-[9px] bg-foreground/[0.05] p-0.5'>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type='button'
+          role='radio'
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            'h-7 flex-1 cursor-pointer rounded-[7px] text-[12.5px] font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+            value === o.value && 'bg-background text-foreground shadow-[0_1px_2px_rgb(0_0_0/0.12)]',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A gradient's two ends as chips either side of it, one picked for the colour picker to edit. */
+export function GradientStops({ from, to, stop, onStop, onSwap }: { from: string; to: string; stop: 0 | 2; onStop: (stop: 0 | 2) => void; onSwap: () => void }) {
+  const chip = (index: 0 | 2, color: string, label: string) => (
+    <button
+      type='button'
+      aria-label={label}
+      aria-pressed={stop === index}
+      onClick={() => onStop(index)}
+      className={cn(
+        'size-6 shrink-0 cursor-pointer rounded-[7px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.18)] outline-none ring-offset-2 ring-offset-popover focus-visible:ring-2 focus-visible:ring-ring',
+        stop === index && 'ring-2 ring-foreground',
+      )}
+      style={{ background: color }}
+    />
+  );
+  return (
+    <div className='flex items-center gap-2'>
+      {chip(0, from, 'Start colour')}
+      <span className='h-2.5 flex-1 rounded-full shadow-[inset_0_0_0_1px_rgb(0_0_0/0.12)]' style={{ background: `linear-gradient(90deg, ${from}, ${to})` }} />
+      {chip(2, to, 'End colour')}
+      <ToolButton label='Swap colours' onClick={onSwap}>
+        <SwapColors />
+      </ToolButton>
+    </div>
   );
 }
 

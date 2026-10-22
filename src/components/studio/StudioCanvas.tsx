@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { PathContour, PathNode, StudioGroup, StudioLayer } from '@/lib/studio-design';
+import type { PathContour, PathNode, StudioDesign, StudioGroup, StudioLayer } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import type { DrawSettings } from './draw';
 import { insideOutline, outlineD } from './outline';
@@ -74,23 +74,30 @@ export const MAX_ZOOM = 64;
 const GRID_FROM = 6;
 const GRID_FULL = 12;
 
-/** Something to snap to along one axis. Centre-only targets don't catch edges; gap targets sit midway between two emblems. */
-type Target = { at: number; centreOnly?: boolean; gap?: [number, number] };
+/**
+ * Something to snap to along one axis. Centre-only targets don't catch edges; gap targets sit
+ * midway between two emblems; an `edge` target catches only the start (0) or end (2) edge, one
+ * gap on from a pair of emblems so the spacing repeats. `spans` are the equal gaps it makes, and
+ * `band` is where across the selection has to be for it to count.
+ */
+type Target = { at: number; centreOnly?: boolean; gap?: [number, number]; edge?: 0 | 2; spans?: [number, number, number, number]; band?: [number, number] };
 type Targets = { x: Target[]; y: Target[] };
+/** Other emblems' widths and heights, to size a selection to. */
+type Size = { at: number; name: string };
 
 type Gesture =
   | { kind: 'move'; ids: string[]; start: [number, number]; origin: Map<string, [number, number]>; box: Box; targets: Targets; moved: boolean }
-  | { kind: 'transform'; handle: number; frame: Frame; poses: LayerPose[]; rings: StudioGroup[]; targets: Targets }
+  | { kind: 'transform'; handle: number; frame: Frame; poses: LayerPose[]; rings: StudioGroup[]; targets: Targets; sizes: { w: Size[]; h: Size[] } }
   | { kind: 'rotate'; poses: LayerPose[]; centre: [number, number]; centreScreen: [number, number]; startAngle: number; rotation: number }
   | { kind: 'pan'; start: [number, number]; origin: View }
   | { kind: 'marquee'; start: [number, number]; current: [number, number]; additive: boolean; onFlag: boolean; points?: boolean }
   | { kind: 'pinch'; poses: LayerPose[]; rings: StudioGroup[]; centre: [number, number]; startDist: number; startAngle: number; startMid: [number, number]; origin: View }
-  | { kind: 'shape'; preset: ShapePreset; start: [number, number]; id: string | null }
+  | { kind: 'shape'; preset: ShapePreset; start: [number, number]; id: string | null; targets: Targets }
   | { kind: 'brush'; points: [number, number][] }
   /** Pulling handles out of the pen's newest node. */
   | { kind: 'pen'; index: number; start: Pt }
   /** Moving a path's picked nodes, from where they were in its own box. */
-  | { kind: 'nodes'; layer: StudioLayer; local: PathContour[]; keys: string[]; start: Pt; moved: boolean }
+  | { kind: 'nodes'; layer: StudioLayer; local: PathContour[]; keys: string[]; start: Pt; moved: boolean; lead: Pt; targets: Targets }
   | { kind: 'handle'; layer: StudioLayer; local: PathContour[]; key: string; side: 'in' | 'out'; smooth: boolean };
 
 /** What a point under the pointer is, while editing a path. */
@@ -108,16 +115,41 @@ function snap45([x, y]: Pt): Pt {
 
 /** A guide line at `at`; for an equal-gap snap, the two gaps (from, to, from, to) drawn across at `across`. */
 type Guide = { at: number; gaps?: [number, number, number, number]; across?: number };
-type Guides = { x?: Guide; y?: Guide; label?: string; region?: Region };
+/** `labelAt` puts the label by a point (flag units) rather than under the selection. */
+type Guides = { x?: Guide; y?: Guide; label?: string; labelAt?: Pt; region?: Region };
+
+const NO_NODES: PathNode[] = [];
 
 const overlaps = (a0: number, a1: number, b0: number, b1: number) => a0 < b1 && b0 < a1;
 
-/** The closest target any of the features (start edge, centre, end edge) is within reach of. */
-function snapAxis(features: [number, number, number], targets: Target[], tol: number) {
+/** The shares of the flag worth lining up on, beyond its middle. */
+const FRACTIONS: [number, string][] = [
+  [1 / 4, '¼'],
+  [1 / 3, '⅓'],
+  [1 / 2, '½'],
+  [2 / 3, '⅔'],
+  [3 / 4, '¾'],
+];
+const fractionOf = (share: number) => FRACTIONS.find(([f]) => Math.abs(f - share) < 1e-6)?.[1];
+
+/** What a snap to `x` across and `y` down lands on, when it's a share of the flag: "⅓ across · ½ down". */
+function fractionLabel(W: number, x?: number, y?: number) {
+  const across = x !== undefined && fractionOf(x / W);
+  const down = y !== undefined && fractionOf(y);
+  return [across && `${across} across`, down && `${down} down`].filter(Boolean).join(' · ') || undefined;
+}
+
+/**
+ * The closest target any of the features (start edge, centre, end edge) is within reach of.
+ * `cross` is where the selection is across the axis, for targets that only count beside it.
+ */
+function snapAxis(features: [number, number, number], targets: Target[], tol: number, cross?: [number, number]) {
   let best: { delta: number; target: Target } | null = null;
   features.forEach((feature, i) => {
     for (const target of targets) {
       if ((target.centreOnly || target.gap) && i !== 1) continue;
+      if (target.edge !== undefined && i !== target.edge) continue;
+      if (target.band && cross && !overlaps(target.band[0], target.band[1], cross[0], cross[1])) continue;
       const delta = target.at - feature;
       if (Math.abs(delta) < tol && (!best || Math.abs(delta) < Math.abs(best.delta))) best = { delta, target };
     }
@@ -248,7 +280,6 @@ export function StudioCanvas({
   const px = pixelSize(W);
   const gridAlpha = clamp((px * scale - GRID_FROM) / (GRID_FULL - GRID_FROM), 0, 1);
   const onPixel = (n: number) => (gridAlpha > 0 ? Math.round(n / px) * px : n);
-  const toPixel = ([u, v]: [number, number]): [number, number] => [onPixel(u), onPixel(v)];
 
   React.useEffect(() => {
     if (scaleRef) scaleRef.current = scale;
@@ -282,10 +313,17 @@ export function StudioCanvas({
 
   const field = fieldGuides(design);
 
-  /** Everything a moving selection can line up with: the field's lines and regions, anchors, and other emblems. */
+  /**
+   * Everything a moving selection can line up with: the field's lines and regions, quarters and
+   * thirds of the flag, anchors, and other emblems, midway between them and spaced as they are.
+   */
   function snapTargets(exclude: string[]): Targets {
     const x: Target[] = field.xs.map((at) => ({ at }));
     const y: Target[] = field.ys.map((at) => ({ at }));
+    for (const [f] of FRACTIONS) {
+      x.push({ at: f * W });
+      y.push({ at: f });
+    }
     for (const r of field.regions) {
       x.push({ at: (r.x0 + r.x1) / 2 });
       y.push({ at: (r.y0 + r.y1) / 2 });
@@ -299,14 +337,75 @@ export function StudioCanvas({
       x.push({ at: b.x0 }, { at: (b.x0 + b.x1) / 2 }, { at: b.x1 });
       y.push({ at: b.y0 }, { at: (b.y0 + b.y1) / 2 }, { at: b.y1 });
     }
-    // Midway between two neighbours, for even spacing.
+    // Midway between two neighbours, for even spacing; or one more gap past either, as far as they are apart.
     for (const a of others) {
       for (const b of others) {
-        if (a.x1 < b.x0 && overlaps(a.y0, a.y1, b.y0, b.y1)) x.push({ at: (a.x1 + b.x0) / 2, gap: [a.x1, b.x0] });
-        if (a.y1 < b.y0 && overlaps(a.x0, a.x1, b.x0, b.x1)) y.push({ at: (a.y1 + b.y0) / 2, gap: [a.y1, b.y0] });
+        if (a.x1 < b.x0 && overlaps(a.y0, a.y1, b.y0, b.y1)) {
+          const gap = b.x0 - a.x1;
+          const band: [number, number] = [Math.min(a.y0, b.y0), Math.max(a.y1, b.y1)];
+          x.push(
+            { at: (a.x1 + b.x0) / 2, gap: [a.x1, b.x0], band },
+            { at: b.x1 + gap, edge: 0, spans: [a.x1, b.x0, b.x1, b.x1 + gap], band: [b.y0, b.y1] },
+            { at: a.x0 - gap, edge: 2, spans: [a.x0 - gap, a.x0, a.x1, b.x0], band: [a.y0, a.y1] },
+          );
+        }
+        if (a.y1 < b.y0 && overlaps(a.x0, a.x1, b.x0, b.x1)) {
+          const gap = b.y0 - a.y1;
+          const band: [number, number] = [Math.min(a.x0, b.x0), Math.max(a.x1, b.x1)];
+          y.push(
+            { at: (a.y1 + b.y0) / 2, gap: [a.y1, b.y0], band },
+            { at: b.y1 + gap, edge: 0, spans: [a.y1, b.y0, b.y1, b.y1 + gap], band: [b.x0, b.x1] },
+            { at: a.y0 - gap, edge: 2, spans: [a.y0 - gap, a.y0, a.y1, b.y0], band: [a.x0, a.x1] },
+          );
+        }
       }
     }
     return { x, y };
+  }
+
+  /** Other emblems' sizes, for a resize to match. */
+  function sizeTargets(exclude: string[]) {
+    const others = design.layers.filter((l) => !exclude.includes(l.id) && !l.hidden);
+    const sizes = { w: [] as Size[], h: [] as Size[] };
+    for (const l of others) {
+      const b = placedBounds(design, l, W);
+      sizes.w.push({ at: b.x1 - b.x0, name: l.name });
+      sizes.h.push({ at: b.y1 - b.y0, name: l.name });
+    }
+    return sizes;
+  }
+
+  /** What the pen lines its next node up with, its own nodes too; kept while they and the design stay the same, as it asks on every move. */
+  const penTargetsRef = React.useRef<{ design: StudioDesign; nodes: PathNode[]; targets: Targets } | null>(null);
+  function penTargets(nodes: PathNode[]) {
+    const cached = penTargetsRef.current;
+    if (cached && cached.design === design && cached.nodes === nodes) return cached.targets;
+    const targets = snapTargets([]);
+    for (const n of nodes) {
+      targets.x.push({ at: n.x });
+      targets.y.push({ at: n.y });
+    }
+    penTargetsRef.current = { design, nodes, targets };
+    return targets;
+  }
+
+  /**
+   * A point being drawn or dragged, caught on each axis by a line, edge or centre near it, or
+   * else landing on a whole pixel up close. ⌘ leaves it be but for the pixel.
+   */
+  function snapPoint([u, v]: Pt, targets: Targets, free: boolean): { at: Pt; guides: Guides } {
+    if (free) return { at: [onPixel(u), onPixel(v)], guides: {} };
+    const tol = 6 / scale;
+    const points = (t: Target[]) => t.filter((t) => !t.gap && t.edge === undefined);
+    const sx = snapAxis([u, u, u], points(targets.x), tol);
+    const sy = snapAxis([v, v, v], points(targets.y), tol);
+    const at: Pt = [sx ? sx.target.at : onPixel(u), sy ? sy.target.at : onPixel(v)];
+    const guides: Guides = {};
+    if (sx) guides.x = { at: sx.target.at };
+    if (sy) guides.y = { at: sy.target.at };
+    const label = fractionLabel(W, sx?.target.at, sy?.target.at);
+    if (label) Object.assign(guides, { label, labelAt: at });
+    return { at, guides };
   }
 
   // Space-drag pans, like every design tool.
@@ -481,7 +580,10 @@ export function StudioCanvas({
 
     if (draw && tool === 'shape') {
       const preset = SHAPE_PRESETS.find((p) => p.id === draw.preset) ?? SHAPE_PRESETS[0];
-      begin({ kind: 'shape', preset, start: toPixel(toUnits(point)), id: null });
+      const targets = snapTargets([]);
+      const start = snapPoint(toUnits(point), targets, e.metaKey || e.ctrlKey);
+      setGuides(start.guides);
+      begin({ kind: 'shape', preset, start: start.at, id: null, targets });
       return;
     }
     if (draw && tool === 'text') {
@@ -510,7 +612,7 @@ export function StudioCanvas({
           return;
         }
       }
-      const start = toPixel(toUnits(point));
+      const start = snapPoint(toUnits(point), penTargets(nodes), e.metaKey || e.ctrlKey).at;
       setPen([...nodes, makeNode(start)]);
       begin({ kind: 'pen', index: nodes.length, start });
       return;
@@ -538,7 +640,17 @@ export function StudioCanvas({
           keys = edit.picked.has(hit.key) ? editing!.nodes : [hit.key];
         }
         studio.actions.setEditNodes(keys);
-        begin({ kind: 'nodes', layer: edit.layer, local, keys, start: toUnits(point), moved: false });
+        // The node under the pointer leads, lining up with the path's other nodes and everything else.
+        const m = layerAffine(edit.layer, W);
+        const [ci, ni] = parseKey(hit.kind === 'segment' ? keys[0] : hit.key);
+        const lead = apply(m, at(local[ci].nodes[ni]));
+        const rest = local.flatMap((c, i) => c.nodes.filter((_, j) => !keys.includes(nodeKey(i, j))).map((n) => apply(m, at(n))));
+        const targets = snapTargets([edit.layer.id]);
+        for (const [u, v] of rest) {
+          targets.x.push({ at: u });
+          targets.y.push({ at: v });
+        }
+        begin({ kind: 'nodes', layer: edit.layer, local, keys, start: toUnits(point), moved: false, lead, targets });
         return;
       }
       const [u, v] = toUnits(point);
@@ -565,7 +677,8 @@ export function StudioCanvas({
           rotation: frame.rotation,
         });
       } else {
-        begin({ kind: 'transform', handle: Number(handle), frame, poses, rings: ringGroups(design, poses.map((p) => p.id)), targets: snapTargets(poses.map((p) => p.id)) });
+        const ids = poses.map((p) => p.id);
+        begin({ kind: 'transform', handle: Number(handle), frame, poses, rings: ringGroups(design, ids), targets: snapTargets(ids), sizes: sizeTargets(ids) });
       }
       return;
     }
@@ -615,7 +728,12 @@ export function StudioCanvas({
         setHover(hitTest(u, v)?.id ?? null);
         if (edit) setPointHover(pointHit(point)?.kind ?? null);
       }
-      if (tool === 'pen') setPenAt(toUnits(point));
+      if (tool === 'pen') {
+        // Where the next node would go, lined up as it would be.
+        const snapped = snapPoint(toUnits(point), penTargets(pen ?? NO_NODES), e.metaKey || e.ctrlKey);
+        setPenAt(snapped.at);
+        setGuides(snapped.guides);
+      } else if (guides.x || guides.y) setGuides({});
       return;
     }
 
@@ -640,8 +758,8 @@ export function StudioCanvas({
         const next: Guides = {};
         if (!(e.metaKey || e.ctrlKey)) {
           const tol = 6 / scale;
-          const sx = lock === 'y' ? null : snapAxis([b.x0 + du, (b.x0 + b.x1) / 2 + du, b.x1 + du], g.targets.x, tol);
-          const sy = lock === 'x' ? null : snapAxis([b.y0 + dv, (b.y0 + b.y1) / 2 + dv, b.y1 + dv], g.targets.y, tol);
+          const sx = lock === 'y' ? null : snapAxis([b.x0 + du, (b.x0 + b.x1) / 2 + du, b.x1 + du], g.targets.x, tol, [b.y0 + dv, b.y1 + dv]);
+          const sy = lock === 'x' ? null : snapAxis([b.y0 + dv, (b.y0 + b.y1) / 2 + dv, b.y1 + dv], g.targets.y, tol, [b.x0 + du, b.x1 + du]);
           if (sx) du += sx.delta;
           if (sy) dv += sy.delta;
           // Otherwise up close, the selection's corner lands on a whole pixel.
@@ -649,12 +767,14 @@ export function StudioCanvas({
           if (!sy && lock !== 'x') dv = onPixel(b.y0 + dv) - b.y0;
           const box = { x0: b.x0 + du, x1: b.x1 + du, y0: b.y0 + dv, y1: b.y1 + dv };
           if (sx) {
-            const gap = sx.target.gap;
-            next.x = gap ? { at: sx.target.at, gaps: [gap[0], box.x0, box.x1, gap[1]], across: (box.y0 + box.y1) / 2 } : { at: sx.target.at };
+            const { gap, spans } = sx.target;
+            const gaps = spans ?? (gap && ([gap[0], box.x0, box.x1, gap[1]] as Guide['gaps']));
+            next.x = gaps ? { at: sx.target.at, gaps, across: (box.y0 + box.y1) / 2 } : { at: sx.target.at };
           }
           if (sy) {
-            const gap = sy.target.gap;
-            next.y = gap ? { at: sy.target.at, gaps: [gap[0], box.y0, box.y1, gap[1]], across: (box.x0 + box.x1) / 2 } : { at: sy.target.at };
+            const { gap, spans } = sy.target;
+            const gaps = spans ?? (gap && ([gap[0], box.y0, box.y1, gap[1]] as Guide['gaps']));
+            next.y = gaps ? { at: sy.target.at, gaps, across: (box.x0 + box.x1) / 2 } : { at: sy.target.at };
           }
           // The part of the field the selection is in, and its name once centred there.
           const cx = (box.x0 + box.x1) / 2;
@@ -667,6 +787,8 @@ export function StudioCanvas({
             if (named) next.label = named.label;
             else if (near((region.x0 + region.x1) / 2, cx) && near((region.y0 + region.y1) / 2, cy)) next.label = region.label;
           }
+          // Otherwise, where on the flag's quarters and thirds the edge or centre that caught is.
+          next.label ??= fractionLabel(W, next.x && !next.x.gaps ? next.x.at : undefined, next.y && !next.y.gaps ? next.y.at : undefined);
         }
         setGuides(next);
         update(
@@ -711,15 +833,33 @@ export function StudioCanvas({
             .filter((i) => span[i] !== 0)
             .map((i) => {
               const edge = centre[i] + about[i] + (i === 0 ? fx : fy) * span[i];
-              const hit = snapAxis([edge, edge, edge], (i === 0 ? g.targets.x : g.targets.y).filter((t) => !t.gap && !t.centreOnly), tol);
+              const hit = snapAxis([edge, edge, edge], (i === 0 ? g.targets.x : g.targets.y).filter((t) => !t.gap && !t.centreOnly && t.edge === undefined), tol);
               return hit && { i, at: hit.target.at, d: Math.abs(hit.delta), f: (hit.target.at - centre[i] - about[i]) / span[i] };
             })
             .filter((hit) => hit !== null && hit.f > 0);
+          // Failing an edge, a width or height another emblem has.
+          const dims = [f.w, f.h];
+          const sized = ([0, 1] as const)
+            .filter((i) => span[i] !== 0 && !snaps.some((hit) => hit!.i === i))
+            .map((i) => {
+              const size = dims[i] * (i === 0 ? fx : fy);
+              let best: { i: 0 | 1; d: number; f: number; name: string } | null = null;
+              for (const s of g.sizes[i === 0 ? 'w' : 'h']) {
+                const d = Math.abs(s.at - size);
+                if (d < tol && (!best || d < best.d)) best = { i, d, f: s.at / dims[i], name: s.name };
+              }
+              return best;
+            })
+            .filter((hit) => hit !== null);
           if (proportional) {
             const best = snaps.sort((a, b) => a!.d - b!.d)[0];
+            const size = sized.sort((a, b) => a!.d - b!.d)[0];
             if (best) {
               fx = fy = best.f;
               next[best.i === 0 ? 'x' : 'y'] = { at: best.at };
+            } else if (size) {
+              fx = fy = size.f;
+              next.label = `Same ${size.i === 0 ? 'width' : 'height'} as ${size.name}`;
             }
           } else {
             for (const hit of snaps) {
@@ -727,7 +867,17 @@ export function StudioCanvas({
               else fy = hit!.f;
               next[hit!.i === 0 ? 'x' : 'y'] = { at: hit!.at };
             }
+            for (const hit of sized) {
+              if (hit!.i === 0) fx = hit!.f;
+              else fy = hit!.f;
+            }
+            if (sized.length) {
+              const names = [...new Set(sized.map((hit) => hit!.name))];
+              const what = sized.length === 2 ? 'size' : sized[0]!.i === 0 ? 'width' : 'height';
+              next.label = names.length === 1 ? `Same ${what} as ${names[0]}` : `Same ${what}`;
+            }
           }
+          next.label ??= fractionLabel(W, next.x?.at, next.y?.at);
         }
         const min = 0.012;
         fx = Math.max(fx, min / Math.max(f.w, min));
@@ -773,9 +923,11 @@ export function StudioCanvas({
         return;
       }
       case 'shape': {
-        const end = toPixel(toUnits(point));
+        const snapped = snapPoint(toUnits(point), g.targets, e.metaKey || e.ctrlKey);
+        const end = snapped.at;
         const start = toScreen(...g.start);
         if (!g.id && Math.hypot(point[0] - start[0], point[1] - start[1]) < 3) return;
+        setGuides(snapped.guides);
         const box = dragBox(g.preset, g.start, end, { shift: e.shiftKey, fromCentre: e.altKey });
         const layer = newShapeLayer(g.preset, box, draw!, W);
         if (g.id) {
@@ -800,7 +952,19 @@ export function StudioCanvas({
         const [u, v] = toUnits(point);
         let drag: Pt = [u - g.start[0], v - g.start[1]];
         if (!g.moved && Math.hypot(...drag) * scale < 3) return;
-        if (e.shiftKey) drag = Math.abs(drag[0]) > Math.abs(drag[1]) ? [drag[0], 0] : [0, drag[1]];
+        const lock = e.shiftKey ? (Math.abs(drag[0]) > Math.abs(drag[1]) ? 'x' : 'y') : null;
+        const snapped = snapPoint([g.lead[0] + drag[0], g.lead[1] + drag[1]], g.targets, e.metaKey || e.ctrlKey);
+        drag = [snapped.at[0] - g.lead[0], snapped.at[1] - g.lead[1]];
+        // Shift keeps it on one axis, guided only along that one.
+        if (lock === 'x') {
+          drag[1] = 0;
+          delete snapped.guides.y;
+        } else if (lock === 'y') {
+          drag[0] = 0;
+          delete snapped.guides.x;
+        }
+        if (lock) snapped.guides.label = fractionLabel(W, snapped.guides.x?.at, snapped.guides.y?.at);
+        setGuides(snapped.guides);
         const [dx, dy] = applyVector(invert(layerAffine(g.layer, W)), drag);
         const picked = new Set(g.keys);
         const contours = g.local.map((c, ci) => ({
@@ -1293,10 +1457,14 @@ export function StudioCanvas({
         )}
       </svg>
 
-      {guides.label && selectionRect && (
+      {guides.label && (guides.labelAt || selectionRect) && (
         <span
           className='pointer-events-none absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-[#ff4fa3] px-2 py-0.5 text-[11px] font-semibold text-white'
-          style={{ left: selectionRect.x + selectionRect.w / 2, top: selectionRect.y + selectionRect.h + 10 }}
+          style={
+            guides.labelAt
+              ? { left: toScreen(...guides.labelAt)[0], top: toScreen(...guides.labelAt)[1] + 14 }
+              : { left: selectionRect!.x + selectionRect!.w / 2, top: selectionRect!.y + selectionRect!.h + 10 }
+          }
         >
           {guides.label}
         </span>

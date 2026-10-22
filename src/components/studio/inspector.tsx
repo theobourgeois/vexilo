@@ -25,6 +25,7 @@ import {
   FieldSwatches,
   LayerMoreMenu,
   LayerSwatches,
+  OpacitySlider,
   OutlineControls,
   PathControls,
   RepeatControls,
@@ -35,6 +36,7 @@ import {
   TextSettings,
   canGroup,
   hasShapeSettings,
+  selectionOpacity,
   selectionRepeat,
 } from './tools';
 import { selectionFrame } from './transform';
@@ -150,6 +152,9 @@ function LayersInspector({ studio }: { studio: Studio }) {
       </Header>
       <PositionSection studio={studio} />
       <AppearanceSections studio={studio} />
+      <Section title='Opacity' action={<span className='text-[12px] tabular-nums text-muted-foreground'>{Math.round(selectionOpacity(studio) * 100)}%</span>}>
+        <OpacitySlider studio={studio} />
+      </Section>
       {repeat && (
         <Section title='Repeat'>
           <RepeatControls studio={studio} className='w-full' />

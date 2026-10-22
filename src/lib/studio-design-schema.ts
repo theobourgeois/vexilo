@@ -103,6 +103,8 @@ const shape = z.object({
   path: z.array(z.tuple([unit, unit])).max(2000).optional(),
   contours: contours.optional(),
   nonzero: z.boolean().optional(),
+  gradient: z.object({ kind: z.enum(['linear', 'radial']), angle: z.number().min(-360).max(360) }).nullable().optional(),
+  strokeStyle: z.enum(['dashed', 'dotted', 'double']).optional(),
 });
 
 const text = z.object({
@@ -167,6 +169,7 @@ const layer = z.object({
     .optional(),
   hidden: z.boolean().optional(),
   locked: z.boolean().optional(),
+  opacity: z.number().min(0).max(1).optional(),
   group: z.string().max(40).optional(),
 });
 const groups = z.array(z.object({ id: z.string().max(40), name: z.string().max(120), repeat: repeat.nullable() })).max(100);

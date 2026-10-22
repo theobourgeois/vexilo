@@ -339,5 +339,9 @@ export function newBrushLayer(points: Pt[], color: string, width: number, W: num
 /** The colours a shape actually shows. */
 export function shapeColors(layer: Pick<StudioLayer, 'colors' | 'shape'>) {
   const shape = layer.shape!;
-  return [...(shape.fill ? [layer.colors[0]] : []), ...(shape.stroke > 0 ? [layer.colors[1] ?? layer.colors[0]] : [])];
+  return [
+    ...(shape.fill ? [layer.colors[0]] : []),
+    ...(shape.fill && shape.gradient ? [layer.colors[2] ?? layer.colors[0]] : []),
+    ...(shape.stroke > 0 ? [layer.colors[1] ?? layer.colors[0]] : []),
+  ];
 }

@@ -69,7 +69,7 @@ import { cn } from '@/lib/utils';
 import type { FieldPartRef, StudioClip, StudioDesign, StudioLayer, StudioRepeat, StudioText } from '@/lib/studio-design';
 import { clipTargets } from './clip';
 import { DIVISIONS, divisionParts } from './divisions';
-import { FontPicker, PaintButton, WidthSlider } from './draw';
+import { FontPicker, GradientStops, PaintButton, Segmented, WidthSlider } from './draw';
 import { PartPreview } from './FlagArt';
 import { documentColors, fieldColors, flagWidth, gridCount, gridShape, layerWidth } from './model';
 import { guideLine } from './repeats';
@@ -420,6 +420,15 @@ export function ShapeControls({ studio, layers, side = 'top', inlineSettings }: 
   const brushes = layers.every((l) => l.shape?.kind === 'brush');
   const stroked = shape.stroke > 0;
   const strokeOn = () => defaultStroke(layerWidth(first), first.size);
+  const gradient = shape.fill ? (shape.gradient ?? null) : null;
+  // Which end of a gradient the picker paints.
+  const [stop, setStop] = React.useState<0 | 2>(0);
+  const fillIndex = gradient ? stop : 0;
+  const [from, to] = [first.colors[0], first.colors[2] ?? first.colors[0]];
+  const swap = () => {
+    actions.setShapeColor(0, to, { transient: true });
+    actions.setShapeColor(2, from);
+  };
   return (
     <>
       {!brushes && (
@@ -427,15 +436,51 @@ export function ShapeControls({ studio, layers, side = 'top', inlineSettings }: 
           studio={studio}
           side={side}
           label='Fill'
-          color={first.colors[0]}
+          color={first.colors[fillIndex] ?? first.colors[0]}
+          paint={gradient ? `${gradient.kind === 'radial' ? 'radial-gradient(circle' : `linear-gradient(${gradient.angle + 90}deg`}, ${from}, ${to})` : undefined}
           on={shape.fill}
           // Something always shows: losing the fill brings in a stroke, and the other way round.
           onToggle={(fill) => actions.setShape({ fill, ...(!fill && !stroked && { stroke: strokeOn() }) })}
           onColor={(color, transient) => {
-            actions.setShapeColor(0, color, { transient });
+            actions.setShapeColor(fillIndex, color, { transient });
             if (!shape.fill) actions.setShape({ fill: true }, { transient });
           }}
-        />
+        >
+          {shape.fill && (
+            <Segmented
+              label='Fill type'
+              value={gradient?.kind ?? 'solid'}
+              options={[
+                { value: 'solid', label: 'Solid' },
+                { value: 'linear', label: 'Linear' },
+                { value: 'radial', label: 'Radial' },
+              ]}
+              onChange={(kind) => {
+                actions.setGradient(kind === 'solid' ? null : { kind, angle: gradient?.angle ?? 90 });
+                if (kind === 'solid') setStop(0);
+              }}
+            />
+          )}
+          {gradient && <GradientStops from={from} to={to} stop={stop} onStop={setStop} onSwap={swap} />}
+          {gradient?.kind === 'linear' && (
+            <label className='flex flex-col gap-1'>
+              <span className='flex justify-between text-[12.5px] text-subtle'>
+                Angle
+                <span className='tabular-nums text-muted-foreground'>{Math.round(gradient.angle)}°</span>
+              </span>
+              <Slider
+                label='Angle'
+                min={0}
+                max={360}
+                step={1}
+                value={gradient.angle}
+                // Settles on the eighths of a turn.
+                onChange={(angle) => actions.setGradient({ ...gradient, angle: Math.abs(angle - Math.round(angle / 45) * 45) < 4 ? Math.round(angle / 45) * 45 : angle }, { transient: true })}
+                onCommit={studio.history.commit}
+              />
+            </label>
+          )}
+        </PaintButton>
       )}
       <PaintButton
         studio={studio}
@@ -451,17 +496,48 @@ export function ShapeControls({ studio, layers, side = 'top', inlineSettings }: 
         }}
       >
         {stroked && (
-          <WidthSlider
-            studio={studio}
-            label={brushes ? 'Size' : 'Width'}
-            value={shape.stroke}
-            max={brushes ? 0.08 : 0.06}
-            onChange={(stroke) => actions.setShape({ stroke }, { transient: true })}
-          />
+          <>
+            <WidthSlider
+              studio={studio}
+              label={brushes ? 'Size' : 'Width'}
+              value={shape.stroke}
+              max={brushes ? 0.08 : 0.06}
+              onChange={(stroke) => actions.setShape({ stroke }, { transient: true })}
+            />
+            <Segmented
+              label='Stroke style'
+              value={shape.strokeStyle ?? 'solid'}
+              options={[
+                { value: 'solid', label: 'Solid' },
+                { value: 'dashed', label: 'Dashed' },
+                { value: 'dotted', label: 'Dotted' },
+                { value: 'double', label: 'Double' },
+              ]}
+              onChange={(style) => actions.setShape({ strokeStyle: style === 'solid' ? undefined : style })}
+            />
+          </>
         )}
       </PaintButton>
       {layers.length === 1 && !inlineSettings && <ShapeSettings studio={studio} layer={first} />}
     </>
+  );
+}
+
+/** How opaque the selected layers are, as the first of them is. */
+export const selectionOpacity = (studio: Studio) => studio.selectedLayers[0]?.opacity ?? 1;
+
+/** A slider for how opaque the selected layers are drawn. */
+export function OpacitySlider({ studio }: { studio: Studio }) {
+  return (
+    <Slider
+      label='Opacity'
+      min={0}
+      max={1}
+      step={0.01}
+      value={selectionOpacity(studio)}
+      onChange={(opacity) => studio.actions.setOpacity(opacity, { transient: true })}
+      onCommit={studio.history.commit}
+    />
   );
 }
 

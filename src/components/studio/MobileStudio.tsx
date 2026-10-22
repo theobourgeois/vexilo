@@ -13,6 +13,7 @@ import {
   GroupIcon,
   Layers,
   MoreHorizontal,
+  Opacity,
   Outline,
   Palette,
   Repeat,
@@ -35,6 +36,7 @@ import {
   FieldSwatches,
   LayerMoreMenu,
   LayerSwatches,
+  OpacitySlider,
   OutlineControls,
   PathControls,
   PointEditBar,
@@ -43,6 +45,7 @@ import {
   ShapeControls,
   TextControls,
   canGroup,
+  selectionOpacity,
   selectionRepeat,
 } from './tools';
 import type { Panel } from './use-shortcuts';
@@ -116,7 +119,7 @@ export function MobileStudio({
   onStartOver?: () => void;
 }) {
   const [panel, setPanel] = React.useState<Panel | null>(null);
-  const [tool, setTool] = React.useState<'repeat' | 'outline' | 'align' | null>(null);
+  const [tool, setTool] = React.useState<'repeat' | 'outline' | 'align' | 'opacity' | null>(null);
   const [view, setView] = React.useState<View>({ zoom: 1, panX: 0, panY: 0 });
   const [mode, setMode] = React.useState<'flat' | 'wave'>('flat');
   const [posting, setPosting] = React.useState(false);
@@ -225,6 +228,9 @@ export function MobileStudio({
                 >
                   <Outline />
                 </Action>}
+                <Action label='Opacity' active={selectionOpacity(studio) < 1} onClick={() => setTool('opacity')}>
+                  <Opacity />
+                </Action>
                 <Action label='Duplicate' onClick={() => actions.duplicateSelected()}>
                   <Copy />
                 </Action>
@@ -314,12 +320,17 @@ export function MobileStudio({
       </Sheet>
 
       <Sheet
-        open={tool === 'align' ? selectedLayers.length > 0 : tool === 'repeat' ? Boolean(repeat) : tool !== null && Boolean(single)}
+        open={tool === 'align' || tool === 'opacity' ? selectedLayers.length > 0 : tool === 'repeat' ? Boolean(repeat) : tool !== null && Boolean(single)}
         onOpenChange={(open) => !open && (studio.history.commit(), setTool(null))}
-        title={tool === 'repeat' ? 'Repeat' : tool === 'align' ? 'Align' : 'Outline'}
+        title={tool === 'repeat' ? 'Repeat' : tool === 'align' ? 'Align' : tool === 'opacity' ? `Opacity · ${Math.round(selectionOpacity(studio) * 100)}%` : 'Outline'}
       >
         <div className='flex justify-center pb-5'>
           {tool === 'align' && <AlignControls studio={studio} />}
+          {tool === 'opacity' && (
+            <div className='w-[248px] py-2'>
+              <OpacitySlider studio={studio} />
+            </div>
+          )}
           {repeat && tool === 'repeat' && <RepeatControls studio={studio} />}
           {single && tool === 'outline' && (
             <div className='flex w-[248px] flex-col gap-3'>

@@ -5,6 +5,7 @@ import type {
   DivisionKind,
   FlagOutlineKind,
   PathContour,
+  ShapeGradient,
   StudioClip,
   StudioDesign,
   StudioDivision,
@@ -17,7 +18,7 @@ import type {
 } from '@/lib/studio-design';
 import { clipsBelow } from './clip';
 import { emblemShapes } from './emblem-shapes';
-import { contrastRatio, luminance, matchToPalette, sameColor } from './colors';
+import { contrastRatio, gradientEnd, luminance, matchToPalette, sameColor } from './colors';
 import { fieldAnchors, type FieldPart } from './divisions';
 import { divisionFor, recolorStack, stackColors, swapStackColor, templateField, type FieldTemplate, type StackField } from './field';
 import {
@@ -122,6 +123,10 @@ function cloneLayers(sources: StudioLayer[], groups: StudioGroup[], whole: (grou
 
 const withGroups = (d: StudioDesign, groups: StudioGroup[]): StudioDesign => (groups.length ? { ...d, groups: [...(d.groups ?? []), ...groups] } : d);
 
+/** Colours with one changed, filling any before it that are missing from the first. */
+const withColor = (colors: string[], index: number, color: string) =>
+  Array.from({ length: Math.max(colors.length, index + 1) }, (_, i) => (i === index ? color : (colors[i] ?? colors[0] ?? color)));
+
 /** Where a colour is used: one of a layer's colours, or its outline at index -1. */
 export type ColorSlot = { id: string; index: number };
 export type SelectionColor = { color: string; slots: ColorSlot[] };
@@ -138,6 +143,7 @@ function selectionPalette(layers: StudioLayer[]): SelectionColor[] {
   for (const l of layers) {
     if (l.shape) {
       if (l.shape.fill) add(l.id, 0, l.colors[0]);
+      if (l.shape.fill && l.shape.gradient) add(l.id, 2, l.colors[2] ?? l.colors[0]);
       if (l.shape.stroke > 0) add(l.id, 1, l.colors[1] ?? l.colors[0]);
     } else l.colors.forEach((c, i) => add(l.id, i, c));
     if (l.outline) add(l.id, -1, l.outline.color);
@@ -385,13 +391,22 @@ export function useStudio(initial: StudioDoc, vectorEmblems: ReadonlySet<string>
         (l) => (l.shape ? { ...l, shape: { ...l.shape, ...patch, fill: l.shape.kind === 'brush' ? false : (patch.fill ?? l.shape.fill) } } : l),
         opts,
       ),
-    /** Paints the selected shapes' fill (0) or stroke (1). A brush's one colour is both. */
-    setShapeColor: (index: 0 | 1, color: string, opts?: Opts) =>
+    /** Paints the selected shapes' fill (0), stroke (1) or where their gradient ends (2). A brush's one colour is both. */
+    setShapeColor: (index: 0 | 1 | 2, color: string, opts?: Opts) =>
+      updateLayers(editable, (l) => (l.shape ? { ...l, colors: l.shape.kind === 'brush' ? [color, color] : withColor(l.colors, index, color) } : l), opts),
+    /** Fills the selected shapes with a gradient, or solid again; one newly set runs to a lighter or darker shade. */
+    setGradient: (gradient: ShapeGradient | null, opts?: Opts) =>
       updateLayers(
         editable,
-        (l) => (l.shape ? { ...l, colors: l.shape.kind === 'brush' ? [color, color] : l.colors.map((c, i) => (i === index ? color : c)) } : l),
+        (l) =>
+          l.shape && l.shape.kind !== 'brush'
+            ? { ...l, shape: { ...l.shape, gradient }, colors: gradient && !l.colors[2] ? withColor(l.colors, 2, gradientEnd(l.colors[0])) : l.colors }
+            : l,
         opts,
       ),
+    /** How opaque the selected layers are drawn. */
+    setOpacity: (opacity: number, opts?: Opts) =>
+      updateLayers(editable, (l) => ({ ...l, opacity: opacity >= 1 ? undefined : Math.max(0, opacity) }), opts),
     /** How thick the selected lines and arrows are, keeping their length. */
     setWeight: (size: number, opts?: Opts) =>
       updateLayers(editable, (l) => (l.shape ? { ...l, size, aspect: layerWidth(l) / size, stretch: undefined } : l), opts),
