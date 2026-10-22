@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import FlagCard from './FlagCard';
 import { FlagOfTheDayLink } from './flag-of-the-day-link';
+import { TopContributorsLink } from './top-contributors-link';
 import Tag from './Tag';
 import {
   getFavoriteFlagsCount,
@@ -317,7 +318,18 @@ export default function FlagSearch() {
               : `${flagsCount.toLocaleString()} flags`
             : ''}
         </p>
-        {!isFavorites && <FlagOfTheDayLink className='-ml-1.5 mt-2 max-w-full sm:-my-2.5 sm:-mr-2.5 sm:ml-auto sm:max-w-[420px] sm:self-center' />}
+        {!isFavorites && (
+          // On phones the flag of the day comes first and the top contributors sit under it.
+          <div className='-ml-1.5 mt-2 flex w-[calc(100%+0.375rem)] flex-col-reverse sm:-my-2.5 sm:-mr-2.5 sm:ml-auto sm:w-auto sm:max-w-full sm:flex-row sm:items-center sm:self-center'>
+            {!isSearching && (
+              <>
+                <TopContributorsLink className='sm:max-w-[340px]' />
+                <span className='mx-1 hidden h-10 w-px shrink-0 bg-line sm:block' />
+              </>
+            )}
+            <FlagOfTheDayLink className='sm:max-w-[420px]' />
+          </div>
+        )}
       </div>
 
       <form

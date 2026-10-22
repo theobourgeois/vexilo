@@ -467,7 +467,9 @@ export const flagRequests = createTable('flag_request', {
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   deleted: boolean('deleted').notNull().default(false),
   userMessage: text('user_message').notNull().default(''),
-});
+  // When the request was published; the homepage's weekly top contributors count from it.
+  approvedAt: timestamp('approved_at', { mode: 'date' }),
+}, (table) => [index('flag_request_approved_at_idx').on(table.approvedAt)]);
 
 export const bannedUsers = createTable('banned_user', {
   id: uuid('id').primaryKey().defaultRandom(),
