@@ -1,14 +1,16 @@
 'use client';
 
 import React from 'react';
-import type { StudioDesign, StudioLayer, StudioOutline, StudioRepeat, StudioShape } from '@/lib/studio-design';
-import { contrastRatio, luminance, matchToPalette } from './colors';
+import type { DivisionKind, PathContour, StudioDesign, StudioDivision, StudioLayer, StudioOutline, StudioRepeat, StudioShape } from '@/lib/studio-design';
+import { contrastRatio, luminance, matchToPalette, sameColor } from './colors';
+import { fieldAnchors, type FieldPart } from './divisions';
+import { divisionFor, recolorStack, stackColors, swapStackColor, templateField, type FieldTemplate, type StackField } from './field';
 import { useHistory } from './history';
-import { defaultParams, LAYOUTS, snapAnchors, type LayoutPreset } from './layouts';
 import {
   clamp,
   defaultRepeat,
   fieldColorAt,
+  fieldColors,
   fitSize,
   flagWidth,
   layerBounds,
@@ -22,9 +24,15 @@ import {
   type StudioDoc,
   type StudioEmblem,
 } from './model';
+import { applyVector, invert, removeNodes } from './paths';
 import { applyPoses, poseOf, scalePoses } from './transform';
+import { canEditPoints, combinedLayer, combineContours, layerAffine, localContours, toPath, withContours, type BooleanOp } from './vector';
 
 export const FIELD = 'field';
+
+/** A division's selection key; the field's base is FIELD. */
+export const divisionKey = (id: string) => `div:${id}`;
+const DIVISION = /^div:/;
 
 export type AlignEdge = 'left' | 'centre' | 'right' | 'top' | 'middle' | 'bottom';
 
@@ -44,15 +52,29 @@ export function useStudio(initial: StudioDoc) {
   const [selection, setSelectionState] = React.useState<string[]>([]);
 
   // Drop ids that no longer exist (after undo, delete…).
-  const ids = React.useMemo(() => new Set(design.layers.map((l) => l.id)), [design.layers]);
+  const divisions = React.useMemo(() => (design.field.kind === 'stack' ? design.field.divisions : []), [design.field]);
+  const ids = React.useMemo(
+    () => new Set([...design.layers.map((l) => l.id), ...divisions.map((d) => divisionKey(d.id))]),
+    [design.layers, divisions],
+  );
   const liveSelection = React.useMemo(
     () => selection.filter((id) => id === FIELD || ids.has(id)),
     [selection, ids],
   );
   const selectedLayers = design.layers.filter((l) => liveSelection.includes(l.id));
-  const fieldSelected = liveSelection.includes(FIELD);
+  const selectedDivision = divisions.find((d) => liveSelection.includes(divisionKey(d.id))) ?? null;
+  /** The field or one of its divisions. */
+  const fieldSelected = liveSelection.some((id) => id === FIELD || DIVISION.test(id));
 
   const setSelection = React.useCallback((next: string[]) => setSelectionState(next), []);
+
+  // Point editing: one path, and which of its nodes are picked. It ends once the path isn't the selection.
+  const [pathEditState, setPathEdit] = React.useState<{ id: string; nodes: string[] } | null>(null);
+  const editingLayer = pathEditState && liveSelection.length === 1 && liveSelection[0] === pathEditState.id
+    ? design.layers.find((l) => l.id === pathEditState.id)
+    : undefined;
+  const pathEdit =
+    editingLayer?.shape?.kind === 'path' && !editingLayer.locked && !editingLayer.hidden ? { ...pathEditState!, layer: editingLayer } : null;
 
   const update = React.useCallback(
     (fn: (d: StudioDesign) => StudioDesign, opts?: Opts) => history.set((d) => ({ ...d, design: fn(d.design) }), opts),
@@ -67,12 +89,22 @@ export function useStudio(initial: StudioDoc) {
 
   const editable = selectedLayers.filter((l) => !l.locked).map((l) => l.id);
 
+  const updateStack = React.useCallback(
+    (fn: (field: StackField) => StackField, opts?: Opts) =>
+      update((d) => (d.field.kind === 'stack' ? { ...d, field: fn(d.field) } : d), opts),
+    [update],
+  );
+  const updateDivision = React.useCallback(
+    (id: string, fn: (division: StudioDivision) => StudioDivision, opts?: Opts) =>
+      updateStack((f) => ({ ...f, divisions: f.divisions.map((d) => (d.id === id ? fn(d) : d)) }), opts),
+    [updateStack],
+  );
+
   const actions = {
     setName: (name: string) => history.set((d) => ({ ...d, name })),
 
     addEmblem(emblem: StudioEmblem, at?: { x: number; y: number }) {
-      const params = design.field.kind === 'layout' ? design.field.params : {};
-      const anchors = snapAnchors(design.field.kind === 'layout' ? design.field.layout : null, W, params);
+      const anchors = fieldAnchors(design);
       let place: { x: number; y: number; size: number };
       if (at) {
         const near = anchors
@@ -93,7 +125,7 @@ export function useStudio(initial: StudioDoc) {
       if (layer.colors.length <= 2 && contrastRatio(layer.colors[0], behind) < 1.6) {
         // Prefer the flag's own colours; fall back to white or black.
         const byContrast = (colors: string[]) => [...colors].sort((a, b) => contrastRatio(b, behind) - contrastRatio(a, behind));
-        const own = byContrast(design.field.colors).filter((c) => contrastRatio(c, behind) >= 2.5);
+        const own = byContrast(fieldColors(design)).filter((c) => contrastRatio(c, behind) >= 2.5);
         layer.colors = [own[0] ?? byContrast(['#FFFFFF', '#000000'])[0], ...layer.colors.slice(1)];
       }
       update((d) => ({ ...d, layers: [...d.layers, layer] }));
@@ -125,9 +157,80 @@ export function useStudio(initial: StudioDoc) {
     setWeight: (size: number, opts?: Opts) =>
       updateLayers(editable, (l) => (l.shape ? { ...l, size, aspect: layerWidth(l) / size, stretch: undefined } : l), opts),
 
+    /** Starts editing a shape's points, turning it into a path first. */
+    editPoints(id = selectedLayers.length === 1 ? selectedLayers[0].id : undefined) {
+      const layer = design.layers.find((l) => l.id === id);
+      if (!layer || layer.locked || !canEditPoints(layer)) return;
+      if (layer.shape!.kind !== 'path') updateLayers([layer.id], (l) => toPath(l, W));
+      setSelectionState([layer.id]);
+      setPathEdit({ id: layer.id, nodes: [] });
+    },
+    stopEditing: () => setPathEdit(null),
+    /** Picks nodes of the path being edited. */
+    setEditNodes: (nodes: string[]) => setPathEdit((p) => p && { ...p, nodes }),
+    /** Gives a shape new outlines, in its own box. */
+    setContours: (id: string, contours: PathContour[], opts?: Opts) => updateLayers([id], (l) => withContours(l, contours, W), opts),
+    /** Removes the picked nodes; a path left with nothing goes. */
+    deleteNodes() {
+      if (!pathEdit || pathEdit.nodes.length === 0) return;
+      const contours = removeNodes(localContours(pathEdit.layer), pathEdit.nodes);
+      if (contours.length === 0) {
+        update((d) => ({ ...d, layers: d.layers.filter((l) => l.id !== pathEdit.id) }));
+        setPathEdit(null);
+        setSelectionState([]);
+        return;
+      }
+      actions.setContours(pathEdit.id, contours);
+      setPathEdit({ id: pathEdit.id, nodes: [] });
+    },
+    /** Moves the picked nodes by flag units. */
+    nudgeNodes(dx: number, dy: number) {
+      if (!pathEdit || pathEdit.nodes.length === 0) return;
+      const [lx, ly] = applyVector(invert(layerAffine(pathEdit.layer, W)), [dx, dy]);
+      const picked = new Set(pathEdit.nodes);
+      const contours = localContours(pathEdit.layer).map((c, ci) => ({
+        ...c,
+        nodes: c.nodes.map((n, ni) => (picked.has(`${ci}:${ni}`) ? { ...n, x: n.x + lx, y: n.y + ly } : n)),
+      }));
+      actions.setContours(pathEdit.id, contours);
+    },
+    selectAllNodes() {
+      if (!pathEdit) return;
+      const contours = pathEdit.layer.shape!.contours ?? [];
+      setPathEdit({ id: pathEdit.id, nodes: contours.flatMap((c, ci) => c.nodes.map((_, ni) => `${ci}:${ni}`)) });
+    },
+
+    /** The selected shapes as paths, so their points can be moved. */
+    convertToPath: () => updateLayers(editable, (l) => (canEditPoints(l) ? toPath(l, W) : l)),
+
+    /**
+     * Combines the selected shapes into one path, where the bottom one was. Returns false when
+     * nothing would be left, as with an intersection of shapes that don't touch.
+     */
+    async combine(op: BooleanOp) {
+      const layers = design.layers.filter((l) => editable.includes(l.id) && canEditPoints(l) && !l.hidden);
+      if (layers.length < 2) return false;
+      const contours = await combineContours(layers, op, W);
+      if (contours.length === 0) return false;
+      const combined = combinedLayer(layers[0], contours, op, W);
+      const ids = new Set(layers.map((l) => l.id));
+      update((d) => {
+        const at = d.layers.findIndex((l) => l.id === layers[0].id);
+        const next = [...d.layers];
+        next.splice(at, 0, combined);
+        return { ...d, layers: next.filter((l) => !ids.has(l.id)) };
+      });
+      setSelectionState([combined.id]);
+      return true;
+    },
+
+    /** Deletes the selected emblems, or the selected division when no emblem is. */
     deleteSelected() {
       const targets = editable;
-      if (targets.length === 0) return;
+      if (targets.length === 0) {
+        if (selectedDivision && !selectedDivision.locked) actions.removeDivision(selectedDivision.id);
+        return;
+      }
       update((d) => ({ ...d, layers: d.layers.filter((l) => !targets.includes(l.id)) }));
       setSelectionState([]);
     },
@@ -166,6 +269,7 @@ export function useStudio(initial: StudioDoc) {
       pasteCount = 0;
     },
     cut() {
+      if (selectedLayers.length === 0) return;
       actions.copy();
       actions.deleteSelected();
     },
@@ -316,8 +420,9 @@ export function useStudio(initial: StudioDoc) {
     matchPalette() {
       updateLayers(editable, (l) => {
         const behind = fieldColorAt(design, l.x * W, l.y);
-        const targets = [...design.field.colors, ...design.layers.filter((o) => o.id !== l.id && !o.hidden).flatMap((o) => o.colors)];
-        return { ...l, colors: matchToPalette(l.palette, design.field.colors.length > 1 ? design.field.colors : targets, behind) };
+        const own = fieldColors(design);
+        const targets = [...own, ...design.layers.filter((o) => o.id !== l.id && !o.hidden).flatMap((o) => o.colors)];
+        return { ...l, colors: matchToPalette(l.palette, own.length > 1 ? own : targets, behind) };
       });
     },
 
@@ -328,7 +433,7 @@ export function useStudio(initial: StudioDoc) {
         if (l.outline) return l;
         // A contrasting edge against what's behind the emblem.
         const behind = fieldColorAt(design, l.x * W, l.y);
-        const options = [...design.field.colors, '#FFFFFF', '#000000'];
+        const options = [...fieldColors(design), '#FFFFFF', '#000000'];
         const color = options.sort((a, b) => contrastRatio(b, behind) - contrastRatio(a, behind))[0];
         return { ...l, outline: { color, width: Math.max(0.006, l.size * 0.035) } };
       });
@@ -355,28 +460,98 @@ export function useStudio(initial: StudioDoc) {
     toggleLocked: (id: string) => updateLayers([id], (l) => ({ ...l, locked: !l.locked })),
     rename: (id: string, name: string) => updateLayers([id], (l) => ({ ...l, name: name.trim() || l.name })),
 
-    setFieldColor: (slot: number, color: string, opts?: Opts) =>
-      update((d) => ({ ...d, field: { ...d.field, colors: d.field.colors.map((c, i) => (i === slot ? color : c)) } }), opts),
-
-    /** Switches layout, keeping the colours already in use where there are slots for them. */
-    setLayout(preset: LayoutPreset) {
-      const def = LAYOUTS[preset.layout];
+    /** Repaints one of the field's colours (as `fieldColors` lists them) wherever the field uses it. */
+    setFieldColor: (index: number, color: string, opts?: Opts) =>
       update((d) => {
-        const current = d.field.colors;
-        const colors = def.colors.map((fallback, i) => current[i] ?? fallback);
-        return { ...d, field: { kind: 'layout', layout: preset.layout, colors, params: defaultParams(preset.layout, preset.params) } };
-      });
+        if (d.field.kind !== 'stack') return { ...d, field: { ...d.field, colors: d.field.colors.map((c, i) => (i === index ? color : c)) } };
+        const from = stackColors(d.field)[index];
+        return from ? { ...d, field: swapStackColor(d.field, from, color) } : d;
+      }, opts),
+    setBaseColor: (color: string, opts?: Opts) => updateStack((f) => ({ ...f, color }), opts),
+
+    /** Paints one part of the field: the base, a division's colour or its fimbriation. */
+    setFieldPartColor(part: Pick<FieldPart, 'divisionId' | 'slot' | 'target'>, color: string, opts?: Opts) {
+      if (!part.divisionId) return updateStack((f) => ({ ...f, color }), opts);
+      updateDivision(
+        part.divisionId,
+        (d) =>
+          part.target === 'fimbriation'
+            ? { ...d, fimbriation: d.fimbriation ? { ...d.fimbriation, color } : d.fimbriation }
+            : { ...d, colors: d.colors.map((c, i) => (i === part.slot ? color : c)) },
+        opts,
+      );
     },
-    setParam: (key: string, value: number, opts?: Opts) =>
-      update((d) => (d.field.kind === 'layout' ? { ...d, field: { ...d.field, params: { ...d.field.params, [key]: value } } } : d), opts),
+
+    // —— Divisions ——
+
+    selectDivision: (id: string | null) => setSelectionState([id ? divisionKey(id) : FIELD]),
+
+    /** Adds a division above the selected one, or on top. */
+    addDivision(kind: DivisionKind) {
+      if (design.field.kind !== 'stack') return;
+      const division = divisionFor(design.field, kind, uid());
+      updateStack((f) => {
+        const at = selectedDivision ? f.divisions.findIndex((d) => d.id === selectedDivision.id) + 1 : f.divisions.length;
+        const next = [...f.divisions];
+        next.splice(at > 0 ? at : f.divisions.length, 0, division);
+        return { ...f, divisions: next };
+      });
+      setSelectionState([divisionKey(division.id)]);
+      return division.id;
+    },
+    updateDivision: (id: string, patch: Partial<StudioDivision>, opts?: Opts) => updateDivision(id, (d) => ({ ...d, ...patch }), opts),
+    setDivisionParam: (id: string, key: string, value: number, opts?: Opts) =>
+      updateDivision(id, (d) => ({ ...d, params: { ...d.params, [key]: value } }), opts),
+    setDivisionColor: (id: string, slot: number, color: string, opts?: Opts) =>
+      updateDivision(id, (d) => ({ ...d, colors: d.colors.map((c, i) => (i === slot ? color : c)) }), opts),
+    removeDivision(id: string) {
+      updateStack((f) => ({ ...f, divisions: f.divisions.filter((d) => d.id !== id) }));
+      setSelectionState([FIELD]);
+    },
+    duplicateDivision(id: string) {
+      const copy = uid();
+      updateStack((f) => {
+        const at = f.divisions.findIndex((d) => d.id === id);
+        if (at < 0) return f;
+        const next = [...f.divisions];
+        next.splice(at + 1, 0, { ...f.divisions[at], id: copy, locked: false });
+        return { ...f, divisions: next };
+      });
+      setSelectionState([divisionKey(copy)]);
+    },
+    /** Moves a division to a place in the stack, 0 being the bottom. */
+    moveDivision: (id: string, toIndex: number) =>
+      updateStack((f) => {
+        const next = [...f.divisions];
+        const from = next.findIndex((d) => d.id === id);
+        if (from < 0) return f;
+        const [division] = next.splice(from, 1);
+        next.splice(clamp(toIndex, 0, next.length), 0, division);
+        return { ...f, divisions: next };
+      }),
+    toggleDivisionHidden: (id: string) => updateDivision(id, (d) => ({ ...d, hidden: !d.hidden })),
+    toggleDivisionLocked: (id: string) => updateDivision(id, (d) => ({ ...d, locked: !d.locked })),
+    renameDivision: (id: string, name: string) => updateDivision(id, (d) => ({ ...d, name: name.trim() || undefined })),
+
+    /** Replaces the field with a template; one built from parts brings its own proportions. */
+    applyTemplate(template: FieldTemplate) {
+      update((d) => ({ ...d, ratio: template.own?.ratio ?? d.ratio, field: templateField(template, d.field, uid) }));
+      setSelectionState([FIELD]);
+    },
 
     setRatio: (ratio: [number, number]) => update((d) => ({ ...d, ratio })),
 
     /** Applies a palette to the field, then pulls the emblems onto it. */
     applyPalette(colors: string[]) {
       update((d) => {
-        const fieldColors = d.field.colors.map((_, i) => colors[i % colors.length]);
-        const next = { ...d, field: { ...d.field, colors: fieldColors } };
+        let field = d.field;
+        if (field.kind === 'stack') {
+          const own = stackColors(field);
+          field = recolorStack(field, (c) => colors[own.findIndex((o) => sameColor(o, c)) % colors.length] ?? c);
+        } else {
+          field = { ...field, colors: field.colors.map((_, i) => colors[i % colors.length]) };
+        }
+        const next = { ...d, field };
         const Wn = flagWidth(next);
         return {
           ...next,
@@ -384,9 +559,19 @@ export function useStudio(initial: StudioDoc) {
         };
       });
     },
-    /** Rotates the field's colours one slot along. */
+    /** Moves each of the field's colours to where the next one was. */
     cycleFieldColors() {
-      update((d) => ({ ...d, field: { ...d.field, colors: [...d.field.colors.slice(1), d.field.colors[0]] } }));
+      update((d) => {
+        if (d.field.kind !== 'stack') return { ...d, field: { ...d.field, colors: [...d.field.colors.slice(1), d.field.colors[0]] } };
+        const own = stackColors(d.field);
+        return {
+          ...d,
+          field: recolorStack(d.field, (c) => {
+            const i = own.findIndex((o) => sameColor(o, c));
+            return i < 0 ? c : own[(i + 1) % own.length];
+          }),
+        };
+      });
     },
     replaceColor: (from: string, to: string, opts?: Opts) => update((d) => replaceColor(d, from, to), opts),
 
@@ -407,6 +592,8 @@ export function useStudio(initial: StudioDoc) {
     W,
     selection: liveSelection,
     selectedLayers,
+    pathEdit,
+    selectedDivision,
     fieldSelected,
     setSelection,
     update,

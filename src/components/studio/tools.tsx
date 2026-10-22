@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import {
   AlignRight,
   AlignTop,
   ArcIcon,
+  BezierCurve,
   BringForward,
   DistributeHorizontal,
   DistributeVertical,
@@ -27,10 +29,13 @@ import {
   Copy,
   Eye,
   EyeSlash,
+  ExcludeShapes,
   FlipHorizontal,
   FlipVertical,
   GridIcon,
+  IntersectShapes,
   Lock,
+  MergeShapes,
   MoreHorizontal,
   Outline,
   Repeat,
@@ -40,6 +45,7 @@ import {
   SendBackward,
   SlidersHorizontal,
   SquaresFour,
+  SubtractShapes,
   SwapColors,
   Trash2,
   Unlock,
@@ -49,13 +55,15 @@ import {
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import type { StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import { DIVISIONS, divisionParts } from './divisions';
 import { PaintButton, WidthSlider } from './draw';
-import { documentColors, layerWidth } from './model';
+import { documentColors, fieldColors, layerWidth } from './model';
 import { alignScopes, type AlignScope } from './regions';
 import { defaultStroke, isLinear, naturalAspect } from './shapes';
 import { ColorPicker, Slider, Swatch, ToolButton, ToolDivider } from './ui';
 import type { Rect } from './StudioCanvas';
 import type { AlignEdge, Studio } from './use-studio';
+import { BOOLEAN_LABELS, canEditPoints, type BooleanOp } from './vector';
 
 /** A colour swatch that opens the picker. `onChange` is live; the popover closing commits. */
 export function ColorButton({
@@ -123,10 +131,42 @@ export function LayerSwatches({ studio, layer, size, side }: { studio: Studio; l
   );
 }
 
+/** The selected division's colours, or every colour the field shows. */
 export function FieldSwatches({ studio, size, side }: { studio: Studio; size?: number; side?: 'top' | 'bottom' }) {
+  const division = studio.selectedDivision;
+  if (division) {
+    const shown = division.colors.slice(0, DIVISIONS[division.kind].cycles ? divisionParts(division) : 1);
+    return (
+      <>
+        {shown.map((color, i) => (
+          <ColorButton
+            key={i}
+            color={color}
+            studio={studio}
+            size={size}
+            side={side}
+            label={`Colour ${i + 1}`}
+            onChange={(next, transient) => studio.actions.setDivisionColor(division.id, i, next, { transient })}
+          />
+        ))}
+        {division.fimbriation && (
+          <ColorButton
+            color={division.fimbriation.color}
+            studio={studio}
+            size={size}
+            side={side}
+            label='Fimbriation'
+            onChange={(next, transient) =>
+              studio.actions.setFieldPartColor({ divisionId: division.id, slot: 0, target: 'fimbriation' }, next, { transient })
+            }
+          />
+        )}
+      </>
+    );
+  }
   return (
     <>
-      {studio.design.field.colors.map((color, i) => (
+      {fieldColors(studio.design).map((color, i) => (
         <ColorButton
           key={i}
           color={color}
@@ -278,6 +318,64 @@ export function ShapeControls({ studio, layers, side = 'top' }: { studio: Studio
         )}
       </PaintButton>
       {layers.length === 1 && <ShapeSettings studio={studio} layer={first} />}
+    </>
+  );
+}
+
+const BOOLEANS: { op: BooleanOp; hint: string; icon: React.ReactNode }[] = [
+  { op: 'unite', hint: 'join them into one', icon: <MergeShapes /> },
+  { op: 'subtract', hint: 'cut the others out of the bottom one', icon: <SubtractShapes /> },
+  { op: 'intersect', hint: 'keep where they overlap', icon: <IntersectShapes /> },
+  { op: 'exclude', hint: 'keep where they don’t overlap', icon: <ExcludeShapes /> },
+];
+
+/**
+ * Editing a shape's outline: its points when one is selected, or combining several into one.
+ * Brush strokes are left out.
+ */
+export function PathControls({ studio, side = 'top' }: { studio: Studio; side?: 'top' | 'bottom' }) {
+  const shapes = studio.selectedLayers.filter((l) => canEditPoints(l) && !l.locked && !l.hidden);
+  if (shapes.length === 1 && studio.selectedLayers.length === 1) {
+    return (
+      <ToolButton label='Edit points (Enter)' side={side} onClick={() => studio.actions.editPoints(shapes[0].id)}>
+        <BezierCurve />
+      </ToolButton>
+    );
+  }
+  if (shapes.length < 2) return null;
+  const combine = async (op: BooleanOp) => {
+    if (!(await studio.actions.combine(op))) toast(op === 'intersect' ? 'Those shapes don’t overlap' : 'Nothing would be left');
+  };
+  return (
+    <>
+      {BOOLEANS.map((b) => (
+        <ToolButton key={b.op} label={`${BOOLEAN_LABELS[b.op]}: ${b.hint}`} side={side} onClick={() => combine(b.op)}>
+          {b.icon}
+        </ToolButton>
+      ))}
+    </>
+  );
+}
+
+/** While a path's points are being edited: what can be done, and a way out. */
+export function PointEditBar({ studio, side = 'top' }: { studio: Studio; side?: 'top' | 'bottom' }) {
+  const { pathEdit, actions } = studio;
+  if (!pathEdit) return null;
+  return (
+    <>
+      <ShapeControls studio={studio} layers={[pathEdit.layer]} side={side} />
+      <ToolDivider />
+      {pathEdit.nodes.length > 0 && (
+        <>
+          <ToolButton label='Delete points' side={side} onClick={actions.deleteNodes}>
+            <Trash2 />
+          </ToolButton>
+          <ToolDivider />
+        </>
+      )}
+      <ToolButton label='Done (Enter)' side={side} onClick={actions.stopEditing} className='text-main hover:text-main'>
+        <span>Done</span>
+      </ToolButton>
     </>
   );
 }
@@ -464,6 +562,11 @@ export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Stud
         <DropdownMenuItem onSelect={() => actions.resetLayerColors(selectedLayers.map((l) => l.id))}>
           <SwapColors /> Original colours
         </DropdownMenuItem>
+        {selectedLayers.some((l) => canEditPoints(l) && l.shape!.kind !== 'path') && (
+          <DropdownMenuItem onSelect={actions.convertToPath}>
+            <BezierCurve /> Convert to path
+          </DropdownMenuItem>
+        )}
         {selectedLayers.some((l) => l.stretch) && (
           <DropdownMenuItem onSelect={actions.unstretch}>
             <Proportions /> Original proportions
@@ -513,17 +616,22 @@ export function ContextToolbar({
   const anyShape = selectedLayers.some((l) => l.shape);
 
   // Clear the rotate handle above the selection.
-  const lift = 58 + (selectedLayers.some((l) => !l.locked && !l.hidden) ? 30 : 0);
+  const lift = 58 + (selectedLayers.some((l) => !l.locked && !l.hidden) && !studio.pathEdit ? 30 : 0);
   const above = rect.y - lift > 12;
   const top = above ? rect.y - lift : Math.min(rect.y + rect.h + 14, container.h - 60);
   const left = Math.min(Math.max(rect.x + rect.w / 2 - width / 2, 12), container.w - width - 12);
 
   let content: React.ReactNode = null;
-  if (selectedLayers.length > 0) {
+  if (studio.pathEdit) {
+    content = <PointEditBar studio={studio} />;
+  } else if (selectedLayers.length > 0) {
     content = (
       <>
         {allShapes ? (
-          <ShapeControls studio={studio} layers={selectedLayers} />
+          <>
+            <ShapeControls studio={studio} layers={selectedLayers} />
+            <PathControls studio={studio} />
+          </>
         ) : (
           <>
             {single && (
@@ -569,6 +677,27 @@ export function ContextToolbar({
         </LayerMoreMenu>
       </>
     );
+  } else if (studio.selectedDivision) {
+    const division = studio.selectedDivision;
+    content = (
+      <>
+        <div className='flex items-center gap-1.5 px-1.5'>
+          <FieldSwatches studio={studio} />
+        </div>
+        <ToolDivider />
+        <ToolButton label='Edit' onClick={onOpenLayout}>
+          <SquaresFour />
+          <span>{division.name ?? DIVISIONS[division.kind].label}</span>
+        </ToolButton>
+        <ToolDivider />
+        <ToolButton label='Duplicate' onClick={() => actions.duplicateDivision(division.id)}>
+          <Copy />
+        </ToolButton>
+        <ToolButton label='Delete' onClick={() => actions.removeDivision(division.id)}>
+          <Trash2 />
+        </ToolButton>
+      </>
+    );
   } else if (fieldSelected) {
     content = (
       <>
@@ -579,9 +708,9 @@ export function ContextToolbar({
         <ToolButton label='Shuffle colours' onClick={actions.cycleFieldColors}>
           <SwapColors />
         </ToolButton>
-        <ToolButton label='Layout' onClick={onOpenLayout}>
+        <ToolButton label='Field' onClick={onOpenLayout}>
           <SquaresFour />
-          <span>Layout</span>
+          <span>Field</span>
         </ToolButton>
       </>
     );

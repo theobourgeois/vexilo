@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import type { StudioDesign, StudioField, StudioLayer } from '@/lib/studio-design';
+import type { StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
 import { layerImage } from './cutout';
+import { divisionGeometry } from './divisions';
 import { useRecolored } from './images';
-import { defaultParams, LAYOUTS } from './layouts';
 import { flagWidth, layerBounds, layerCopies, layerWidth } from './model';
 import { shapePath } from './shapes';
 
@@ -73,7 +73,7 @@ export function FlagArt({
         })}
       </defs>
       <g clipPath={`url(#${id}-clip)`}>
-        <FieldArt field={design.field} W={W} href={hrefs?.field} />
+        <FieldArt field={design.field} W={W} href={hrefs?.field} id={id} />
         {design.layers.map((layer) =>
           layer.hidden ? null : layer.shape ? (
             <ShapeArt key={layer.id} layer={layer} W={W} filter={layer.outline ? `url(#${id}-o-${layer.id})` : undefined} />
@@ -92,25 +92,53 @@ export function FlagArt({
   );
 }
 
-function FieldArt({ field, W, href }: { field: StudioField; W: number; href?: string }) {
+function FieldArt({ field, W, href, id }: { field: StudioField; W: number; href?: string; id: string }) {
   if (field.kind === 'image') return <FieldImage field={field} W={W} href={href} />;
-  const shapes = LAYOUTS[field.layout].shapes(W, { ...defaultParams(field.layout), ...field.params });
   return (
     <>
-      {shapes.map((shape, i) => (
-        // A hairline stroke in the same colour hides anti-aliasing seams where shapes meet.
-        <path
-          key={i}
-          d={shape.d}
-          fill={field.colors[shape.slot] ?? '#888888'}
-          stroke={field.colors[shape.slot] ?? '#888888'}
-          strokeWidth={0.6}
-          vectorEffect='non-scaling-stroke'
-        />
-      ))}
+      <rect width={W} height={1} fill={field.color} />
+      {field.divisions.map((division) => (division.hidden ? null : <DivisionArt key={division.id} division={division} W={W} id={id} />))}
     </>
   );
 }
+
+/**
+ * A division, clipped to its box. A charge's fimbriation is a stroke twice as wide under its
+ * fill, so `width` shows outside it; a tiling's runs centred along the edges between its parts.
+ */
+const DivisionArt = React.memo(function DivisionArt({ division, W, id }: { division: StudioDivision; W: number; id: string }) {
+  const geometry = divisionGeometry(division, W);
+  const { clip, tiling } = geometry;
+  const fim = division.fimbriation && division.fimbriation.width > 0 ? division.fimbriation : null;
+  const join = division.edge ? 'round' : 'miter';
+  const clipId = `${id}-d-${division.id}`;
+  const color = (i: number) => division.colors[i % division.colors.length] ?? '#888888';
+  return (
+    <>
+      {division.box && (
+        <clipPath id={clipId}>
+          <rect x={clip.x} y={clip.y} width={clip.w} height={clip.h} />
+        </clipPath>
+      )}
+      <g clipPath={division.box ? `url(#${clipId})` : undefined}>
+        {fim &&
+          !tiling &&
+          geometry.parts.map((part, i) => (
+            <path key={`f${i}`} d={part.d} fill='none' stroke={fim.color} strokeWidth={fim.width * 2} strokeLinejoin={join} strokeMiterlimit={20} />
+          ))}
+        {geometry.parts.map((part, i) => (
+          // A hairline stroke in the same colour hides anti-aliasing seams where shapes meet.
+          <path key={i} d={part.d} fill={color(i)} stroke={color(i)} strokeWidth={0.6} vectorEffect='non-scaling-stroke' />
+        ))}
+        {fim &&
+          tiling &&
+          geometry.parts.map((part, i) => (
+            <path key={`f${i}`} d={part.d} fill='none' stroke={fim.color} strokeWidth={fim.width} strokeLinejoin={join} strokeMiterlimit={20} />
+          ))}
+      </g>
+    </>
+  );
+});
 
 function FieldImage({ field, W, href }: { field: Extract<StudioField, { kind: 'image' }>; W: number; href?: string }) {
   const live = useRecolored(field.src, field.palette, field.colors);
@@ -164,6 +192,7 @@ export const ShapeArt = React.memo(function ShapeArt({ layer, W, filter }: { lay
           key={i}
           d={d}
           fill={shape.fill ? layer.colors[0] : 'none'}
+          fillRule='evenodd'
           stroke={shape.stroke > 0 ? (layer.colors[1] ?? layer.colors[0]) : 'none'}
           strokeWidth={shape.stroke}
           strokeLinecap={brush ? 'round' : 'butt'}

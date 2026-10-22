@@ -123,7 +123,7 @@ export function ColorPicker({
   const EyeDropper = typeof window !== 'undefined' ? (window as unknown as { EyeDropper?: EyeDropperCtor }).EyeDropper : undefined;
 
   return (
-    <div className='-m-1.5 flex max-h-[min(520px,var(--radix-popover-content-available-height,70dvh))] w-[248px] flex-col gap-3 overflow-y-auto p-1.5'>
+    <div className='flex w-[248px] flex-col gap-3'>
       <div className='flex items-center gap-2'>
         <label className='relative size-9 shrink-0 cursor-pointer overflow-hidden rounded-[10px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.16)]' style={{ background: value }}>
           <input

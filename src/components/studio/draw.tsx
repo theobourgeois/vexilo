@@ -3,14 +3,14 @@
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
-import { Cursor, PaintBrush, Shapes } from '@/components/icons';
+import { Cursor, PaintBrush, PenNib, Shapes } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { documentColors, EXPORT_WIDTH } from './model';
 import { isLinear, SHAPE_PRESETS, shapePath, type ShapePreset, type ShapeStyle } from './shapes';
 import { ColorPicker, Slider, ToolButton, ToolDivider } from './ui';
 import type { Studio } from './use-studio';
 
-export type ToolKind = 'select' | 'shape' | 'brush';
+export type ToolKind = 'select' | 'shape' | 'brush' | 'pen';
 
 /** The tool in hand, and how it paints. */
 export type DrawSettings = ShapeStyle & {
@@ -36,6 +36,7 @@ export const DEFAULT_DRAW: DrawSettings = {
 const TOOLS: { tool: ToolKind; label: string; icon: React.ReactNode }[] = [
   { tool: 'select', label: 'Select (V)', icon: <Cursor /> },
   { tool: 'shape', label: 'Shapes (U)', icon: <Shapes /> },
+  { tool: 'pen', label: 'Pen (P)', icon: <PenNib /> },
   { tool: 'brush', label: 'Brush (B)', icon: <PaintBrush /> },
 ];
 
@@ -61,7 +62,7 @@ export function ShapeIcon({ preset, className }: { preset: ShapePreset; classNam
   else if (kind === 'rect') [w, h] = [19, 13];
   return (
     <svg viewBox='-12 -12 24 24' aria-hidden className={cn('size-[18px]', className)}>
-      <path d={shapePath(shape, w, h)} fill='currentColor' transform={isLinear(kind) ? 'rotate(-45)' : undefined} />
+      <path d={shapePath(shape, w, h)} fill='currentColor' fillRule='evenodd' transform={isLinear(kind) ? 'rotate(-45)' : undefined} />
     </svg>
   );
 }
@@ -175,7 +176,23 @@ function shiftHint(preset: ShapePreset) {
   return preset.shape.kind === 'rect' ? 'Shift for a square' : 'Shift to keep its shape';
 }
 
-/** What the shape or brush tool will paint with, under the toolbar. */
+function StrokeButton({ studio, draw, onChange }: { studio: Studio; draw: DrawSettings; onChange: (patch: Partial<DrawSettings>) => void }) {
+  return (
+    <PaintButton
+      studio={studio}
+      label='Stroke'
+      ring
+      color={draw.stroke}
+      on={draw.strokeWidth > 0}
+      onToggle={(on) => onChange({ strokeWidth: on ? 0.008 : 0, ...(!on && { filled: true }) })}
+      onColor={(stroke) => onChange({ stroke, strokeWidth: draw.strokeWidth || 0.008 })}
+    >
+      {draw.strokeWidth > 0 && <WidthSlider studio={studio} value={draw.strokeWidth} onChange={(strokeWidth) => onChange({ strokeWidth })} />}
+    </PaintButton>
+  );
+}
+
+/** What the shape, pen or brush tool will paint with, under the toolbar. */
 export function ToolOptions({
   studio,
   draw,
@@ -194,7 +211,19 @@ export function ToolOptions({
   const linear = isLinear(preset.shape.kind);
   return (
     <div className={cn('flex h-11 items-center gap-0.5 rounded-[13px] bg-surface p-[5px] shadow-pop', className)} style={style}>
-      {draw.tool === 'shape' ? (
+      {draw.tool === 'pen' ? (
+        <>
+          <PaintButton
+            studio={studio}
+            label='Fill'
+            color={draw.fill}
+            on={draw.filled}
+            onToggle={(filled) => onChange({ filled, ...(!filled && !draw.strokeWidth && { strokeWidth: 0.008 }) })}
+            onColor={(fill) => onChange({ fill, filled: true })}
+          />
+          <StrokeButton studio={studio} draw={draw} onChange={onChange} />
+        </>
+      ) : draw.tool === 'shape' ? (
         <>
           {SHAPE_PRESETS.map((p) => (
             <ToolButton
@@ -217,19 +246,7 @@ export function ToolOptions({
             onToggle={linear ? undefined : (filled) => onChange({ filled, ...(!filled && !draw.strokeWidth && { strokeWidth: 0.008 }) })}
             onColor={(fill) => onChange({ fill, filled: true })}
           />
-          <PaintButton
-            studio={studio}
-            label='Stroke'
-            ring
-            color={draw.stroke}
-            on={draw.strokeWidth > 0}
-            onToggle={(on) => onChange({ strokeWidth: on ? 0.008 : 0, ...(!on && { filled: true }) })}
-            onColor={(stroke) => onChange({ stroke, strokeWidth: draw.strokeWidth || 0.008 })}
-          >
-            {draw.strokeWidth > 0 && (
-              <WidthSlider studio={studio} value={draw.strokeWidth} onChange={(strokeWidth) => onChange({ strokeWidth })} />
-            )}
-          </PaintButton>
+          <StrokeButton studio={studio} draw={draw} onChange={onChange} />
         </>
       ) : (
         <>

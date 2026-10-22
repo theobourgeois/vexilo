@@ -8,7 +8,7 @@ import { flags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { extractPalette } from '@/lib/flag-palette';
-import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG, type StudioDesign } from '@/lib/studio-design';
+import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG, type StoredStudioDesign } from '@/lib/studio-design';
 import { studioDesignSchema } from '@/lib/studio-design-schema';
 import { createFlagRequest } from './requests';
 import { uploadFile } from './s3';
@@ -31,7 +31,7 @@ export async function postFlagDesign(input: {
   description: string;
   tags: string[];
   image: string;
-  design: StudioDesign;
+  design: StoredStudioDesign;
   remixOf: string | null;
 }) {
   const parsed = postSchema.safeParse(input);

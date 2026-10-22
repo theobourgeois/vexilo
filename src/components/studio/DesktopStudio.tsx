@@ -4,6 +4,7 @@ import React from 'react';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Download, Emblems, Layers, Palette, Send, SquaresFour, X } from '@/components/icons';
+import type { StudioDesign } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import {
   ContextMenu,
@@ -21,6 +22,7 @@ import {
   ZoomControl,
   type Remix,
 } from './chrome';
+import type { FieldPart } from './divisions';
 import { DEFAULT_DRAW, ToolOptions, ToolPicker, type DrawSettings, type ToolKind } from './draw';
 import { documentColors, pixelSize, type StudioEmblem } from './model';
 import { useImageImport } from './import-image';
@@ -32,13 +34,13 @@ import { useShortcuts, type Panel } from './use-shortcuts';
 import type { Studio } from './use-studio';
 
 const RAIL: { panel: Panel; label: string; icon: React.ReactNode }[] = [
-  { panel: 'layout', label: 'Layout', icon: <SquaresFour /> },
+  { panel: 'layout', label: 'Field', icon: <SquaresFour /> },
   { panel: 'emblems', label: 'Emblems', icon: <Emblems /> },
   { panel: 'colors', label: 'Colours', icon: <Palette /> },
   { panel: 'layers', label: 'Layers', icon: <Layers /> },
 ];
 
-type ColorTarget = { x: number; y: number; kind: 'field'; slot: number } | { x: number; y: number; kind: 'layer'; id: string };
+type ColorTarget = { x: number; y: number; kind: 'field'; part: FieldPart } | { x: number; y: number; kind: 'layer'; id: string };
 
 export function DesktopStudio({
   studio,
@@ -104,7 +106,7 @@ export function DesktopStudio({
           draw={draw}
           onShapeDrawn={() => setTool('select')}
           scaleRef={scaleRef}
-          onDoubleClickField={(slot, at) => setColorTarget({ ...at, kind: 'field', slot })}
+          onDoubleClickField={(part, at) => setColorTarget({ ...at, kind: 'field', part })}
           onDoubleClickLayer={(id, at) => setColorTarget({ ...at, kind: 'layer', id })}
           onDropFiles={(files, at) => importImages(files, at)}
           onDropEmblem={(id, at) => {
@@ -203,7 +205,7 @@ export function DesktopStudio({
 /** The colour picker that double-clicking a stripe or emblem opens, right where you clicked. */
 function CanvasColorPicker({ studio, target, onClose }: { studio: Studio; target: ColorTarget | null; onClose: () => void }) {
   const layer = target?.kind === 'layer' ? studio.design.layers.find((l) => l.id === target.id) : null;
-  const value = target?.kind === 'field' ? studio.design.field.colors[target.slot] : layer?.colors[0];
+  const value = target?.kind === 'field' ? fieldPartColor(studio.design, target.part) : layer?.colors[0];
   if (!target || !value) return null;
   return (
     <Popover open onOpenChange={(open) => (!open && (studio.history.commit(), onClose()))}>
@@ -216,7 +218,7 @@ function CanvasColorPicker({ studio, target, onClose }: { studio: Studio; target
           documentColors={documentColors(studio.design)}
           onChange={(color) =>
             target.kind === 'field'
-              ? studio.actions.setFieldColor(target.slot, color, { transient: true })
+              ? studio.actions.setFieldPartColor(target.part, color, { transient: true })
               : studio.actions.setLayerColor(target.id, 0, color, { transient: true })
           }
           onCommit={studio.history.commit}
@@ -226,3 +228,11 @@ function CanvasColorPicker({ studio, target, onClose }: { studio: Studio; target
   );
 }
 
+/** The colour a field part shows now, which may have changed since it was picked. */
+function fieldPartColor(design: StudioDesign, part: FieldPart) {
+  const field = design.field;
+  if (field.kind !== 'stack') return undefined;
+  const division = field.divisions.find((d) => d.id === part.divisionId);
+  if (!division) return part.divisionId ? undefined : field.color;
+  return part.target === 'fimbriation' ? division.fimbriation?.color : division.colors[part.slot];
+}

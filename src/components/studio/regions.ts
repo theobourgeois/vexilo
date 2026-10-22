@@ -1,6 +1,6 @@
 import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
-import { defaultParams, LAYOUTS, snapAnchors } from './layouts';
-import { fieldSlotAt, flagWidth, layerBounds, unionBox, type Box } from './model';
+import { divisionGeometry, fieldAnchors, fieldPartAt } from './divisions';
+import { flagWidth, layerBounds, unionBox, type Box } from './model';
 
 /** A part of the field an emblem can sit in, like a canton, a band or a quarter. */
 export type Region = Box & { label: string };
@@ -15,11 +15,9 @@ export type FieldGuides = {
   containerAt: (u: number, v: number) => Region;
 };
 
-const NUM = String.raw`(-?[\d.]+(?:e-?\d+)?)`;
-const RECT = new RegExp(String.raw`M${NUM} ${NUM}h${NUM}v${NUM}h${NUM}z`, 'g');
 const EPS = 1e-4;
-/** Slot names too general to call a region by. */
-const GENERIC = new Set(['Field', 'Stripes', 'Between', 'Quarters']);
+/** Part names too general to call a region by. */
+const GENERIC = /^(Field|Fimbriation|Half|Stripe \d+|Ray \d+)$/;
 
 function uniqueSorted(values: number[]) {
   return [...values].sort((a, b) => a - b).filter((value, i, all) => i === 0 || value - all[i - 1] > EPS);
@@ -29,12 +27,16 @@ const cache = new Map<string, FieldGuides>();
 
 /**
  * Splits the field along the edges of its straight shapes into cells, then grows each cell
- * over neighbours of the same colour, so a canton layout reads as canton + fly, a cross as
- * four quarters and two arms. Diagonal layouts only get the flag itself.
+ * over neighbours showing the same part, so a canton reads as canton + fly, a cross as four
+ * quarters and two arms. Diagonal divisions add no lines of their own.
  */
 export function fieldGuides(design: StudioDesign): FieldGuides {
   const W = flagWidth(design);
-  const key = JSON.stringify([design.field.kind === 'layout' ? [design.field.layout, design.field.params] : 'image', W]);
+  const field = design.field;
+  const key = JSON.stringify([
+    W,
+    field.kind === 'stack' ? field.divisions.filter((d) => !d.hidden).map((d) => [d.kind, d.params, d.box, d.edge, d.fimbriation?.width]) : 'image',
+  ]);
   const cached = cache.get(key);
   if (cached) return cached;
 
@@ -44,29 +46,25 @@ export function fieldGuides(design: StudioDesign): FieldGuides {
   const containers: Region[][] = [];
   const regions: Region[] = [];
 
-  if (design.field.kind === 'layout') {
-    const { layout } = design.field;
-    const params = { ...defaultParams(layout), ...design.field.params };
-    const def = LAYOUTS[layout];
-    for (const shape of def.shapes(W, params)) {
-      for (const [, x, y, w, h] of shape.d.matchAll(RECT)) {
-        const [x0, y0] = [Number(x), Number(y)];
-        const [x1, y1] = [x0 + Number(w), y0 + Number(h)];
-        xs.push(Math.min(Math.max(x0, 0), W), Math.min(Math.max(x1, 0), W));
-        ys.push(Math.min(Math.max(y0, 0), 1), Math.min(Math.max(y1, 0), 1));
-      }
+  if (field.kind === 'stack') {
+    for (const division of field.divisions) {
+      if (division.hidden) continue;
+      const geometry = divisionGeometry(division, W);
+      xs.push(...geometry.xs.map((x) => Math.min(Math.max(x, 0), W)));
+      ys.push(...geometry.ys.map((y) => Math.min(Math.max(y, 0), 1)));
     }
     xs = uniqueSorted(xs);
     ys = uniqueSorted(ys);
 
     const cols = xs.length - 1;
     const rows = ys.length - 1;
-    const slot = Array.from({ length: cols }, (_, i) =>
-      Array.from({ length: rows }, (_, j) => fieldSlotAt(design, (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2)),
+    const parts = Array.from({ length: cols }, (_, i) =>
+      Array.from({ length: rows }, (_, j) => fieldPartAt(design, (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2)),
     );
-    const anchors = snapAnchors(layout, W, params);
+    const slot = parts.map((column) => column.map((part) => (part ? `${part.divisionId ?? 'base'}|${part.part}|${part.target}` : '')));
+    const anchors = fieldAnchors(design);
 
-    const name = (box: Box, s: number) => {
+    const name = (box: Box, i: number, j: number) => {
       const cx = (box.x0 + box.x1) / 2;
       const cy = (box.y0 + box.y1) / 2;
       // An anchor names the region it sits well inside and roughly fills (not a whole cross arm).
@@ -75,8 +73,8 @@ export function fieldGuides(design: StudioDesign): FieldGuides {
         .filter((a) => a.x > box.x0 + EPS && a.x < box.x1 - EPS && a.y > box.y0 + EPS && a.y < box.y1 - EPS && area <= a.w * a.h * 2.5)
         .sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))[0];
       if (anchor) return anchor.label;
-      const slotName = def.slots[s];
-      if (slotName && !GENERIC.has(slotName)) return slotName;
+      const partName = parts[i][j]?.name;
+      if (partName && !GENERIC.test(partName)) return partName;
       const fullWidth = box.x1 - box.x0 > W - EPS;
       const fullHeight = box.y1 - box.y0 > 1 - EPS;
       const across = fullWidth ? '' : cx < W * 0.4 ? 'hoist' : cx > W * 0.6 ? 'fly' : '';
@@ -116,7 +114,7 @@ export function fieldGuides(design: StudioDesign): FieldGuides {
         const whole = box.x1 - box.x0 > W - EPS && box.y1 - box.y0 > 1 - EPS;
         let region = whole ? flag : regions.find((r) => r.x0 === box.x0 && r.x1 === box.x1 && r.y0 === box.y0 && r.y1 === box.y1);
         if (!region) {
-          region = { ...box, label: name(box, slot[i][j]) };
+          region = { ...box, label: name(box, i, j) };
           regions.push(region);
         }
         containers[i].push(region);

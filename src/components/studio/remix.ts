@@ -3,6 +3,7 @@
 import type { LayoutId, StudioDesign } from '@/lib/studio-design';
 import { colorDistance, nearest, rgbToHex } from './colors';
 import { cutoutPalette, loadImage } from './cutout';
+import { layoutToStack, migrateDesign } from './field';
 import { proxied } from './images';
 import { defaultParams, LAYOUT_VARIANTS, LAYOUTS } from './layouts';
 import { newLayer, uid, type RemixSource } from './model';
@@ -26,13 +27,13 @@ type Match = { layout: LayoutId; params: Record<string, number>; medians: number
  * layers of their own. Flags no layout fits stay a single recolourable image.
  */
 export async function buildRemixDesign(source: RemixSource): Promise<StudioDesign> {
-  if (source.design) return source.design;
+  if (source.design) return migrateDesign(source.design);
 
   const img = await loadImage(proxied(source.image));
   const aspect = img.naturalWidth / img.naturalHeight || 1.5;
   const ratio: [number, number] = [1, Math.round(aspect * 1000) / 1000];
   const fallback: StudioDesign = {
-    version: 1,
+    version: 2,
     ratio,
     field: { kind: 'image', src: source.image, palette: source.palette, colors: [...source.palette] },
     layers: [],
@@ -187,7 +188,7 @@ export async function buildRemixDesign(source: RemixSource): Promise<StudioDesig
       repeat: null,
     });
   }
-  return { version: 1, ratio, field: { kind: 'layout', layout: best.layout, colors, params: best.params }, layers };
+  return { version: 2, ratio, field: layoutToStack(best.layout, best.params, colors), layers };
 }
 
 type StrayShape = { box: [number, number, number, number]; seeds: [number, number][]; pixels: number[]; area: number };

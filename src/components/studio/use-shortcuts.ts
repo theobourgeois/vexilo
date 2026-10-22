@@ -5,13 +5,14 @@ import type { ToolKind } from './draw';
 import { alignScopes } from './regions';
 import { MAX_ZOOM, type View } from './StudioCanvas';
 import type { Studio } from './use-studio';
+import { canEditPoints } from './vector';
 
 export type Panel = 'layout' | 'emblems' | 'colors' | 'layers';
 const PANELS: Panel[] = ['layout', 'emblems', 'colors', 'layers'];
 
 /**
  * Design-tool keyboard shortcuts: undo/redo, clipboard, duplicate, delete, nudge, arrange,
- * flip, resize, zoom, select all, cycle selection, tools and panel switching.
+ * flip, resize, zoom, select all, cycle selection, tools, point editing and panel switching.
  */
 export function useShortcuts(
   studio: Studio,
@@ -46,6 +47,17 @@ export function useShortcuts(
         fn();
       };
 
+      // Editing a path's points: keys move, drop and pick its nodes rather than whole emblems.
+      const editing = studio.pathEdit;
+      if (editing) {
+        if (mod && key === 'a') return run(actions.selectAllNodes);
+        if (!mod && (key === 'backspace' || key === 'delete')) return run(actions.deleteNodes);
+        if (key === 'escape' || key === 'enter') return run(actions.stopEditing);
+        const step = (options.nudgeStep?.() ?? 0.004) * (e.shiftKey ? 10 : 1);
+        const nudge = ({ arrowleft: [-step, 0], arrowright: [step, 0], arrowup: [0, -step], arrowdown: [0, step] } as const)[key as 'arrowleft'];
+        if (nudge && editing.nodes.length) return run(() => actions.nudgeNodes(nudge[0], nudge[1]));
+      }
+
       if (mod) {
         if (key === 'z') return run(e.shiftKey ? history.redo : history.undo);
         if (key === 'y') return run(history.redo);
@@ -79,9 +91,10 @@ export function useShortcuts(
         }
       }
       if (key === 'backspace' || key === 'delete') return run(actions.deleteSelected);
+      if (key === 'enter' && studio.selectedLayers.length === 1 && canEditPoints(studio.selectedLayers[0])) return run(() => actions.editPoints());
       if (key === 'escape') return run(() => (options.tool && options.tool !== 'select' ? options.setTool?.('select') : studio.setSelection([])));
       if (options.setTool && !e.shiftKey && !e.altKey) {
-        const tool = ({ v: 'select', u: 'shape', b: 'brush' } as const)[key as 'v'];
+        const tool = ({ v: 'select', u: 'shape', b: 'brush', p: 'pen' } as const)[key as 'v'];
         if (tool) return run(() => options.setTool!(tool));
       }
       if (key === 'tab') return run(() => actions.selectNext(e.shiftKey ? -1 : 1));

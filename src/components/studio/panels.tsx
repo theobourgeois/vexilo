@@ -2,18 +2,22 @@
 
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dice, Eye, EyeSlash, Lock, Search, Unlock, Upload, X } from '@/components/icons';
+import { Copy, Dice, Eye, EyeSlash, Lock, Minus, Plus, Search, Trash2, Unlock, Upload, X } from '@/components/icons';
+import { Segmented } from '@/components/ui/segmented';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { EMBLEM_CATEGORIES, emblemSearchScore, mixEmblemCategories } from '@/lib/emblem-search';
-import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
+import type { EdgeStyle, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
 import { luminance, PALETTE_GROUPS, PALETTES } from './colors';
 import { FlagArt } from './FlagArt';
 import { layerImage } from './cutout';
+import { DIVISION_KINDS, DIVISIONS, divisionParams, divisionParts } from './divisions';
+import { divisionFor, LAYOUT_TEMPLATES, PART_TEMPLATES, sameShape, templateField, type FieldTemplate, type StackField } from './field';
 import { useRecolored } from './images';
-import { defaultParams, LAYOUT_PRESETS, LAYOUTS, type LayoutPreset } from './layouts';
 import { documentColors, layerColors, layerWidth, type StudioEmblem } from './model';
 import { shapePath } from './shapes';
 import { EMBLEM_MIME } from './StudioCanvas';
+import { ColorButton } from './tools';
 import { ColorPicker, Slider, Swatch } from './ui';
 import { FIELD, type Studio } from './use-studio';
 
@@ -165,78 +169,463 @@ export function EmblemsPanel({
   );
 }
 
-// ───────────────────────── Layout ─────────────────────────
+// ───────────────────────── Field ─────────────────────────
 
-function presetDesign(design: StudioDesign, preset: LayoutPreset): StudioDesign {
-  const def = LAYOUTS[preset.layout];
-  return {
-    ...design,
-    layers: [],
-    field: {
-      kind: 'layout',
-      layout: preset.layout,
-      colors: def.colors.map((fallback, i) => design.field.colors[i] ?? fallback),
-      params: defaultParams(preset.layout, preset.params),
-    },
-  };
+const THUMB = 'block aspect-[3/2] w-full rounded-[4px] shadow-[0_0_0_1px_rgb(0_0_0/0.12)]';
+
+/** The field alone, for thumbnails. */
+const fieldOnly = (design: StudioDesign, field: StudioField, ratio = design.ratio): StudioDesign => ({ ...design, ratio, field, layers: [] });
+
+/** One division across the whole flag, on the base colour unless that would hide it. */
+function divisionThumb(design: StudioDesign, field: StackField, division: StudioDivision, ratio = design.ratio) {
+  const own = [...division.colors, division.fimbriation?.color].filter(Boolean).map((c) => c!.toUpperCase());
+  const color = !own.includes(field.color.toUpperCase()) ? field.color : luminance(own[0]) > 0.5 ? '#6B7280' : '#D1D5DB';
+  return fieldOnly(design, { ...field, color, divisions: [{ ...division, box: undefined, hidden: false }] }, ratio);
 }
 
-const samePreset = (design: StudioDesign, preset: LayoutPreset) =>
-  design.field.kind === 'layout' &&
-  design.field.layout === preset.layout &&
-  Object.entries(defaultParams(preset.layout, preset.params)).every(
-    ([key, value]) => Math.abs((design.field.kind === 'layout' ? design.field.params[key] : NaN) - value) < 0.005,
-  );
+const EDGE_OPTIONS: { value: EdgeStyle | 'none'; label: string }[] = [
+  { value: 'none', label: 'Straight' },
+  { value: 'wavy', label: 'Wavy' },
+  { value: 'zigzag', label: 'Zigzag' },
+  { value: 'serrated', label: 'Serrated' },
+  { value: 'stepped', label: 'Stepped' },
+];
 
+/** The field, built from divisions stacked over a base colour; or a template to start from. */
 export function LayoutPanel({ studio, columns = 3 }: { studio: Studio; columns?: number }) {
-  const { design, actions, history } = studio;
-  const field = design.field;
-  const params = field.kind === 'layout' ? LAYOUTS[field.layout].params : [];
+  const field = studio.design.field;
+  const [tab, setTab] = React.useState<'parts' | 'templates'>(field.kind === 'stack' ? 'parts' : 'templates');
   return (
-    // Room around the tiles so the selected ring and hover zoom aren't clipped by the scroll area.
-    <div className='-mx-1.5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1.5'>
-      <div className='grid gap-2.5 pt-1.5' style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {LAYOUT_PRESETS.map((preset, i) => {
-          const active = samePreset(design, preset);
-          return (
-            <button
-              key={i}
-              type='button'
-              onClick={() => actions.setLayout(preset)}
-              className={cn(
-                'cursor-pointer rounded-[6px] outline-none transition-transform hover:scale-[1.04] focus-visible:ring-2 focus-visible:ring-ring',
-                active && 'ring-2 ring-main ring-offset-2 ring-offset-surface',
-              )}
-            >
-              <FlagArt design={presetDesign({ ...design, ratio: [2, 3] }, preset)} className='block aspect-[3/2] w-full rounded-[4px] shadow-[0_0_0_1px_rgb(0_0_0/0.12)]' />
-            </button>
-          );
-        })}
+    <div className='flex min-h-0 flex-1 flex-col gap-3'>
+      <Segmented
+        aria-label='Field'
+        value={field.kind === 'stack' ? tab : 'templates'}
+        options={[
+          { value: 'parts', label: 'Parts' },
+          { value: 'templates', label: 'Templates' },
+        ]}
+        onChange={setTab}
+        className='w-full [&>button]:flex-1 [&>button]:justify-center'
+      />
+      {/* Room around the tiles so the selected ring and hover zoom aren't clipped by the scroll area. */}
+      <div className='-mx-1.5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1.5 pb-2'>
+        {field.kind === 'stack' && tab === 'parts' ? (
+          <DivisionsEditor studio={studio} field={field} columns={columns} />
+        ) : (
+          <Templates studio={studio} columns={columns} onPicked={() => setTab('parts')} />
+        )}
       </div>
-      {field.kind === 'layout' && params.length > 0 && (
-        <div className='flex flex-col gap-3 border-t border-line pt-4'>
-          {params.map((param) => (
-            <label key={param.key} className='flex flex-col gap-1'>
-              <span className='text-[12.5px] text-subtle'>{param.label}</span>
-              <Slider
-                label={param.label}
-                min={param.min}
-                max={param.max}
-                step={param.step}
-                value={field.params[param.key] ?? param.value}
-                onChange={(value) => actions.setParam(param.key, value, { transient: true })}
-                onCommit={history.commit}
-              />
-            </label>
-          ))}
-        </div>
-      )}
-      {field.kind === 'image' && (
-        <p className='border-t border-line pt-4 text-[13px] text-subtle'>Pick a layout to rebuild this flag from parts.</p>
-      )}
     </div>
   );
 }
+
+function Templates({ studio, columns, onPicked }: { studio: Studio; columns: number; onPicked: () => void }) {
+  const { design, actions } = studio;
+  // Previews in the flag's colours; ids only need to be distinct within one preview.
+  const previews = React.useMemo(() => {
+    let n = 0;
+    return new Map([...LAYOUT_TEMPLATES, ...PART_TEMPLATES].map((t) => [t.id, templateField(t, design.field, () => `t${n++}`)]));
+  }, [design.field]);
+  const grid = (templates: FieldTemplate[]) => (
+    <div className='grid gap-2.5' style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+      {templates.map((template) => {
+        const field = previews.get(template.id)!;
+        const active = sameShape(design.field, field);
+        return (
+          <button
+            key={template.id}
+            type='button'
+            title={template.label}
+            aria-label={template.label}
+            onClick={() => (actions.applyTemplate(template), onPicked())}
+            className={cn(
+              'cursor-pointer rounded-[6px] outline-none transition-transform hover:scale-[1.04] focus-visible:ring-2 focus-visible:ring-ring',
+              active && 'ring-2 ring-main ring-offset-2 ring-offset-surface',
+            )}
+          >
+            <FlagArt design={fieldOnly(design, field, [2, 3])} className={THUMB} />
+          </button>
+        );
+      })}
+    </div>
+  );
+  return (
+    <>
+      <div className='pt-1.5'>
+        <SectionLabel>Layouts</SectionLabel>
+        {grid(LAYOUT_TEMPLATES)}
+      </div>
+      <div>
+        <SectionLabel>Built from parts</SectionLabel>
+        {grid(PART_TEMPLATES)}
+      </div>
+      {design.field.kind === 'image' && <p className='text-[13px] text-subtle'>Pick a template to rebuild this flag from parts.</p>}
+    </>
+  );
+}
+
+const divisionLabel = (division: StudioDivision) => division.name ?? DIVISIONS[division.kind].label;
+
+/**
+ * Drag-to-reorder for a list shown top-down over items stored bottom-up (layers, divisions).
+ * `onMove` gets the dragged id and its new index in storage order.
+ */
+function useReorder(ids: string[], onMove: (id: string, index: number) => void) {
+  const [dragging, setDragging] = React.useState<string | null>(null);
+  const [dropAt, setDropAt] = React.useState<number | null>(null);
+  const end = () => (setDragging(null), setDropAt(null));
+  const rowProps = (id: string, row: number) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      setDragging(id);
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', id);
+    },
+    onDragEnd: end,
+    onDragOver: (e: React.DragEvent<HTMLElement>) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const r = e.currentTarget.getBoundingClientRect();
+      setDropAt(e.clientY < r.top + r.height / 2 ? row : row + 1);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (dragging && dropAt !== null) {
+        const from = ids.indexOf(dragging);
+        const target = dropAt > from ? dropAt - 1 : dropAt;
+        if (target !== from) onMove(dragging, ids.length - 1 - target);
+      }
+      end();
+    },
+  });
+  /** The line showing where a drop would land, for a row. */
+  const marker = (row: number) => (
+    <>
+      {dropAt === row && <span className='absolute inset-x-2 -top-px h-0.5 rounded bg-main' />}
+      {dropAt === row + 1 && row === ids.length - 1 && <span className='absolute inset-x-2 -bottom-px h-0.5 rounded bg-main' />}
+    </>
+  );
+  return { dragging, rowProps, marker };
+}
+
+function DivisionsEditor({ studio, field, columns }: { studio: Studio; field: StackField; columns: number }) {
+  const { design, selectedDivision, actions } = studio;
+  const rows = [...field.divisions].reverse();
+  const reorder = useReorder(
+    rows.map((d) => d.id),
+    actions.moveDivision,
+  );
+  const baseSelected = !selectedDivision;
+  return (
+    <>
+      <div className='flex flex-col gap-0.5 pt-1'>
+        <div className='mb-1 flex items-center justify-between'>
+          <SectionLabel>Divisions</SectionLabel>
+          <AddDivision studio={studio} field={field} columns={columns} />
+        </div>
+        {rows.map((division, row) => {
+          const active = selectedDivision?.id === division.id;
+          return (
+            <div
+              key={division.id}
+              {...reorder.rowProps(division.id, row)}
+              onClick={() => actions.selectDivision(division.id)}
+              className={cn(
+                'group relative flex h-10 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
+                active ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
+                division.hidden && 'opacity-50',
+                reorder.dragging === division.id && 'opacity-40',
+              )}
+            >
+              {reorder.marker(row)}
+              <FlagArt
+                design={divisionThumb(design, field, division)}
+                className='h-5 w-8 shrink-0 rounded-[3px] shadow-[0_0_0_1px_rgb(0_0_0/0.15)]'
+              />
+              <span className='min-w-0 flex-1 truncate'>{divisionLabel(division)}</span>
+              <RowButton label={division.locked ? 'Unlock' : 'Lock'} pinned={division.locked} onClick={() => actions.toggleDivisionLocked(division.id)}>
+                {division.locked ? <Lock className='size-3.5' /> : <Unlock className='size-3.5' />}
+              </RowButton>
+              <RowButton label={division.hidden ? 'Show' : 'Hide'} pinned={division.hidden} onClick={() => actions.toggleDivisionHidden(division.id)}>
+                {division.hidden ? <EyeSlash className='size-3.5' /> : <Eye className='size-3.5' />}
+              </RowButton>
+            </div>
+          );
+        })}
+        <div
+          onClick={() => actions.selectDivision(null)}
+          className={cn(
+            'flex h-10 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
+            baseSelected ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
+          )}
+        >
+          <span className='h-5 w-8 shrink-0 rounded-[3px] shadow-[0_0_0_1px_rgb(0_0_0/0.15)]' style={{ background: field.color }} />
+          <span className='flex-1'>Base</span>
+        </div>
+      </div>
+      <div className='flex flex-col gap-3.5 border-t border-line pt-4'>
+        {selectedDivision ? (
+          <DivisionSettings key={selectedDivision.id} studio={studio} division={selectedDivision} />
+        ) : (
+          <Setting label='Base colour'>
+            <div className='flex'>
+              <ColorButton color={field.color} studio={studio} side='right' size={26} label='Base colour' onChange={(color, transient) => actions.setBaseColor(color, { transient })} />
+            </div>
+          </Setting>
+        )}
+      </div>
+    </>
+  );
+}
+
+function RowButton({
+  label,
+  pinned,
+  onClick,
+  children,
+}: {
+  label: string;
+  pinned?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type='button'
+      aria-label={label}
+      title={label}
+      onClick={(e) => (e.stopPropagation(), onClick())}
+      className={cn(
+        'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] hover:bg-foreground/[0.07]',
+        !pinned && 'opacity-0 focus-visible:opacity-70 group-hover:opacity-70',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function AddDivision({ studio, field, columns }: { studio: Studio; field: StackField; columns: number }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type='button'
+          className='-mt-2 inline-flex h-7 cursor-pointer items-center gap-1 rounded-[8px] px-2 text-[12.5px] font-medium text-subtle hover:bg-foreground/[0.06] hover:text-foreground'
+        >
+          <Plus className='size-3.5' />
+          Add
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side='right' align='start' className='max-h-[var(--radix-popover-content-available-height)] w-[300px] overflow-y-auto p-3'>
+        <div className='grid gap-2' style={{ gridTemplateColumns: `repeat(${Math.min(columns, 3)}, minmax(0, 1fr))` }}>
+          {DIVISION_KINDS.map((kind) => (
+            <button
+              key={kind}
+              type='button'
+              onClick={() => (studio.actions.addDivision(kind), setOpen(false))}
+              className='flex min-w-0 cursor-pointer flex-col items-center gap-1 rounded-[8px] p-1 text-[11.5px] text-subtle outline-none hover:bg-foreground/[0.05] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring'
+            >
+              <FlagArt design={divisionThumb(studio.design, field, divisionFor(field, kind, kind), [2, 3])} className={THUMB} />
+              <span className='w-full truncate text-center'>{DIVISIONS[kind].label}</span>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+const Setting = ({ label, value, children }: { label: string; value?: string; children: React.ReactNode }) => (
+  <div className='flex flex-col gap-1.5'>
+    <span className='flex justify-between text-[12.5px] text-subtle'>
+      {label}
+      {value !== undefined && <span className='tabular-nums text-muted-foreground'>{value}</span>}
+    </span>
+    {children}
+  </div>
+);
+
+function DivisionSettings({ studio, division }: { studio: Studio; division: StudioDivision }) {
+  const { actions, history } = studio;
+  const def = DIVISIONS[division.kind];
+  const params = divisionParams(division);
+  const id = division.id;
+  const parts = divisionParts(division);
+  const shown = def.cycles ? division.colors.slice(0, parts) : division.colors.slice(0, 1);
+  const weighted = def.weighted?.(params) ?? 0;
+  const fim = division.fimbriation ?? null;
+  const edge = division.edge ?? null;
+  const box = division.box ?? null;
+  const commit = history.commit;
+  const transient = { transient: true };
+  return (
+    <>
+      <div className='flex items-center gap-2'>
+        <span className='flex-1 truncate text-[13.5px] font-medium'>{divisionLabel(division)}</span>
+        <RowButton label='Duplicate' pinned onClick={() => actions.duplicateDivision(id)}>
+          <Copy className='size-3.5' />
+        </RowButton>
+        <RowButton label='Delete' pinned onClick={() => actions.removeDivision(id)}>
+          <Trash2 className='size-3.5' />
+        </RowButton>
+      </div>
+
+      <Setting label={shown.length > 1 ? 'Colours' : 'Colour'}>
+        <div className='flex flex-wrap items-center gap-1.5'>
+          {shown.map((color, i) => (
+            <ColorButton key={i} color={color} studio={studio} side='right' size={26} label={`Colour ${i + 1}`} onChange={(next, t) => actions.setDivisionColor(id, i, next, { transient: t })} />
+          ))}
+          {def.cycles && (
+            <>
+              {division.colors.length < Math.min(16, parts) && (
+                <RowButton label='Add colour' pinned onClick={() => actions.updateDivision(id, { colors: [...division.colors, division.colors[division.colors.length % 2]] })}>
+                  <Plus className='size-3.5' />
+                </RowButton>
+              )}
+              {division.colors.length > 1 && (
+                <RowButton label='Remove colour' pinned onClick={() => actions.updateDivision(id, { colors: division.colors.slice(0, Math.min(division.colors.length, parts) - 1) })}>
+                  <Minus className='size-3.5' />
+                </RowButton>
+              )}
+            </>
+          )}
+        </div>
+      </Setting>
+
+      {def.params.map((param) =>
+        param.options ? (
+          <Setting key={param.key} label={param.label}>
+            <Segmented
+              aria-label={param.label}
+              value={String(Math.round(params[param.key]))}
+              options={param.options.map((o) => ({ value: String(o.value), label: o.label }))}
+              onChange={(value) => actions.setDivisionParam(id, param.key, Number(value))}
+              className='flex-wrap [&>button]:h-[26px] [&>button]:px-2 [&>button]:text-[12px]'
+            />
+          </Setting>
+        ) : (
+          <Setting key={param.key} label={param.label} value={formatParam(params[param.key], param.step)}>
+            <Slider
+              label={param.label}
+              min={param.min}
+              max={param.max}
+              step={param.step}
+              value={params[param.key]}
+              onChange={(value) => actions.setDivisionParam(id, param.key, value, transient)}
+              onCommit={commit}
+            />
+          </Setting>
+        ),
+      )}
+
+      {weighted > 1 && (
+        <Setting label='Sizes'>
+          <div className='flex flex-col gap-1.5'>
+            {Array.from({ length: weighted }, (_, i) => (
+              <Slider
+                key={i}
+                label={`Size ${i + 1}`}
+                min={0.1}
+                max={5}
+                step={0.05}
+                value={params[`w${i}`] ?? 1}
+                onChange={(value) => actions.setDivisionParam(id, `w${i}`, value, transient)}
+                onCommit={commit}
+              />
+            ))}
+          </div>
+        </Setting>
+      )}
+
+      <div className='flex flex-col gap-3 border-t border-line pt-3.5'>
+        <label className='flex items-center justify-between text-[12.5px] text-subtle'>
+          Fimbriation
+          <Switch
+            checked={Boolean(fim)}
+            onCheckedChange={(on) => actions.updateDivision(id, { fimbriation: on ? { color: '#FFFFFF', width: 0.03 } : null })}
+          />
+        </label>
+        {fim && (
+          <div className='flex items-center gap-2.5'>
+            <ColorButton
+              color={fim.color}
+              studio={studio}
+              side='right'
+              size={26}
+              label='Fimbriation colour'
+              onChange={(color, t) => actions.updateDivision(id, { fimbriation: { ...fim, color } }, { transient: t })}
+            />
+            <Slider
+              label='Fimbriation width'
+              min={0.005}
+              max={0.2}
+              step={0.005}
+              value={fim.width}
+              onChange={(width) => actions.updateDivision(id, { fimbriation: { ...fim, width } }, transient)}
+              onCommit={commit}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className='flex flex-col gap-3 border-t border-line pt-3.5'>
+        <Setting label='Edges'>
+          <Segmented
+            aria-label='Edges'
+            value={edge?.style ?? 'none'}
+            options={EDGE_OPTIONS}
+            onChange={(style) =>
+              actions.updateDivision(id, { edge: style === 'none' ? null : { depth: edge?.depth ?? 0.04, period: edge?.period ?? 0.2, style } })
+            }
+            className='flex-wrap [&>button]:h-[26px] [&>button]:px-2 [&>button]:text-[12px]'
+          />
+        </Setting>
+        {edge && (
+          <>
+            <Setting label='Depth' value={formatParam(edge.depth, 0.005)}>
+              <Slider label='Edge depth' min={0.005} max={0.2} step={0.005} value={edge.depth} onChange={(depth) => actions.updateDivision(id, { edge: { ...edge, depth } }, transient)} onCommit={commit} />
+            </Setting>
+            <Setting label='Length' value={formatParam(edge.period, 0.01)}>
+              <Slider label='Edge length' min={0.03} max={1} step={0.01} value={edge.period} onChange={(period) => actions.updateDivision(id, { edge: { ...edge, period } }, transient)} onCommit={commit} />
+            </Setting>
+          </>
+        )}
+      </div>
+
+      <div className='flex flex-col gap-3 border-t border-line pt-3.5'>
+        <label className='flex items-center justify-between text-[12.5px] text-subtle'>
+          Only in part of the flag
+          <Switch checked={Boolean(box)} onCheckedChange={(on) => actions.updateDivision(id, { box: on ? [0, 0, 0.5, 0.5] : undefined })} />
+        </label>
+        {box &&
+          (['Left', 'Top', 'Right', 'Bottom'] as const).map((label, i) => (
+            <Setting key={label} label={label} value={formatParam(box[i], 0.01)}>
+              <Slider
+                label={`Box ${label.toLowerCase()}`}
+                min={0}
+                max={1}
+                step={0.01}
+                value={box[i]}
+                onChange={(value) => {
+                  const next = [...box] as [number, number, number, number];
+                  next[i] = value;
+                  // Keep at least a sliver between opposite edges.
+                  if (i < 2) next[i] = Math.min(value, next[i + 2] - 0.02);
+                  else next[i] = Math.max(value, next[i - 2] + 0.02);
+                  actions.updateDivision(id, { box: next }, transient);
+                }}
+                onCommit={commit}
+              />
+            </Setting>
+          ))}
+      </div>
+    </>
+  );
+}
+
+const formatParam = (value: number, step: number) => (step >= 1 ? String(Math.round(value)) : value.toFixed(step >= 0.01 ? 2 : 3));
 
 // ───────────────────────── Colours ─────────────────────────
 
@@ -330,6 +719,7 @@ function ShapeThumb({ layer }: { layer: StudioLayer }) {
         <path
           d={shapePath(drawn, w, h)}
           fill={shape.fill ? layer.colors[0] : 'none'}
+          fillRule='evenodd'
           stroke={stroke ? (layer.colors[1] ?? layer.colors[0]) : 'none'}
           strokeWidth={stroke}
           strokeLinecap='round'
@@ -382,13 +772,21 @@ function LayerName({ layer, onRename }: { layer: StudioLayer; onRename: (name: s
 
 export function LayersPanel({ studio }: { studio: Studio }) {
   const { design, selection, setSelection, actions } = studio;
-  const [dragging, setDragging] = React.useState<string | null>(null);
-  const [dropAt, setDropAt] = React.useState<number | null>(null);
   const ordered = [...design.layers].reverse();
+  const reorder = useReorder(
+    ordered.map((l) => l.id),
+    actions.move,
+  );
   const fieldDesign: StudioDesign = { ...design, layers: [] };
 
   const select = (id: string, additive: boolean) =>
-    setSelection(additive ? (selection.includes(id) ? selection.filter((s) => s !== id) : [...selection.filter((s) => s !== FIELD), id]) : [id]);
+    setSelection(
+      additive
+        ? selection.includes(id)
+          ? selection.filter((s) => s !== id)
+          : [...selection.filter((s) => design.layers.some((l) => l.id === s)), id]
+        : [id],
+    );
 
   return (
     <div className='flex min-h-0 flex-1 flex-col overflow-y-auto'>
@@ -398,40 +796,16 @@ export function LayersPanel({ studio }: { studio: Studio }) {
           return (
             <div
               key={layer.id}
-              draggable
-              onDragStart={(e) => {
-                setDragging(layer.id);
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', layer.id);
-              }}
-              onDragEnd={() => (setDragging(null), setDropAt(null))}
-              onDragOver={(e) => {
-                if (!dragging) return;
-                e.preventDefault();
-                const r = e.currentTarget.getBoundingClientRect();
-                setDropAt(e.clientY < r.top + r.height / 2 ? row : row + 1);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragging && dropAt !== null) {
-                  // Rows run top-down; layers bottom-up.
-                  const from = ordered.findIndex((l) => l.id === dragging);
-                  const target = dropAt > from ? dropAt - 1 : dropAt;
-                  actions.move(dragging, design.layers.length - 1 - target);
-                }
-                setDragging(null);
-                setDropAt(null);
-              }}
+              {...reorder.rowProps(layer.id, row)}
               onClick={(e) => select(layer.id, e.shiftKey || e.metaKey)}
               className={cn(
                 'group relative flex h-11 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
                 active ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
                 layer.hidden && 'opacity-50',
-                dragging === layer.id && 'opacity-40',
+                reorder.dragging === layer.id && 'opacity-40',
               )}
             >
-              {dropAt === row && <span className='absolute inset-x-2 -top-px h-0.5 rounded bg-main' />}
-              {dropAt === row + 1 && row === ordered.length - 1 && <span className='absolute inset-x-2 -bottom-px h-0.5 rounded bg-main' />}
+              {reorder.marker(row)}
               <LayerThumb layer={layer} />
               <LayerName layer={layer} onRename={(name) => actions.rename(layer.id, name)} />
               <button
@@ -457,7 +831,7 @@ export function LayersPanel({ studio }: { studio: Studio }) {
           onClick={() => setSelection([FIELD])}
           className={cn(
             'flex h-11 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 text-[13px] transition-colors',
-            selection.includes(FIELD) ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
+            studio.fieldSelected ? 'bg-main-soft text-foreground' : 'text-subtle hover:bg-foreground/[0.05] hover:text-foreground',
           )}
         >
           <FlagArt design={fieldDesign} className='h-5 w-8 shrink-0 rounded-[3px] shadow-[0_0_0_1px_rgb(0_0_0/0.15)]' />

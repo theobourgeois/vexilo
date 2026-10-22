@@ -6,6 +6,7 @@ import type { StudioDesign } from '@/lib/studio-design';
 import { studioDesignSchema } from '@/lib/studio-design-schema';
 import { FlagArt } from './FlagArt';
 import { layerImage } from './cutout';
+import { migrateDesign } from './field';
 import { recolor, toDataUrl } from './images';
 import { flagWidth, type StudioDoc } from './model';
 
@@ -94,7 +95,7 @@ export async function decodeDoc(value: string): Promise<StudioDoc | null> {
     const json = JSON.parse(new TextDecoder().decode(await pipe(fromBase64Url(value), new DecompressionStream('deflate-raw'))));
     const design = studioDesignSchema.safeParse(json?.design);
     if (!design.success || typeof json.name !== 'string') return null;
-    return { name: json.name.slice(0, 120), design: design.data };
+    return { name: json.name.slice(0, 120), design: migrateDesign(design.data) };
   } catch {
     return null;
   }

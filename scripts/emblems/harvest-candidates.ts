@@ -6,7 +6,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { sql } from 'drizzle-orm';
 import { db } from '../../src/db';
-import type { StudioDesign } from '../../src/lib/studio-design';
+import type { StoredStudioDesign } from '../../src/lib/studio-design';
 import { features, type Features } from './features';
 
 /**
@@ -89,7 +89,7 @@ async function main() {
       select f.index, f.name, f.tags, p.design
       from vexilo_flag_parts p join vexilo_flag f on f.id = p.flag_id
       where p.status = 'ok' and p.image = f.image`)
-  ).rows as { index: number; name: string; tags: string[] | null; design: StudioDesign }[];
+  ).rows as { index: number; name: string; tags: string[] | null; design: StoredStudioDesign }[];
   const library = (
     await db.execute(sql`
       select e.source_key, e.image, e.svg, e.width, e.height, e.colors, e.box, f.index, f.name, f.tags

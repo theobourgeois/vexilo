@@ -1,7 +1,9 @@
-import type { StudioDesign, StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import type { StoredStudioDesign, StudioDesign, StudioLayer, StudioRepeat } from '@/lib/studio-design';
 import { uniqueColors } from './colors';
+import { fieldPartAt } from './divisions';
+import { layoutToStack, stackColors, swapStackColor } from './field';
 import { defaultParams, LAYOUTS, type Anchor } from './layouts';
-import { hitsBrush, shapeColors } from './shapes';
+import { hitsBrush, hitsPath, shapeColors } from './shapes';
 
 /** An emblem from the library, as the editor gets it. */
 export type StudioEmblem = {
@@ -30,7 +32,7 @@ export type RemixSource = {
   name: string;
   image: string;
   palette: string[];
-  design: StudioDesign | null;
+  design: StoredStudioDesign | null;
   placements: { emblem: StudioEmblem; box: [number, number, number, number]; copies: number }[];
 };
 
@@ -53,9 +55,9 @@ export const RATIOS: [number, number][] = [
 
 export function newDesign(): StudioDesign {
   return {
-    version: 1,
+    version: 2,
     ratio: [2, 3],
-    field: { kind: 'layout', layout: 'triband-v', colors: [...LAYOUTS['triband-v'].colors], params: defaultParams('triband-v') },
+    field: layoutToStack('triband-v', defaultParams('triband-v'), LAYOUTS['triband-v'].colors),
     layers: [],
   };
 }
@@ -192,35 +194,23 @@ export function hitsLayer(layer: StudioLayer, W: number, px: number, py: number,
     const [dx, dy] = [px - copy.cx, py - copy.cy];
     const lx = dx * Math.cos(a) - dy * Math.sin(a);
     const ly = dx * Math.sin(a) + dy * Math.cos(a);
-    if (layer.shape?.kind === 'brush') return hitsBrush(layer.shape, w, h, [layer.flipX ? -lx : lx, layer.flipY ? -ly : ly], reach);
+    const own: [number, number] = [layer.flipX ? -lx : lx, layer.flipY ? -ly : ly];
+    if (layer.shape?.kind === 'brush') return hitsBrush(layer.shape, w, h, own, reach);
+    if (layer.shape?.kind === 'path') return hitsPath(layer.shape, w, h, own, reach);
     return Math.abs(lx) <= Math.max(w / 2, reach) && Math.abs(ly) <= Math.max(h / 2, reach);
   });
 }
 
-let scratch: CanvasRenderingContext2D | null = null;
-
-/** The field slot under a point (flag units), or -1. */
-export function fieldSlotAt(design: StudioDesign, px: number, py: number) {
-  if (design.field.kind !== 'layout') return -1;
-  scratch ??= document.createElement('canvas').getContext('2d');
-  if (!scratch) return -1;
-  const W = flagWidth(design);
-  const shapes = LAYOUTS[design.field.layout].shapes(W, { ...defaultParams(design.field.layout), ...design.field.params });
-  for (let i = shapes.length - 1; i >= 0; i--) {
-    if (scratch.isPointInPath(new Path2D(shapes[i].d), px, py)) return shapes[i].slot;
-  }
-  return 0;
-}
-
+/** The colour of the field under a point (flag units). */
 export function fieldColorAt(design: StudioDesign, px: number, py: number) {
   const field = design.field;
-  if (field.kind !== 'layout') return field.colors[0];
-  const slot = fieldSlotAt(design, px, py);
-  return field.colors[slot] ?? field.colors[0];
+  if (field.kind !== 'stack') return field.colors[0];
+  return fieldPartAt(design, px, py)?.color ?? field.color;
 }
 
+/** Every colour the field shows, each once. */
 export function fieldColors(design: StudioDesign) {
-  return design.field.colors;
+  return design.field.kind === 'stack' ? stackColors(design.field) : design.field.colors;
 }
 
 /** The colours a layer shows. */
@@ -228,7 +218,7 @@ export const layerColors = (layer: StudioLayer) => (layer.shape ? shapeColors(la
 
 /** Every colour in the flag, field first. */
 export function documentColors(design: StudioDesign) {
-  return uniqueColors([...design.field.colors, ...design.layers.filter((l) => !l.hidden).flatMap(layerColors)]);
+  return uniqueColors([...fieldColors(design), ...design.layers.filter((l) => !l.hidden).flatMap(layerColors)]);
 }
 
 /** Swaps one colour for another everywhere it's used. */
@@ -236,7 +226,7 @@ export function replaceColor(design: StudioDesign, from: string, to: string): St
   const swap = (colors: string[]) => colors.map((c) => (c.toUpperCase() === from.toUpperCase() ? to : c));
   return {
     ...design,
-    field: { ...design.field, colors: swap(design.field.colors) },
+    field: design.field.kind === 'stack' ? swapStackColor(design.field, from, to) : { ...design.field, colors: swap(design.field.colors) },
     layers: design.layers.map((layer) => ({
       ...layer,
       colors: swap(layer.colors),

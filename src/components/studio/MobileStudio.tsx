@@ -27,12 +27,12 @@ import type { StudioEmblem } from './model';
 import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
-import { AlignControls, FieldSwatches, LayerMoreMenu, LayerSwatches, OutlineControls, RepeatControls, ShapeControls } from './tools';
+import { AlignControls, FieldSwatches, LayerMoreMenu, LayerSwatches, OutlineControls, PathControls, PointEditBar, RepeatControls, ShapeControls } from './tools';
 import type { Panel } from './use-shortcuts';
 import type { Studio } from './use-studio';
 
 const TABS: { panel: Panel; label: string; icon: React.ReactNode }[] = [
-  { panel: 'layout', label: 'Layout', icon: <SquaresFour /> },
+  { panel: 'layout', label: 'Field', icon: <SquaresFour /> },
   { panel: 'emblems', label: 'Emblems', icon: <Emblems /> },
   { panel: 'colors', label: 'Colours', icon: <Palette /> },
   { panel: 'layers', label: 'Layers', icon: <Layers /> },
@@ -145,11 +145,16 @@ export function MobileStudio({
       {(selectedLayers.length > 0 || fieldSelected) && mode === 'flat' && (
         <div className='shrink-0 border-t border-line bg-surface'>
           <div className='flex items-center gap-1 overflow-x-auto px-2 py-1.5 [scrollbar-width:none]'>
-            {selectedLayers.length > 0 ? (
+            {studio.pathEdit ? (
+              <div className='flex shrink-0 items-center px-1'>
+                <PointEditBar studio={studio} />
+              </div>
+            ) : selectedLayers.length > 0 ? (
               <>
                 {allShapes ? (
                   <div className='flex shrink-0 items-center px-1'>
                     <ShapeControls studio={studio} layers={selectedLayers} />
+                    <PathControls studio={studio} />
                   </div>
                 ) : (
                   <>
@@ -207,7 +212,7 @@ export function MobileStudio({
                 <Action label='Shuffle' onClick={actions.cycleFieldColors}>
                   <SwapColors />
                 </Action>
-                <Action label='Layout' onClick={() => setPanel('layout')}>
+                <Action label='Field' onClick={() => setPanel('layout')}>
                   <SquaresFour />
                 </Action>
               </>

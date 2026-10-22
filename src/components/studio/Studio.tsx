@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Loader2 } from '@/components/icons';
 import { DesktopStudio } from './DesktopStudio';
 import { decodeDoc } from './export';
+import { migrateDesign } from './field';
 import { MobileStudio } from './MobileStudio';
 import { newDesign, type RemixSource, type StudioDoc, type StudioEmblem } from './model';
 import { buildRemixDesign } from './remix';
@@ -15,7 +16,10 @@ const draftKey = (remixId: string | null) => `vexilo-flag-maker:${remixId ?? 'ne
 function loadDraft(key: string): StudioDoc | null {
   try {
     const value = JSON.parse(localStorage.getItem(key) ?? 'null');
-    return value?.design?.version === 1 && typeof value.name === 'string' ? value : null;
+    // Drafts from before divisions are opened in the current version.
+    return (value?.design?.version === 1 || value?.design?.version === 2) && typeof value.name === 'string'
+      ? { name: value.name, design: migrateDesign(value.design) }
+      : null;
   } catch {
     return null;
   }

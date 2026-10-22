@@ -4,7 +4,7 @@ import {
   LAYOUT_VARIANTS,
   LAYOUTS,
 } from '../../src/components/studio/layouts';
-import type { LayoutId, StudioDesign } from '../../src/lib/studio-design';
+import type { LayoutId, StudioDesignV1 } from '../../src/lib/studio-design';
 
 /** Independent from the SVG extractor: changing this never invalidates the SVG backfill. */
 export const RASTER_VERSION = 2;
@@ -23,8 +23,8 @@ export type RasterResult = {
   field: Buffer;
   rebuilt: Buffer;
   fit:
-    | Extract<StudioDesign['field'], { kind: 'layout' }>
-    | Omit<Extract<StudioDesign['field'], { kind: 'image' }>, 'src'>;
+    | Extract<StudioDesignV1['field'], { kind: 'layout' }>
+    | Omit<Extract<StudioDesignV1['field'], { kind: 'image' }>, 'src'>;
   parts: RasterPart[];
   mismatch: number;
   meanError: number;
@@ -142,7 +142,7 @@ function frameDepths(pixels: Buffer, w: number, h: number) {
 /** Fit the field using both the whole image and its perimeter, so central badges remain objects. */
 async function fitField(pixels: Buffer, w: number, h: number) {
   let best = null as {
-    fit: Extract<StudioDesign['field'], { kind: 'layout' }>;
+    fit: Extract<StudioDesignV1['field'], { kind: 'layout' }>;
     score: number;
     off: number;
     borderOff: number;
@@ -910,7 +910,7 @@ export function rasterDesign(
   result: RasterResult,
   urls: string[],
   fieldUrl?: string,
-): StudioDesign {
+): StudioDesignV1 {
   if (result.fit.kind === 'image' && !fieldUrl)
     throw new Error('An inferred field needs its cached image URL');
   return {
