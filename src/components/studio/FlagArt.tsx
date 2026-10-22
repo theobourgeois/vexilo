@@ -14,19 +14,27 @@ type Hrefs = { field?: string; layers?: Record<string, string> };
 /**
  * A design as an SVG in flag units (W wide, 1 tall). `hrefs` replaces the live, recoloured
  * images with fixed ones, which export uses to embed them. `view` shows just that part of the
- * flag (flag units), so a close zoom never draws more than fits on screen.
+ * flag (flag units), so a close zoom never draws more than fits on screen. `ghosts` names
+ * clipped layers to draw faintly in full on top, so the parts their clip hides can be seen.
  */
 export function FlagArt({
   design,
   hrefs,
   view,
+  ghosts,
   className,
   style,
   ...rest
-}: { design: StudioDesign; hrefs?: Hrefs; view?: { x: number; y: number; w: number; h: number } } & Omit<React.SVGProps<SVGSVGElement>, 'viewBox'>) {
+}: {
+  design: StudioDesign;
+  hrefs?: Hrefs;
+  view?: { x: number; y: number; w: number; h: number };
+  ghosts?: string[];
+} & Omit<React.SVGProps<SVGSVGElement>, 'viewBox'>) {
   const W = flagWidth(design);
   const id = React.useId().replace(/[^a-zA-Z0-9]/g, '');
   const outlined = design.layers.filter((layer) => layer.outline && !layer.hidden);
+  const ghosted = ghosts?.length ? design.layers.filter((layer) => layer.clip && !layer.hidden && ghosts.includes(layer.id)) : [];
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
@@ -78,6 +86,7 @@ export function FlagArt({
         {clipGroups(design.layers).map((group) => (
           <ClipGroup key={group[0].id} group={group} field={design.field} W={W} hrefs={hrefs} id={id} />
         ))}
+        {ghosted.length > 0 && <g opacity={0.35}>{ghosted.map((layer) => layerArt(layer, W, id, hrefs))}</g>}
       </g>
     </svg>
   );
@@ -90,14 +99,7 @@ export function FlagArt({
 function ClipGroup({ group, field, W, hrefs, id }: { group: StudioLayer[]; field: StudioField; W: number; hrefs?: Hrefs; id: string }) {
   const [base, ...rest] = group;
   if (base.hidden) return null;
-  const art = (layer: StudioLayer, outline = true) => {
-    const filter = outline && layer.outline ? `url(#${id}-o-${layer.id})` : undefined;
-    return layer.shape ? (
-      <ShapeArt key={layer.id} layer={layer} W={W} filter={filter} />
-    ) : (
-      <LayerArt key={layer.id} layer={layer} W={W} filter={filter} href={hrefs?.layers?.[layer.id]} />
-    );
-  };
+  const art = (layer: StudioLayer, outline = true) => layerArt(layer, W, id, hrefs, outline);
   const clipped = rest.filter((layer) => !layer.hidden);
   const maskId = `${id}-m-${base.id}`;
   return (
@@ -112,6 +114,42 @@ function ClipGroup({ group, field, W, hrefs, id }: { group: StudioLayer[]; field
         </>
       )}
     </PartClip>
+  );
+}
+
+function layerArt(layer: StudioLayer, W: number, id: string, hrefs?: Hrefs, outline = true) {
+  const filter = outline && layer.outline ? `url(#${id}-o-${layer.id})` : undefined;
+  return layer.shape ? (
+    <ShapeArt key={layer.id} layer={layer} W={W} filter={filter} />
+  ) : (
+    <LayerArt key={layer.id} layer={layer} W={W} filter={filter} href={hrefs?.layers?.[layer.id]} />
+  );
+}
+
+/**
+ * The field with one part of it picked out: the rest washed out, the part in full colour and
+ * outlined. Sized by its height; the width follows the flag's ratio.
+ */
+export function PartPreview({ design, part, height = 20, className }: { design: StudioDesign; part: FieldPartRef; height?: number; className?: string }) {
+  const W = flagWidth(design);
+  const id = React.useId().replace(/[^a-zA-Z0-9]/g, '');
+  const target = partTarget(design.field, part);
+  const d = target && divisionGeometry(target.division, W).parts[target.part]?.d;
+  return (
+    <svg viewBox={`0 0 ${W} 1`} width={Math.round(height * W)} height={height} aria-hidden className={className}>
+      <mask id={`${id}-wash`} maskUnits='userSpaceOnUse' x={0} y={0} width={W} height={1}>
+        <rect width={W} height={1} fill='#fff' />
+        <PartClip target={target} W={W} id={`${id}-wc`}>
+          {d && <path d={d} fill='#000' />}
+        </PartClip>
+      </mask>
+      <FieldArt field={design.field} W={W} id={id} />
+      <rect width={W} height={1} fill='rgb(255 255 255 / 0.72)' mask={`url(#${id}-wash)`} />
+      {/* Clipped to the part, so only the inside half of the stroke shows. */}
+      <PartClip target={target} W={W} id={`${id}-oc`}>
+        {d && <path d={d} fill='none' stroke='rgb(0 0 0 / 0.75)' strokeWidth={2.5} vectorEffect='non-scaling-stroke' />}
+      </PartClip>
+    </svg>
   );
 }
 

@@ -158,6 +158,7 @@ export const FitInto = bold(Ph.FrameCorners, 'FitInto');
 export const Proportions = bold(Ph.Resize, 'Proportions');
 export const ClipMask = bold(Ph.Crop, 'ClipMask');
 export const ClippedBelow = bold(Ph.ArrowElbowLeftDown, 'ClippedBelow');
+export const NoClip = bold(Ph.Prohibit, 'NoClip');
 export const Cursor = bold(Ph.Cursor, 'Cursor');
 export const Shapes = bold(Ph.Shapes, 'Shapes');
 export const PaintBrush = bold(Ph.PaintBrush, 'PaintBrush');

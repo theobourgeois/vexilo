@@ -31,6 +31,7 @@ import {
   FitInto,
   Proportions,
   ClipMask,
+  ClippedBelow,
   ColumnsIcon,
   Copy,
   Eye,
@@ -42,6 +43,7 @@ import {
   IntersectShapes,
   Lock,
   MergeShapes,
+  NoClip,
   MoreHorizontal,
   Outline,
   Repeat,
@@ -60,10 +62,11 @@ import {
   ChevronDown,
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import type { StudioClip, StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import type { FieldPartRef, StudioClip, StudioDesign, StudioLayer, StudioRepeat } from '@/lib/studio-design';
 import { clipTargets } from './clip';
 import { DIVISIONS, divisionParts } from './divisions';
 import { PaintButton, WidthSlider } from './draw';
+import { PartPreview } from './FlagArt';
 import { documentColors, fieldColors, layerWidth } from './model';
 import { alignScopes, type AlignScope } from './regions';
 import { defaultStroke, isLinear, naturalAspect } from './shapes';
@@ -553,6 +556,15 @@ const clipKey = (clip: StudioClip | null | undefined) =>
   !clip ? 'none' : clip.kind === 'below' ? 'below' : `part:${clip.divisionId}:${clip.part}`;
 
 /** What the selection only shows inside: nothing, the layer under it, or a part of the field. */
+/** What a clip choice shows before its name, in one column: the part on the flag, or an icon. */
+export function ClipChoiceArt({ design, part, icon }: { design: StudioDesign; part?: FieldPartRef; icon?: React.ReactNode }) {
+  return (
+    <span className='flex w-9 shrink-0 justify-center text-muted-foreground [&>svg:not([width])]:size-4'>
+      {part ? <PartPreview design={design} part={part} className='rounded-[3px] shadow-[0_0_0_1px_rgb(0_0_0/0.15)]' /> : icon}
+    </span>
+  );
+}
+
 function ClipSubmenu({ studio }: { studio: Studio }) {
   const { actions, selectedLayers, design } = studio;
   const keys = new Set(selectedLayers.map((l) => clipKey(l.clip)));
@@ -570,17 +582,20 @@ function ClipSubmenu({ studio }: { studio: Studio }) {
       <DropdownMenuSubTrigger>
         <ClipMask /> Clip to
       </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className='max-h-(--radix-dropdown-menu-content-available-height) w-56 overflow-y-auto'>
+      <DropdownMenuSubContent sideOffset={8} alignOffset={-6} className='max-h-(--radix-dropdown-menu-content-available-height) w-72 overflow-y-auto'>
         <DropdownMenuRadioGroup value={value} onValueChange={choose}>
-          <DropdownMenuRadioItem value='none'>Nothing</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value='none'>
+            <ClipChoiceArt design={design} icon={<NoClip />} /> Nothing
+          </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value='below' disabled={bottom}>
-            Layer below <span className='ml-auto pl-3 text-xs text-muted-foreground'>⌥⌘G</span>
+            <ClipChoiceArt design={design} icon={<ClippedBelow />} /> Layer below <span className='ml-auto pl-3 text-xs text-muted-foreground'>⌥⌘G</span>
           </DropdownMenuRadioItem>
           {targets.length > 0 && <DropdownMenuSeparator />}
           {targets.map((t) => {
             const key = clipKey({ kind: 'part', ...t.ref });
             return (
               <DropdownMenuRadioItem key={key} value={key}>
+                <ClipChoiceArt design={design} part={t.ref} />
                 <span className='truncate'>{t.label}</span>
               </DropdownMenuRadioItem>
             );

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ChevronDown, ClipMask, ClippedBelow, Copy, Dice, Eye, EyeSlash, Lock, Minus, Plus, Search, Trash2, Unlock, Upload, X } from '@/components/icons';
+import { ChevronDown, ClipMask, ClippedBelow, Copy, Dice, Eye, EyeSlash, Lock, Minus, NoClip, Plus, Search, Trash2, Unlock, Upload, X } from '@/components/icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +18,7 @@ import { EMBLEM_CATEGORIES, emblemSearchScore, mixEmblemCategories } from '@/lib
 import type { EdgeStyle, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
 import { clipBaseIndex, clipsBelow, clipTargets, partLabel } from './clip';
 import { luminance, PALETTE_GROUPS, PALETTES } from './colors';
-import { FlagArt } from './FlagArt';
+import { FlagArt, PartPreview } from './FlagArt';
 import { layerImage } from './cutout';
 import { DIVISION_KINDS, DIVISIONS, divisionLabel, divisionParams, divisionParts } from './divisions';
 import { divisionFor, LAYOUT_TEMPLATES, PART_TEMPLATES, sameShape, templateField, type FieldTemplate, type StackField } from './field';
@@ -26,7 +26,7 @@ import { useRecolored } from './images';
 import { documentColors, layerColors, layerWidth, type StudioEmblem } from './model';
 import { shapePath } from './shapes';
 import { EMBLEM_MIME } from './StudioCanvas';
-import { ColorButton } from './tools';
+import { ClipChoiceArt, ColorButton } from './tools';
 import { ColorPicker, Slider, Swatch } from './ui';
 import { FIELD, type Studio } from './use-studio';
 
@@ -662,16 +662,22 @@ function OnlyInside({ studio, division }: { studio: Studio; division: StudioDivi
               type='button'
               className='flex h-8 w-full cursor-pointer items-center justify-between gap-2 rounded-[9px] bg-foreground/[0.05] px-2.5 text-[13px] font-medium outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring'
             >
-              <span className='truncate'>{clip ? (partLabel(design, clip) ?? 'Nothing') : 'Nothing'}</span>
+              <span className='flex min-w-0 items-center gap-2'>
+                {clip && partLabel(design, clip) && <PartPreview design={design} part={clip} height={16} className='shrink-0 rounded-[2px] shadow-[0_0_0_1px_rgb(0_0_0/0.15)]' />}
+                <span className='truncate'>{clip ? (partLabel(design, clip) ?? 'Nothing') : 'Nothing'}</span>
+              </span>
               <ChevronDown className='size-3.5 shrink-0 text-muted-foreground' />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='start' className='max-h-(--radix-dropdown-menu-content-available-height) w-(--radix-dropdown-menu-trigger-width) overflow-y-auto'>
             <DropdownMenuRadioGroup value={clip ? partKey(clip) : 'none'} onValueChange={choose}>
-              <DropdownMenuRadioItem value='none'>Nothing</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value='none'>
+                <ClipChoiceArt design={design} icon={<NoClip />} /> Nothing
+              </DropdownMenuRadioItem>
               {targets.length > 0 && <DropdownMenuSeparator />}
               {targets.map((t) => (
                 <DropdownMenuRadioItem key={partKey(t.ref)} value={partKey(t.ref)}>
+                  <ClipChoiceArt design={design} part={t.ref} />
                   <span className='truncate'>{t.label}</span>
                 </DropdownMenuRadioItem>
               ))}

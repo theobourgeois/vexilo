@@ -255,10 +255,12 @@ export function StudioCanvas({
 
   const anchors = React.useMemo(() => fieldAnchors(design), [design]);
 
+  // A selected layer can be grabbed where its clip hides it, so one clipped out of sight can still be moved back.
   const hitTest = (u: number, v: number) => {
     for (let i = design.layers.length - 1; i >= 0; i--) {
       const layer = design.layers[i];
-      if (!layer.hidden && !layer.locked && hitsLayer(layer, W, u, v, 5 / scale) && layerShownAt(design, layer, u, v)) return layer;
+      if (layer.hidden || layer.locked || !hitsLayer(layer, W, u, v, 5 / scale)) continue;
+      if (selection.includes(layer.id) || layerShownAt(design, layer, u, v)) return layer;
     }
     return null;
   };
@@ -1041,6 +1043,7 @@ export function StudioCanvas({
         <FlagArt
           design={design}
           view={{ x: -ox / scale, y: -oy / scale, w: size.w / scale, h: size.h / scale }}
+          ghosts={selecting ? selection : undefined}
           className='studio-flag pointer-events-none absolute inset-0 block size-full'
         />
       )}
