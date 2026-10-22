@@ -42,6 +42,20 @@ function createLocalRedis() {
       store.set(key, { value, expiresAt: current?.expiresAt ?? null });
       return value;
     },
+    async hincrby(key: string, field: string, by: number) {
+      const hash = (await this.get<Record<string, number>>(key)) ?? {};
+      hash[field] = (hash[field] ?? 0) + by;
+      const expiresAt = store.get(key)?.expiresAt ?? null;
+      store.set(key, { value: hash, expiresAt });
+      return hash[field];
+    },
+    async hget<T>(key: string, field: string): Promise<T | null> {
+      const hash = await this.get<Record<string, T>>(key);
+      return hash?.[field] ?? null;
+    },
+    async hgetall<T extends Record<string, unknown>>(key: string): Promise<T | null> {
+      return this.get<T>(key);
+    },
     async expire(key: string, seconds: number) {
       const entry = store.get(key);
       if (!entry) return 0;

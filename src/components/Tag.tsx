@@ -8,6 +8,8 @@ interface TagProps {
   text: string;
   className?: string;
   count?: number;
+  /** Shown before the text on chips. */
+  icon?: React.ReactNode;
   onClick?: () => void;
   isActive?: boolean;
   /** `chip` is the raised filter style used on browse; `outline` is the quiet pill used on flag pages. */
@@ -18,6 +20,7 @@ export default function Tag({
   text,
   className,
   count,
+  icon,
   onClick,
   isActive: isActiveProp,
   variant = 'outline',
@@ -49,11 +52,12 @@ export default function Tag({
         onClick={handleClick}
         aria-pressed={isActive}
         className={cn(
-          'inline-flex h-8 shrink-0 cursor-pointer items-center gap-[7px] whitespace-nowrap rounded-full px-3 text-[13px] font-medium transition-[color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'inline-flex h-8 shrink-0 cursor-pointer items-center gap-[7px] whitespace-nowrap rounded-full px-3 text-[13px] font-medium transition-[color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3.5',
           isActive ? 'bg-foreground text-background' : 'vx-key text-subtle hover:text-foreground',
           className,
         )}
       >
+        {icon}
         {text}
         {count !== undefined && (
           <span className={cn('tabular-nums text-[11px]', isActive ? 'opacity-60' : 'text-muted-foreground')}>

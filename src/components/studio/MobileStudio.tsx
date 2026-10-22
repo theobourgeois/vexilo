@@ -22,7 +22,21 @@ import {
   WandSparkles,
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import { ExportMenu, FlagName, PostDialog, RatioControl, RemixPill, StartOver, UndoRedo, ViewModeControl, WavePreview, type Remix } from './chrome';
+import {
+  ContestEntryDialog,
+  ContestPill,
+  ExportMenu,
+  FlagName,
+  PostDialog,
+  RatioControl,
+  RemixPill,
+  StartOver,
+  UndoRedo,
+  ViewModeControl,
+  WavePreview,
+  type Contest,
+  type Remix,
+} from './chrome';
 import type { StudioEmblem } from './model';
 import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel } from './panels';
@@ -91,11 +105,13 @@ export function MobileStudio({
   studio,
   emblems,
   remix,
+  contest,
   onStartOver,
 }: {
   studio: Studio;
   emblems: StudioEmblem[];
   remix: Remix;
+  contest: Contest;
   onStartOver?: () => void;
 }) {
   const [panel, setPanel] = React.useState<Panel | null>(null);
@@ -122,7 +138,7 @@ export function MobileStudio({
           </button>
         </ExportMenu>
         <Button size='sm' className='ml-1' onClick={() => setPosting(true)}>
-          Post
+          {contest ? (contest.entry ? 'Update' : 'Submit') : 'Post'}
         </Button>
       </header>
 
@@ -133,9 +149,10 @@ export function MobileStudio({
         ) : (
           <WavePreview doc={studio.doc} className='absolute inset-0' />
         )}
-        {(remix || onStartOver) && (
+        {(remix || contest || onStartOver) && (
           <div className='absolute left-3 top-3 flex items-center gap-1.5'>
             <RemixPill remix={remix} />
+            <ContestPill contest={contest} />
             <StartOver remix={remix} onStartOver={onStartOver} className='bg-surface' />
           </div>
         )}
@@ -281,7 +298,11 @@ export function MobileStudio({
         </div>
       </Sheet>
 
-      <PostDialog studio={studio} remix={remix} open={posting} onOpenChange={setPosting} />
+      {contest ? (
+        <ContestEntryDialog studio={studio} contest={contest} open={posting} onOpenChange={setPosting} />
+      ) : (
+        <PostDialog studio={studio} remix={remix} open={posting} onOpenChange={setPosting} />
+      )}
     </div>
   );
 }

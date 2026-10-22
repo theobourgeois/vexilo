@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { openSignIn } from '@/lib/sign-in';
 import { toast } from 'sonner';
 import { postFlagDesign } from '@/actions/studio';
+import { submitContestEntry, type StudioContest } from '@/actions/contests';
 import WavingFlag from '@/components/WavingFlag';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,10 +44,13 @@ import {
   BringForward,
   SendBackward,
   Plus,
+  Trophy,
+  ArrowRight,
 } from '@/components/icons';
 import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/utils';
 import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@/lib/studio-design';
+import { formatContestDate, STATEMENT_MAX } from '@/lib/contest';
 import { blobToDataUrl, designToPng, designToSvg, download, encodeDoc, fileName } from './export';
 import { FlagArt } from './FlagArt';
 import { EXPORT_WIDTH, RATIOS, type StudioDoc } from './model';
@@ -55,6 +59,7 @@ import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
 
 export type Remix = { id: string; name: string } | null;
+export type Contest = StudioContest | null;
 
 // ───────────────────────── Title ─────────────────────────
 
@@ -99,6 +104,20 @@ export function RemixPill({ remix }: { remix: Remix }) {
     >
       <Shuffle className='size-3' />
       <span className='max-w-[220px] truncate'>Remix of {remix.name.replace(/^the /, '')}</span>
+    </Link>
+  );
+}
+
+/** Shown while designing an entry, linking back to the brief. */
+export function ContestPill({ contest }: { contest: Contest }) {
+  if (!contest) return null;
+  return (
+    <Link
+      href={`/contest/${contest.slug}`}
+      className='inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-[rgb(217_154_11/0.14)] px-2.5 text-[12px] font-semibold text-[#9a6a00] hover:brightness-110 dark:text-[#f2c14e]'
+    >
+      <Trophy className='size-3' />
+      <span className='max-w-[240px] truncate'>Contest entry · {contest.theme}</span>
     </Link>
   );
 }
@@ -270,6 +289,116 @@ export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Stud
               <Button variant='neutral' className='h-11' onClick={() => openSignIn()}>
                 <GoogleLogo />
                 Sign in to post
+              </Button>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ───────────────────────── Contest entry ─────────────────────────
+
+export function ContestEntryDialog({
+  studio,
+  contest,
+  open,
+  onOpenChange,
+}: {
+  studio: Studio;
+  contest: StudioContest;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const session = useSession();
+  const [title, setTitle] = React.useState(studio.doc.name);
+  const [statement, setStatement] = React.useState(contest.entry?.statement ?? '');
+  const [busy, setBusy] = React.useState(false);
+  const [done, setDone] = React.useState<null | { updated: boolean }>(null);
+  const ratio = { aspectRatio: `${studio.design.ratio[1]} / ${studio.design.ratio[0]}` };
+
+  React.useEffect(() => { if (open) setTitle(studio.doc.name); }, [open, studio.doc.name]);
+
+  async function submit() {
+    const name = title.trim();
+    if (!name) { toast.error('Give your entry a title.'); return; }
+    studio.actions.setName(name);
+    setBusy(true);
+    try {
+      const image = await blobToDataUrl(await designToPng(studio.design, 1800));
+      const result = await submitContestEntry({ contestId: contest.id, title: name, statement: statement.trim(), image, design: studio.design });
+      if (result.success) setDone({ updated: Boolean(contest.entry) });
+      else toast.error(result.message);
+    } catch {
+      toast.error('Could not submit your entry. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => (onOpenChange(next), !next && setDone(null))}>
+      <DialogContent className='w-[calc(100%-2rem)] max-w-[460px] sm:max-w-[460px] max-h-[calc(100dvh-2rem)] overflow-y-auto gap-5'>
+        {done ? (
+          <div className='flex flex-col items-center gap-3 py-4 text-center'>
+            <FlagArt design={studio.design} className='studio-flag h-24 w-auto' style={ratio} />
+            <DialogTitle className='mt-2 text-[19px]'>{done.updated ? 'Entry updated' : 'You’re in'}</DialogTitle>
+            <DialogDescription className='text-[13.5px] text-subtle'>
+              You can keep changing it until {formatContestDate(contest.votingStartsAt, true)}. Then everyone votes, without seeing who made what.
+            </DialogDescription>
+            <div className='mt-2 flex gap-2'>
+              <Button variant='neutral' onClick={() => onOpenChange(false)}>
+                Keep editing
+              </Button>
+              <Button asChild>
+                <Link href={`/contest/${contest.slug}`}>
+                  Contest page
+                  <ArrowRight />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className='flex items-center gap-4'>
+              <FlagArt design={studio.design} className='studio-flag h-14 w-auto shrink-0' style={ratio} />
+              <div className='min-w-0 flex-1'>
+                <DialogTitle className='sr-only'>Submit your contest entry</DialogTitle>
+                <label htmlFor='contest-entry-title' className='mb-1 block text-xs font-medium text-muted-foreground'>Title</label>
+                <Input id='contest-entry-title' value={title} maxLength={120} required disabled={busy} onChange={(event) => setTitle(event.target.value)} className='text-[17px] font-semibold' />
+                <DialogDescription className='mt-0.5 truncate text-[13px] text-muted-foreground'>
+                  {contest.title} · {contest.theme}
+                </DialogDescription>
+              </div>
+            </div>
+            {session.status === 'authenticated' ? (
+              <>
+                <div className='space-y-1.5'>
+                  <label htmlFor='contest-entry-statement' className='flex justify-between text-[13px] font-medium'>
+                    The idea behind it
+                    <span className='tabular-nums font-normal text-muted-foreground'>{statement.length}/{STATEMENT_MAX}</span>
+                  </label>
+                  <textarea
+                    id='contest-entry-statement'
+                    value={statement}
+                    onChange={(e) => setStatement(e.target.value)}
+                    placeholder='What do the colours and symbols stand for?'
+                    rows={3}
+                    maxLength={STATEMENT_MAX}
+                    className='vx-well w-full resize-none rounded-[12px] px-3.5 py-3 text-[14px] outline-none focus:ring-2 focus:ring-ring'
+                  />
+                  <p className='text-[12px] text-muted-foreground'>Voters see your flag, title and this note. Your name stays hidden until the winner is announced.</p>
+                </div>
+                <Button onClick={submit} disabled={busy || !title.trim()} className='h-11'>
+                  {busy ? <Loader2 className='animate-spin' /> : <Trophy />}
+                  {contest.entry ? 'Update entry' : 'Submit entry'}
+                </Button>
+              </>
+            ) : (
+              <Button variant='neutral' className='h-11' onClick={() => openSignIn()}>
+                <GoogleLogo />
+                Sign in to enter
               </Button>
             )}
           </>

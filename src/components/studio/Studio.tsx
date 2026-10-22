@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { toast } from 'sonner';
+import type { StudioContest } from '@/actions/contests';
 import { Loader2 } from '@/components/icons';
 import { DesktopStudio } from './DesktopStudio';
 import { decodeDoc } from './export';
@@ -10,7 +11,8 @@ import { newDesign, type RemixSource, type StudioDoc, type StudioEmblem } from '
 import { buildRemixDesign } from './remix';
 import { useStudio } from './use-studio';
 
-const draftKey = (remixId: string | null) => `vexilo-flag-maker:${remixId ?? 'new'}`;
+const draftKey = (remixId: string | null, contestSlug: string | null) =>
+  `vexilo-flag-maker:${contestSlug ? `contest-${contestSlug}` : (remixId ?? 'new')}`;
 
 function loadDraft(key: string): StudioDoc | null {
   try {
@@ -33,24 +35,35 @@ function useIsMobile() {
   return mobile;
 }
 
-export default function Studio({ emblems, remix }: { emblems: StudioEmblem[]; remix: RemixSource | null }) {
-  const studio = useStudio({ name: remix ? `${remix.name.replace(/^the /, '')} remix` : 'Untitled flag', design: newDesign() });
+export default function Studio({
+  emblems,
+  remix,
+  contest = null,
+}: {
+  emblems: StudioEmblem[];
+  remix: RemixSource | null;
+  contest?: StudioContest | null;
+}) {
+  const startName = contest?.entry?.title ?? (remix ? `${remix.name.replace(/^the /, '')} remix` : 'Untitled flag');
+  const studio = useStudio({ name: startName, design: newDesign() });
   const [ready, setReady] = React.useState(false);
   const mobile = useIsMobile();
-  const key = draftKey(remix?.id ?? null);
+  const key = draftKey(remix?.id ?? null, contest?.slug ?? null);
   const reset = studio.actions.reset;
   const restore = studio.actions.restore;
-  const startName = remix ? `${remix.name.replace(/^the /, '')} remix` : 'Untitled flag';
 
-  // What "start over" goes back to: the remixed flag as first opened, or a blank flag.
+  // What "start over" goes back to: the submitted entry, the remixed flag as first opened, or a blank flag.
   const original = React.useRef<Promise<StudioDoc> | null>(null);
   const getOriginal = React.useCallback(() => {
-    original.current ??= (remix ? buildRemixDesign(remix).catch(() => newDesign()) : Promise.resolve(newDesign())).then((design) => ({
+    const entry = contest?.entry?.design;
+    original.current ??= (
+      entry ? Promise.resolve(entry) : remix ? buildRemixDesign(remix).catch(() => newDesign()) : Promise.resolve(newDesign())
+    ).then((design) => ({
       name: startName,
       design,
     }));
     return original.current;
-  }, [remix, startName]);
+  }, [remix, contest, startName]);
   const [originalDoc, setOriginalDoc] = React.useState<StudioDoc | null>(null);
   React.useEffect(() => {
     getOriginal().then(setOriginalDoc);
@@ -127,8 +140,8 @@ export default function Studio({ emblems, remix }: { emblems: StudioEmblem[]; re
   }
   const startOverProps = { onStartOver: changed ? startOver : undefined };
   return mobile ? (
-    <MobileStudio studio={studio} emblems={emblems} remix={remixLink} {...startOverProps} />
+    <MobileStudio studio={studio} emblems={emblems} remix={remixLink} contest={contest} {...startOverProps} />
   ) : (
-    <DesktopStudio studio={studio} emblems={emblems} remix={remixLink} {...startOverProps} />
+    <DesktopStudio studio={studio} emblems={emblems} remix={remixLink} contest={contest} {...startOverProps} />
   );
 }

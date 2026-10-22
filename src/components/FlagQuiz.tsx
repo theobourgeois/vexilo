@@ -4,7 +4,6 @@ import React from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getRandomFlag } from '@/lib/get-random-flag';
 import { toggleFavoriteFlag } from '@/actions/flags';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
 import FlagImage from '@/components/FlagImage';
@@ -21,54 +20,51 @@ import {
   Trophy,
   XCircle,
 } from '@/components/icons';
+import { Stat } from '@/components/games/shared';
+import { COUNTRIES, PLACES, type GameFlag } from '@/lib/games/pool';
 import { cn } from '@/lib/utils';
 
-type QuizFlag = {
-  name: string;
-  image: string;
-  id: string;
-};
-
 type Mode = 'name' | 'find';
+type QuizSet = 'countries' | 'us' | 'more' | 'all';
 
 type Question = {
-  answer: QuizFlag;
-  options: QuizFlag[];
+  answer: GameFlag;
+  options: GameFlag[];
 };
 
 const BEST_KEY = 'vexilo-quiz-best';
 const LETTERS = ['A', 'B', 'C', 'D'];
 
-function makeQuestion(): Question {
-  const picked = new Map<string, QuizFlag>();
-  while (picked.size < 4) {
-    const flag = getRandomFlag() as unknown as QuizFlag;
-    if (flag?.name && !picked.has(flag.name)) picked.set(flag.name, flag);
-  }
-  const options = [...picked.values()];
-  const answer = options[0];
-  return { answer, options: options.sort(() => Math.random() - 0.5) };
-}
+/** Wrong options come from the answer's own group, so a US state is never up against three countries. */
+const GROUPS = {
+  countries: COUNTRIES,
+  us: PLACES.filter((f) => f.set === 'us-state'),
+  more: PLACES.filter((f) => f.set !== 'us-state'),
+};
+const groupOf = (flag: GameFlag) => (flag.set === 'country' ? GROUPS.countries : flag.set === 'us-state' ? GROUPS.us : GROUPS.more);
+const SETS: Record<QuizSet, GameFlag[]> = { ...GROUPS, all: [...COUNTRIES, ...PLACES] };
 
-function Stat({ icon, label, value, hot }: { icon: React.ReactNode; label: string; value: React.ReactNode; hot?: boolean }) {
-  return (
-    <span
-      className={cn(
-        'vx-well inline-flex h-[38px] items-center gap-2 rounded-[11px] px-3 text-[13px] text-subtle [&_svg]:size-[15px]',
-        hot && '[&_svg]:text-main',
-      )}
-    >
-      {icon}
-      <span className='hidden sm:inline'>{label}</span>
-      <b className='tabular-nums text-[13px] font-semibold text-foreground'>{value}</b>
-    </span>
-  );
+const pickFrom = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
+
+function makeQuestion(set: QuizSet, recent: string[]): Question {
+  const pool = SETS[set];
+  const fresh = pool.filter((f) => !recent.includes(f.id));
+  const answer = pickFrom(fresh.length ? fresh : pool);
+  const picked = new Map([[answer.id, answer]]);
+  const group = groupOf(answer);
+  while (picked.size < 4) {
+    const flag = pickFrom(group);
+    picked.set(flag.id, flag);
+  }
+  return { answer, options: [...picked.values()].sort(() => Math.random() - 0.5) };
 }
 
 export default function FlagQuiz() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [mode, setMode] = React.useState<Mode>('name');
+  const [set, setSet] = React.useState<QuizSet>('countries');
+  const recent = React.useRef<string[]>([]);
   const [question, setQuestion] = React.useState<Question | null>(null);
   const [selected, setSelected] = React.useState<string | null>(null);
   const [score, setScore] = React.useState(0);
@@ -78,22 +74,26 @@ export default function FlagQuiz() {
   const [history, setHistory] = React.useState<boolean[]>([]);
   const [isFavorite, setIsFavorite] = React.useState(false);
 
-  React.useEffect(() => {
-    setQuestion(makeQuestion());
-    setBest(Number(localStorage.getItem(BEST_KEY) || 0));
-  }, []);
-
-  const next = React.useCallback(() => {
-    setQuestion(makeQuestion());
+  const next = React.useCallback((from: QuizSet = set) => {
+    const question = makeQuestion(from, recent.current);
+    recent.current = [question.answer.id, ...recent.current].slice(0, Math.floor(SETS[from].length / 2));
+    setQuestion(question);
     setSelected(null);
     setIsFavorite(false);
+  }, [set]);
+
+  React.useEffect(() => {
+    next();
+    setBest(Number(localStorage.getItem(BEST_KEY) || 0));
+    // Only the first question; later ones come from answering.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const answer = React.useCallback(
-    (name: string) => {
+    (id: string) => {
       if (!question || selected !== null) return;
-      const correct = name === question.answer.name;
-      setSelected(name);
+      const correct = id === question.answer.id;
+      setSelected(id);
       setTotal((t) => t + 1);
       setHistory((h) => [...h, correct].slice(-10));
       if (correct) {
@@ -120,7 +120,7 @@ export default function FlagQuiz() {
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
       const n = Number(e.key);
       if (question && n >= 1 && n <= 4 && selected === null) {
-        answer(question.options[n - 1].name);
+        answer(question.options[n - 1].id);
       } else if (e.key === 'Enter' && selected !== null) {
         e.preventDefault();
         next();
@@ -144,8 +144,8 @@ export default function FlagQuiz() {
   };
 
   const answered = selected !== null;
-  const correct = answered && selected === question?.answer.name;
-  const flagHref = question ? `/flag/${encodeURIComponent(question.answer.name)}` : '#';
+  const correct = answered && selected === question?.answer.id;
+  const flagHref = question?.answer.href ?? '#';
 
   const historyDots = (
     <div className='flex gap-[5px]' title='Last 10 answers'>
@@ -188,7 +188,7 @@ export default function FlagQuiz() {
           <ArrowUpRight />
         </Link>
       </Button>
-      <Button onClick={next}>
+      <Button onClick={() => next()}>
         Next flag
         <kbd className='rounded-md bg-white/20 px-1.5 tabular-nums text-[11px] leading-5'>↵</kbd>
       </Button>
@@ -210,7 +210,22 @@ export default function FlagQuiz() {
             { value: 'find', label: 'Find the flag', icon: <SquaresFour /> },
           ]}
         />
-        <div className='flex gap-2 sm:ml-auto'>
+        <Segmented
+          aria-label='Which flags'
+          value={set}
+          onChange={(s) => {
+            setSet(s);
+            recent.current = [];
+            next(s);
+          }}
+          options={[
+            { value: 'countries', label: 'Countries' },
+            { value: 'us', label: 'US states' },
+            { value: 'more', label: 'More places' },
+            { value: 'all', label: 'All' },
+          ]}
+        />
+        <div className='flex gap-2 lg:ml-auto'>
           <Stat icon={<Fire weight='fill' />} label='Streak' value={streak} hot={streak > 0} />
           <Stat icon={<Target />} label='Score' value={`${score}/${total}`} />
           <Stat icon={<Trophy />} label='Best' value={best} />
@@ -250,14 +265,14 @@ export default function FlagQuiz() {
             <h1 className='mb-4 text-lg font-semibold tracking-[-0.02em]'>Which flag is this?</h1>
             <div className='grid gap-2.5 sm:grid-cols-2'>
               {question?.options.map((option, i) => {
-                const isAnswer = option.name === question.answer.name;
-                const isPicked = option.name === selected;
+                const isAnswer = option.id === question.answer.id;
+                const isPicked = option.id === selected;
                 return (
                   <button
-                    key={option.name}
+                    key={option.id}
                     type='button'
                     disabled={answered}
-                    onClick={() => answer(option.name)}
+                    onClick={() => answer(option.id)}
                     className={cn(
                       'flex h-14 cursor-pointer items-center gap-3 rounded-[13px] pl-3 pr-3.5 text-left text-[15px] font-semibold transition-[transform,opacity] disabled:cursor-default',
                       !(answered && (isAnswer || isPicked)) && 'vx-key',
@@ -298,14 +313,14 @@ export default function FlagQuiz() {
           </div>
           <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
             {question?.options.map((option, i) => {
-              const isAnswer = option.name === question.answer.name;
-              const isPicked = option.name === selected;
+              const isAnswer = option.id === question.answer.id;
+              const isPicked = option.id === selected;
               return (
                 <button
-                  key={option.name}
+                  key={option.id}
                   type='button'
                   disabled={answered}
-                  onClick={() => answer(option.name)}
+                  onClick={() => answer(option.id)}
                   className={cn(
                     'vx-tile flex cursor-pointer flex-col transition-[transform,box-shadow,opacity] enabled:hover:shadow-tile-hover disabled:cursor-default',
                     answered && isAnswer && 'shadow-[inset_0_0_0_1.5px_var(--good),var(--sh-tile)]',

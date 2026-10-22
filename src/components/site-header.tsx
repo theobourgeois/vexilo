@@ -9,11 +9,13 @@ import { PostFlagButton } from '@/components/post-flag-button';
 import { AuthHeader } from '@/components/auth-header';
 import { HamburgerMenu } from '@/components/hamburger-menu';
 import { cn } from '@/lib/utils';
+import { PendingDot, useDailyPending } from '@/components/games/shared';
 import { FOCUS_SEARCH_KEY, NAV_LINKS } from '@/lib/nav';
 
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const dailyPending = useDailyPending();
 
   // Search lives on the browse page; "/" or ⌘K from anywhere else goes there with the box focused.
   useEffect(() => {
@@ -49,11 +51,12 @@ export function SiteHeader() {
                 key={href}
                 href={href}
                 className={cn(
-                  'rounded-[9px] px-3 py-[7px] text-sm font-medium text-subtle transition-colors hover:bg-foreground/[0.06] hover:text-foreground',
+                  'relative rounded-[9px] px-3 py-[7px] text-sm font-medium text-subtle transition-colors hover:bg-foreground/[0.06] hover:text-foreground',
                   active && 'bg-foreground/[0.07] text-foreground',
                 )}
               >
                 {label}
+                {href === '/play' && dailyPending && <PendingDot className='absolute right-[5px] top-[6px]' />}
               </Link>
             );
           })}

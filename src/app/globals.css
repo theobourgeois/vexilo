@@ -280,3 +280,73 @@
 .studio-range:focus-visible::-webkit-slider-thumb {
     box-shadow: 0 0 0 3px var(--ring);
 }
+
+/* ───────────────────────── Contest ─────────────────────────
+   The contest prompt is printed on a navy flag hoisted on a pole. The cloth is a mask with
+   a waving top and bottom edge, shaded with soft folds. */
+
+.contest-mast {
+    position: relative;
+    padding-left: 9px;
+}
+.contest-pole {
+    position: absolute;
+    left: 0;
+    top: -20px;
+    bottom: var(--pole-below, -120px);
+    width: 9px;
+    border-radius: 5px;
+    background: linear-gradient(90deg, #8e8c87, #e9e7e2 45%, #b5b3ae 70%, #7f7d78);
+    mask-image: linear-gradient(180deg, #000 calc(100% - 90px), transparent);
+    pointer-events: none;
+}
+.contest-finial {
+    position: absolute;
+    left: -6px;
+    top: -40px;
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff3c4, #d9a520 45%, #8a6200);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.2);
+}
+.contest-cloth {
+    filter: drop-shadow(0 18px 26px rgb(28 29 31 / 0.18)) drop-shadow(0 0 0.6px rgb(28 29 31 / 0.3));
+}
+.dark .contest-cloth {
+    filter: drop-shadow(0 18px 30px rgb(0 0 0 / 0.5)) drop-shadow(0 0 0.6px rgb(0 0 0 / 0.6));
+}
+.contest-wave {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background: #203f8f;
+    color: #fff;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M0 1.2 C12 -0.6 22 4.6 38 3 S68 -1 82 2.6 S96 4.4 100 3.4 L100 97.4 C96 98.4 90 100.2 82 98.6 S54 94 38 97 S12 100.6 0 98.8Z'/%3E%3C/svg%3E")
+        0 0 / 100% 100% no-repeat;
+}
+.contest-wave::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(
+        90deg,
+        rgb(0 0 0 / 0.16),
+        rgb(255 255 255 / 0.03) 9%,
+        rgb(255 255 255 / 0.09) 18%,
+        rgb(0 0 0 / 0.02) 29%,
+        rgb(0 0 0 / 0.13) 39%,
+        rgb(255 255 255 / 0.02) 52%,
+        rgb(255 255 255 / 0.1) 64%,
+        rgb(0 0 0 / 0.03) 74%,
+        rgb(0 0 0 / 0.11) 84%,
+        rgb(255 255 255 / 0.04) 94%,
+        rgb(0 0 0 / 0.06)
+    );
+}
+.contest-slot {
+    background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--foreground) 4%, transparent) 6px 7px);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--foreground) 16%, transparent);
+}

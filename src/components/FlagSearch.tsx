@@ -4,18 +4,18 @@ import React, { useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, ChevronDown, Heart, Search, X } from '@/components/icons';
+import { ArrowLeft, ArrowRight, ArrowsDownUp, ChevronDown, Heart, Search, SlidersHorizontal, X } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { Segmented } from '@/components/ui/segmented';
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FlagCard from './FlagCard';
-import { FlagOfTheDayLink } from './flag-of-the-day-link';
-import { TopContributorsLink } from './top-contributors-link';
+import { TodayRail } from './today-rail';
 import Tag from './Tag';
 import {
   getFavoriteFlagsCount,
@@ -33,6 +33,7 @@ import {
   removeFromQuery,
 } from '@/lib/flag-search-terms';
 import { FOCUS_SEARCH_KEY } from '@/lib/nav';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn } from '@/lib/utils';
 
 type OrderBy = keyof typeof flags.$inferSelect;
@@ -41,10 +42,10 @@ type Sort = 'popular' | 'latest' | 'az';
 const ITEMS_PER_PAGE = 56;
 const DEBOUNCE_DELAY = 300;
 
-const SORTS: Record<Sort, { orderBy: OrderBy; direction: 'asc' | 'desc' }> = {
-  popular: { orderBy: 'favorites', direction: 'desc' },
-  latest: { orderBy: 'updatedAt', direction: 'desc' },
-  az: { orderBy: 'name', direction: 'asc' },
+const SORTS: Record<Sort, { label: string; orderBy: OrderBy; direction: 'asc' | 'desc' }> = {
+  popular: { label: 'Popular', orderBy: 'favorites', direction: 'desc' },
+  latest: { label: 'Latest', orderBy: 'updatedAt', direction: 'desc' },
+  az: { label: 'A–Z', orderBy: 'name', direction: 'asc' },
 };
 
 /** Colours offered as swatches; the rest (pink, brown, grey) can still be typed. */
@@ -106,49 +107,34 @@ function SimplePagination({
 
 const listParam = (value: string | null) => (value ? value.split(',').filter(Boolean) : []);
 
-function TraitMenu({
-  label,
-  group,
-  selected,
-  onToggle,
-}: {
-  label: string;
-  group: 'type' | 'symbol';
-  selected: string[];
-  onToggle: (key: string) => void;
-}) {
-  const options = FLAG_TRAITS.filter((trait) => trait.group === group);
-  const count = options.filter((trait) => selected.includes(trait.key)).length;
+/** The toggle chips for one trait group inside the Filters popover. */
+function TraitChips({ group, selected, onToggle }: { group: 'type' | 'symbol'; selected: Set<string>; onToggle: (key: string) => void }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type='button'
-          className={cn(
-            'inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors',
-            count > 0 ? 'bg-main-soft text-main shadow-[0_0_0_1px_color-mix(in_srgb,var(--main)_40%,transparent)]' : 'vx-key text-subtle hover:text-foreground',
-          )}
-        >
-          {label}
-          {count > 0 && <span className='tabular-nums'>· {count}</span>}
-          <ChevronDown className='size-3.5' />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align='start' className='max-h-[360px] w-56 overflow-y-auto'>
-        {options.map((trait) => (
-          <DropdownMenuCheckboxItem
+    <div className='flex flex-wrap gap-1.5'>
+      {FLAG_TRAITS.filter((trait) => trait.group === group).map((trait) => {
+        const active = selected.has(trait.key);
+        return (
+          <button
             key={trait.key}
-            checked={selected.includes(trait.key)}
-            onSelect={(event) => event.preventDefault()}
-            onCheckedChange={() => onToggle(trait.key)}
+            type='button'
+            aria-pressed={active}
+            onClick={() => onToggle(trait.key)}
+            className={cn(
+              'inline-flex h-[30px] cursor-pointer items-center rounded-full px-2.5 text-[13px] font-medium transition-colors',
+              active
+                ? 'bg-main-soft text-main shadow-[0_0_0_1px_color-mix(in_srgb,var(--main)_40%,transparent)]'
+                : 'vx-key text-subtle hover:text-foreground',
+            )}
           >
             {trait.label}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          </button>
+        );
+      })}
+    </div>
   );
 }
+
+const TOOL = 'vx-key inline-flex h-[52px] shrink-0 cursor-pointer items-center gap-2 rounded-[13px] px-3.5 text-sm font-medium text-subtle transition-colors hover:text-foreground data-[state=open]:text-foreground sm:px-4';
 
 export default function FlagSearch() {
   const router = useRouter();
@@ -172,6 +158,7 @@ export default function FlagSearch() {
 
   const [value, setValue] = React.useState(query);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const updateParams = useCallback(
     (update: (params: URLSearchParams) => void) => {
@@ -318,113 +305,128 @@ export default function FlagSearch() {
               : `${flagsCount.toLocaleString()} flags`
             : ''}
         </p>
-        {!isFavorites && (
-          // On phones the flag of the day comes first and the top contributors sit under it.
-          <div className='-ml-1.5 mt-2 flex w-[calc(100%+0.375rem)] flex-col-reverse sm:-my-2.5 sm:-mr-2.5 sm:ml-auto sm:w-auto sm:max-w-full sm:flex-row sm:items-center sm:self-center'>
-            {!isSearching && (
-              <>
-                <TopContributorsLink className='sm:max-w-[340px]' />
-                <span className='mx-1 hidden h-10 w-px shrink-0 bg-line sm:block' />
-              </>
-            )}
-            <FlagOfTheDayLink className='sm:max-w-[420px]' />
-          </div>
-        )}
       </div>
 
-      <form
-        role='search'
-        className='vx-well mt-4 flex h-[52px] items-center gap-3 rounded-[13px] pl-4 pr-3 text-muted-foreground transition-shadow focus-within:shadow-[var(--sh-well),0_0_0_2px_var(--main)]'
-        onSubmit={(event) => {
-          event.preventDefault();
-          setQuery(value);
-          inputRef.current?.blur();
-        }}
-      >
-        <Search className='size-[18px] shrink-0' />
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder='Search by name, or describe a flag: “green with a star”, “red and white cross”'
-          aria-label='Search flags'
-          className='min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground'
-        />
-        {value ? (
-          <button
-            type='button'
-            aria-label='Clear search'
-            className='grid size-7 cursor-pointer place-items-center rounded-md hover:text-foreground'
-            onClick={() => {
-              setValue('');
-              setQuery('');
-              inputRef.current?.focus();
-            }}
-          >
-            <X className='size-4' />
-          </button>
-        ) : (
-          <kbd className='vx-key hidden h-[22px] min-w-[22px] place-items-center rounded-md px-1.5 text-[11px] font-medium text-subtle sm:grid'>
-            /
-          </kbd>
-        )}
-      </form>
+      {!isFavorites && !isSearching && currentPage === 1 && <TodayRail className='mt-4' />}
 
-      <div className='mt-3 flex flex-wrap items-center gap-2'>
-        <TraitMenu label='Type' group='type' selected={[...activeTraits]} onToggle={toggleTrait} />
-        <TraitMenu label='Symbol' group='symbol' selected={[...activeTraits]} onToggle={toggleTrait} />
-        <span className='mx-1 hidden h-[22px] w-px bg-line sm:block' />
-        <div className='flex items-center gap-2' role='group' aria-label='Colours'>
-          {SWATCHES.map((family) => {
-            const active = activeColors.has(family.key);
-            return (
-              <button
-                key={family.key}
-                type='button'
-                title={family.label}
-                aria-label={family.label}
-                aria-pressed={active}
-                onClick={() => toggleColor(family.key)}
-                className={cn(
-                  'size-[22px] cursor-pointer rounded-full shadow-[inset_0_0_0_1px_rgb(127_127_127/0.35)] transition-shadow',
-                  active && 'shadow-[0_0_0_2px_var(--background),0_0_0_4px_var(--main)]',
-                )}
-                style={{ background: family.swatch }}
-              />
-            );
-          })}
-        </div>
-        <div className='flex flex-wrap items-center gap-2 sm:ml-auto'>
-          <Segmented
-            aria-label='Collection'
-            value={isFavorites ? 'favorites' : 'all'}
-            onChange={(v) =>
-              updateParams((params) => {
-                if (v === 'favorites') params.set('favorites', 'true');
-                else params.delete('favorites');
-              })
-            }
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'favorites', label: 'Favorites', icon: <Heart /> },
-            ]}
+      <div className='mt-4 flex gap-2'>
+        <form
+          role='search'
+          className='vx-well flex h-[52px] min-w-0 flex-1 items-center gap-3 rounded-[13px] pl-4 pr-3 text-muted-foreground transition-shadow focus-within:shadow-[var(--sh-well),0_0_0_2px_var(--main)]'
+          onSubmit={(event) => {
+            event.preventDefault();
+            setQuery(value);
+            inputRef.current?.blur();
+          }}
+        >
+          <Search className='size-[18px] shrink-0' />
+          <input
+            ref={inputRef}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder={isMobile ? 'Search or describe a flag' : 'Search by name, or describe a flag: “green with a star”, “red and white cross”'}
+            aria-label='Search flags'
+            className='min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground'
           />
-          <Segmented
-            aria-label='Sort'
-            value={sort}
-            onChange={(v) =>
-              updateParams((params) => {
-                params.set('orderBy', SORTS[v].orderBy);
-                params.set('orderDirection', SORTS[v].direction);
-              })
-            }
-            options={[
-              { value: 'popular', label: 'Popular' },
-              { value: 'latest', label: 'Latest' },
-              { value: 'az', label: 'A–Z' },
-            ]}
-          />
-        </div>
+          {value ? (
+            <button
+              type='button'
+              aria-label='Clear search'
+              className='grid size-7 cursor-pointer place-items-center rounded-md hover:text-foreground'
+              onClick={() => {
+                setValue('');
+                setQuery('');
+                inputRef.current?.focus();
+              }}
+            >
+              <X className='size-4' />
+            </button>
+          ) : (
+            <kbd className='vx-key hidden h-[22px] min-w-[22px] place-items-center rounded-md px-1.5 text-[11px] font-medium text-subtle sm:grid'>
+              /
+            </kbd>
+          )}
+        </form>
+
+
+        <Popover>
+          <PopoverTrigger className={TOOL} aria-label={chips.length ? `Filters, ${chips.length} on` : 'Filters'}>
+            <SlidersHorizontal className='size-[18px]' />
+            <span className='hidden sm:inline'>Filters</span>
+            {chips.length > 0 && (
+              <span className='grid h-[18px] min-w-[18px] place-items-center rounded-full bg-main px-1 text-[11px] font-semibold tabular-nums text-white'>
+                {chips.length}
+              </span>
+            )}
+          </PopoverTrigger>
+          <PopoverContent
+            align='end'
+            sideOffset={8}
+            className='max-h-[min(560px,var(--radix-popover-content-available-height))] w-[400px] max-w-[calc(100vw-24px)] space-y-4 overflow-y-auto bg-surface-hi'
+          >
+            <section>
+              <h2 className='vx-label mb-2'>Colours</h2>
+              <div className='flex flex-wrap items-center gap-2.5' role='group' aria-label='Colours'>
+                {SWATCHES.map((family) => {
+                  const active = activeColors.has(family.key);
+                  return (
+                    <button
+                      key={family.key}
+                      type='button'
+                      title={family.label}
+                      aria-label={family.label}
+                      aria-pressed={active}
+                      onClick={() => toggleColor(family.key)}
+                      className={cn(
+                        'size-[26px] cursor-pointer rounded-full shadow-[inset_0_0_0_1px_rgb(127_127_127/0.35)] transition-shadow',
+                        active && 'shadow-[0_0_0_2px_var(--surface-hi),0_0_0_4px_var(--main)]',
+                      )}
+                      style={{ background: family.swatch }}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+            <section>
+              <h2 className='vx-label mb-2'>Type</h2>
+              <TraitChips group='type' selected={activeTraits} onToggle={toggleTrait} />
+            </section>
+            <section>
+              <h2 className='vx-label mb-2'>Symbol</h2>
+              <TraitChips group='symbol' selected={activeTraits} onToggle={toggleTrait} />
+            </section>
+            {hasFilters && (
+              <button type='button' onClick={clearAll} className='cursor-pointer text-[13px] font-medium text-muted-foreground hover:text-foreground'>
+                Clear all
+              </button>
+            )}
+          </PopoverContent>
+        </Popover>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger className={TOOL} aria-label={`Sort: ${SORTS[sort].label}`}>
+            <ArrowsDownUp className='size-[18px] sm:hidden' />
+            <span className='hidden sm:inline'>{SORTS[sort].label}</span>
+            <ChevronDown className='hidden size-4 sm:block' />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='end' className='w-40'>
+            <DropdownMenuRadioGroup
+              value={sort}
+              onValueChange={(v) =>
+                updateParams((params) => {
+                  params.set('orderBy', SORTS[v as Sort].orderBy);
+                  params.set('orderDirection', SORTS[v as Sort].direction);
+                })
+              }
+            >
+              {(Object.keys(SORTS) as Sort[]).map((key) => (
+                <DropdownMenuRadioItem key={key} value={key}>
+                  {SORTS[key].label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {hasFilters && (
@@ -455,8 +457,25 @@ export default function FlagSearch() {
         <Tag
           variant='chip'
           text='All'
-          isActive={!tag}
-          onClick={() => updateParams((params) => params.delete('tag'))}
+          isActive={!tag && !isFavorites}
+          onClick={() =>
+            updateParams((params) => {
+              params.delete('tag');
+              params.delete('favorites');
+            })
+          }
+        />
+        <Tag
+          variant='chip'
+          text='Favorites'
+          icon={<Heart />}
+          isActive={isFavorites}
+          onClick={() =>
+            updateParams((params) => {
+              if (isFavorites) params.delete('favorites');
+              else params.set('favorites', 'true');
+            })
+          }
         />
         {tag && !topFlagTags?.some((t) => t.tag === tag) && <Tag variant='chip' text={tag} />}
         {topFlagTags?.map((t) => (

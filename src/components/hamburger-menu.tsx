@@ -9,18 +9,21 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from './ui/drawer';
 import { AuthHeader } from './auth-header';
 import { ThemeToggle } from './theme-toggle';
 import Logo from './Logo';
+import { PendingDot, useDailyPending } from '@/components/games/shared';
 import { NAV_LINKS } from '@/lib/nav';
 import { cn } from '@/lib/utils';
 
 export function HamburgerMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const dailyPending = useDailyPending();
 
   return (
     <Drawer direction='right' open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
-        <Button variant='neutral' size='icon' className='shrink-0 md:hidden' aria-label='Open menu'>
+        <Button variant='neutral' size='icon' className='relative shrink-0 md:hidden' aria-label='Open menu'>
           <Menu />
+          {dailyPending && <PendingDot className='absolute right-[7px] top-[7px]' />}
         </Button>
       </DrawerTrigger>
       <DrawerContent className='p-0 data-[vaul-drawer-direction=right]:w-[86vw] data-[vaul-drawer-direction=right]:max-w-[320px]'>
@@ -48,6 +51,7 @@ export function HamburgerMenu() {
                   )}
                 >
                   {label}
+                  {href === '/play' && dailyPending && <PendingDot className='ml-2' />}
                 </Link>
               );
             })}
