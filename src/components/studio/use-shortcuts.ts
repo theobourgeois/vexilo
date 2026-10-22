@@ -59,6 +59,8 @@ export function useShortcuts(
       }
 
       if (mod) {
+        // ⌥⌘G, by its key since Option changes the letter on a Mac.
+        if (e.altKey && e.code === 'KeyG') return studio.selectedLayers.length ? run(actions.toggleClipBelow) : undefined;
         if (key === 'z') return run(e.shiftKey ? history.redo : history.undo);
         if (key === 'y') return run(history.redo);
         if (key === 'c') return run(actions.copy);

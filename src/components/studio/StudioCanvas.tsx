@@ -4,6 +4,7 @@ import React from 'react';
 import type { PathContour, PathNode, StudioLayer } from '@/lib/studio-design';
 import { cn } from '@/lib/utils';
 import type { DrawSettings } from './draw';
+import { layerShownAt } from './clip';
 import { FlagArt } from './FlagArt';
 import { divisionGeometry, fieldAnchors, fieldPartAt, type FieldPart } from './divisions';
 import { type Anchor } from './layouts';
@@ -257,7 +258,7 @@ export function StudioCanvas({
   const hitTest = (u: number, v: number) => {
     for (let i = design.layers.length - 1; i >= 0; i--) {
       const layer = design.layers[i];
-      if (!layer.hidden && !layer.locked && hitsLayer(layer, W, u, v, 5 / scale)) return layer;
+      if (!layer.hidden && !layer.locked && hitsLayer(layer, W, u, v, 5 / scale) && layerShownAt(design, layer, u, v)) return layer;
     }
     return null;
   };

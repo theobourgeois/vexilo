@@ -1,4 +1,4 @@
-import type { DivisionKind, EdgeStyle, StudioDesign, StudioDivision } from '@/lib/studio-design';
+import type { DivisionKind, EdgeStyle, FieldPartRef, StudioDesign, StudioDivision, StudioField } from '@/lib/studio-design';
 import type { Anchor } from './layouts';
 
 /**
@@ -882,23 +882,63 @@ export type FieldPart = {
 let scratch: CanvasRenderingContext2D | null = null;
 const pathCache = new WeakMap<DivisionGeometry, Path2D[]>();
 
+function scratchContext() {
+  scratch ??= typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  return scratch;
+}
+
+function partPaths(geometry: DivisionGeometry) {
+  let paths = pathCache.get(geometry);
+  if (!paths) pathCache.set(geometry, (paths = geometry.parts.map((part) => new Path2D(part.d))));
+  return paths;
+}
+
+const inFrame = (clip: DivisionGeometry['clip'], px: number, py: number) =>
+  px >= clip.x && px <= clip.x + clip.w && py >= clip.y && py <= clip.y + clip.h;
+
+/**
+ * The division part a clip points at, with its outline in flag units and, for a division drawn
+ * in a box, that box. Null when it's gone: the division deleted, or with fewer parts now.
+ */
+export function resolvePart(field: StudioField, ref: FieldPartRef | null | undefined, W: number) {
+  if (!ref || field.kind !== 'stack') return null;
+  const division = field.divisions.find((d) => d.id === ref.divisionId);
+  if (!division) return null;
+  const geometry = divisionGeometry(division, W);
+  const part = geometry.parts[ref.part];
+  return part ? { division, name: part.name, d: part.d, box: division.box ? geometry.clip : null, geometry } : null;
+}
+
+/**
+ * Whether a point (flag units) is inside a field part, by its own outline: the part's division
+ * being clipped too doesn't carry over. A part that's gone clips nothing.
+ */
+export function insidePart(field: StudioField, ref: FieldPartRef, W: number, px: number, py: number) {
+  const target = resolvePart(field, ref, W);
+  const ctx = scratchContext();
+  if (!target || !ctx) return true;
+  if (target.box && !inFrame(target.box, px, py)) return false;
+  return ctx.isPointInPath(partPaths(target.geometry)[ref.part], px, py);
+}
+
+/** What a division is called in lists: its own name, or what kind it is. */
+export const divisionLabel = (division: StudioDivision) => division.name ?? DIVISIONS[division.kind].label;
+
 /** The field part under a point (flag units); null for an image field. */
 export function fieldPartAt(design: StudioDesign, px: number, py: number): FieldPart | null {
   const field = design.field;
   if (field.kind !== 'stack') return null;
   const base: FieldPart = { divisionId: null, part: 0, slot: 0, target: 'fill', color: field.color, name: 'Field' };
-  scratch ??= typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
-  const ctx = scratch;
+  const ctx = scratchContext();
   if (!ctx) return base;
   const W = design.ratio[1] / design.ratio[0];
   for (let k = field.divisions.length - 1; k >= 0; k--) {
     const division = field.divisions[k];
     if (division.hidden) continue;
     const geometry = divisionGeometry(division, W);
-    const { clip } = geometry;
-    if (px < clip.x || px > clip.x + clip.w || py < clip.y || py > clip.y + clip.h) continue;
-    let paths = pathCache.get(geometry);
-    if (!paths) pathCache.set(geometry, (paths = geometry.parts.map((part) => new Path2D(part.d))));
+    if (!inFrame(geometry.clip, px, py)) continue;
+    if (division.clip && !insidePart(field, division.clip, W, px, py)) continue;
+    const paths = partPaths(geometry);
     const fim = division.fimbriation;
     if (fim && fim.width > 0) {
       ctx.lineWidth = geometry.tiling ? fim.width : fim.width * 2;

@@ -43,6 +43,8 @@ const fieldV1 = z.discriminatedUnion('kind', [
   image,
 ]);
 
+const partRef = { divisionId: z.string().max(40), part: z.number().int().min(0).max(400) };
+
 const division = z.object({
   id: z.string().max(40),
   kind: z.enum([
@@ -75,6 +77,7 @@ const division = z.object({
     })
     .nullable()
     .optional(),
+  clip: z.object(partRef).nullable().optional(),
   name: z.string().max(120).optional(),
   hidden: z.boolean().optional(),
   locked: z.boolean().optional(),
@@ -131,6 +134,10 @@ const layer = z.object({
       facing: z.boolean(),
     })
     .nullable(),
+  clip: z
+    .discriminatedUnion('kind', [z.object({ kind: z.literal('below') }), z.object({ kind: z.literal('part'), ...partRef })])
+    .nullable()
+    .optional(),
   hidden: z.boolean().optional(),
   locked: z.boolean().optional(),
 });

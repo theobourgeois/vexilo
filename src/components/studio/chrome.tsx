@@ -43,13 +43,17 @@ import {
   BringForward,
   SendBackward,
   Plus,
+  ClipMask,
+  ClippedBelow,
 } from '@/components/icons';
 import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/utils';
 import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@/lib/studio-design';
 import { blobToDataUrl, designToPng, designToSvg, download, encodeDoc, fileName } from './export';
 import { FlagArt } from './FlagArt';
-import { EXPORT_WIDTH, RATIOS, type StudioDoc } from './model';
+import { clipsBelow, clipTargets, samePart } from './clip';
+import { fieldPartAt } from './divisions';
+import { EXPORT_WIDTH, flagWidth, RATIOS, type StudioDoc } from './model';
 import type { View } from './StudioCanvas';
 import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
@@ -393,10 +397,18 @@ export function ContextMenu({
       className='flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium outline-none hover:bg-foreground/[0.06] disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4 [&_svg]:text-subtle'
     >
       {icon}
-      {label}
+      <span className='min-w-0 truncate'>{label}</span>
     </button>
   );
   const hasLayers = selectedLayers.length > 0;
+  const single = selectedLayers.length === 1 && !selectedLayers[0].locked ? selectedLayers[0] : null;
+  // Offers the field part under the layer's middle, the one it most likely belongs in.
+  const under = single && fieldPartAt(studio.design, single.x * flagWidth(studio.design), single.y);
+  const partTarget =
+    single && under?.divisionId && under.target === 'fill'
+      ? clipTargets(studio.design).find((t) => samePart(t.ref, { divisionId: under.divisionId!, part: under.part }))
+      : null;
+  const clip = single?.clip;
   return (
     <div
       ref={ref}
@@ -414,6 +426,17 @@ export function ContextMenu({
           <div className='my-1 h-px bg-line' />
           {item('Bring to front', <BringForward />, () => actions.arrange('front'))}
           {item('Send to back', <SendBackward />, () => actions.arrange('back'))}
+          {single && (
+            <>
+              <div className='my-1 h-px bg-line' />
+              {partTarget &&
+                !samePart(clip?.kind === 'part' ? clip : null, partTarget.ref) &&
+                item(`Clip to ${partTarget.label}`, <ClipMask />, () => actions.setClip({ kind: 'part', ...partTarget.ref }))}
+              {!clipsBelow(single) &&
+                item('Clip to layer below', <ClippedBelow />, actions.toggleClipBelow, studio.design.layers[0]?.id === single.id)}
+              {clip && item('Release clip', <ClipMask />, () => actions.setClip(null))}
+            </>
+          )}
           <div className='my-1 h-px bg-line' />
           {item('Delete', <Trash2 />, actions.deleteSelected)}
         </>

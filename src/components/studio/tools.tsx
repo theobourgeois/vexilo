@@ -7,7 +7,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
@@ -25,6 +30,7 @@ import {
   DistributeVertical,
   FitInto,
   Proportions,
+  ClipMask,
   ColumnsIcon,
   Copy,
   Eye,
@@ -54,7 +60,8 @@ import {
   ChevronDown,
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import type { StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import type { StudioClip, StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import { clipTargets } from './clip';
 import { DIVISIONS, divisionParts } from './divisions';
 import { PaintButton, WidthSlider } from './draw';
 import { documentColors, fieldColors, layerWidth } from './model';
@@ -542,6 +549,48 @@ function ToolPopover({
   );
 }
 
+const clipKey = (clip: StudioClip | null | undefined) =>
+  !clip ? 'none' : clip.kind === 'below' ? 'below' : `part:${clip.divisionId}:${clip.part}`;
+
+/** What the selection only shows inside: nothing, the layer under it, or a part of the field. */
+function ClipSubmenu({ studio }: { studio: Studio }) {
+  const { actions, selectedLayers, design } = studio;
+  const keys = new Set(selectedLayers.map((l) => clipKey(l.clip)));
+  const value = keys.size === 1 ? [...keys][0] : '';
+  const targets = clipTargets(design);
+  const bottom = selectedLayers.length === 1 && design.layers[0]?.id === selectedLayers[0].id;
+  const choose = (key: string) => {
+    if (key === 'none') return actions.setClip(null);
+    if (key === 'below') return actions.setClip({ kind: 'below' });
+    const target = targets.find((t) => clipKey({ kind: 'part', ...t.ref }) === key);
+    if (target) actions.setClip({ kind: 'part', ...target.ref });
+  };
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <ClipMask /> Clip to
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className='max-h-(--radix-dropdown-menu-content-available-height) w-56 overflow-y-auto'>
+        <DropdownMenuRadioGroup value={value} onValueChange={choose}>
+          <DropdownMenuRadioItem value='none'>Nothing</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value='below' disabled={bottom}>
+            Layer below <span className='ml-auto pl-3 text-xs text-muted-foreground'>⌥⌘G</span>
+          </DropdownMenuRadioItem>
+          {targets.length > 0 && <DropdownMenuSeparator />}
+          {targets.map((t) => {
+            const key = clipKey({ kind: 'part', ...t.ref });
+            return (
+              <DropdownMenuRadioItem key={key} value={key}>
+                <span className='truncate'>{t.label}</span>
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
 export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Studio; children: React.ReactNode; side?: 'top' | 'bottom' }) {
   const { actions, selectedLayers } = studio;
   const single = selectedLayers.length === 1 ? selectedLayers[0] : null;
@@ -558,6 +607,7 @@ export function LayerMoreMenu({ studio, children, side = 'top' }: { studio: Stud
         <DropdownMenuItem onSelect={() => actions.arrange('back')}>
           <SendBackward /> Send to back
         </DropdownMenuItem>
+        <ClipSubmenu studio={studio} />
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => actions.resetLayerColors(selectedLayers.map((l) => l.id))}>
           <SwapColors /> Original colours

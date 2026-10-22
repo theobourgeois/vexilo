@@ -35,7 +35,7 @@ export function fieldGuides(design: StudioDesign): FieldGuides {
   const field = design.field;
   const key = JSON.stringify([
     W,
-    field.kind === 'stack' ? field.divisions.filter((d) => !d.hidden).map((d) => [d.kind, d.params, d.box, d.edge, d.fimbriation?.width]) : 'image',
+    field.kind === 'stack' ? field.divisions.filter((d) => !d.hidden).map((d) => [d.kind, d.params, d.box, d.edge, d.fimbriation?.width, d.clip]) : 'image',
   ]);
   const cached = cache.get(key);
   if (cached) return cached;

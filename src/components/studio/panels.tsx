@@ -2,16 +2,25 @@
 
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Copy, Dice, Eye, EyeSlash, Lock, Minus, Plus, Search, Trash2, Unlock, Upload, X } from '@/components/icons';
+import { ChevronDown, ClipMask, ClippedBelow, Copy, Dice, Eye, EyeSlash, Lock, Minus, Plus, Search, Trash2, Unlock, Upload, X } from '@/components/icons';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { EMBLEM_CATEGORIES, emblemSearchScore, mixEmblemCategories } from '@/lib/emblem-search';
 import type { EdgeStyle, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
+import { clipBaseIndex, clipsBelow, clipTargets, partLabel } from './clip';
 import { luminance, PALETTE_GROUPS, PALETTES } from './colors';
 import { FlagArt } from './FlagArt';
 import { layerImage } from './cutout';
-import { DIVISION_KINDS, DIVISIONS, divisionParams, divisionParts } from './divisions';
+import { DIVISION_KINDS, DIVISIONS, divisionLabel, divisionParams, divisionParts } from './divisions';
 import { divisionFor, LAYOUT_TEMPLATES, PART_TEMPLATES, sameShape, templateField, type FieldTemplate, type StackField } from './field';
 import { useRecolored } from './images';
 import { documentColors, layerColors, layerWidth, type StudioEmblem } from './model';
@@ -264,8 +273,6 @@ function Templates({ studio, columns, onPicked }: { studio: Studio; columns: num
   );
 }
 
-const divisionLabel = (division: StudioDivision) => division.name ?? DIVISIONS[division.kind].label;
-
 /**
  * Drag-to-reorder for a list shown top-down over items stored bottom-up (layers, divisions).
  * `onMove` gets the dragged id and its new index in storage order.
@@ -343,6 +350,11 @@ function DivisionsEditor({ studio, field, columns }: { studio: Studio; field: St
                 className='h-5 w-8 shrink-0 rounded-[3px] shadow-[0_0_0_1px_rgb(0_0_0/0.15)]'
               />
               <span className='min-w-0 flex-1 truncate'>{divisionLabel(division)}</span>
+              {division.clip && (
+                <span title={`Only inside ${partLabel(design, division.clip) ?? 'a removed part'}`} className='shrink-0 text-muted-foreground'>
+                  <ClipMask className='size-3.5' />
+                </span>
+              )}
               <RowButton label={division.locked ? 'Unlock' : 'Lock'} pinned={division.locked} onClick={() => actions.toggleDivisionLocked(division.id)}>
                 {division.locked ? <Lock className='size-3.5' /> : <Unlock className='size-3.5' />}
               </RowButton>
@@ -621,7 +633,53 @@ function DivisionSettings({ studio, division }: { studio: Studio; division: Stud
             </Setting>
           ))}
       </div>
+
+      <OnlyInside studio={studio} division={division} />
     </>
+  );
+}
+
+const partKey = (ref: { divisionId: string; part: number }) => `${ref.divisionId}:${ref.part}`;
+
+/** Which part of a division under this one it only shows inside, like stripes in a disc. */
+function OnlyInside({ studio, division }: { studio: Studio; division: StudioDivision }) {
+  const { design, actions } = studio;
+  const field = design.field;
+  const index = field.kind === 'stack' ? field.divisions.findIndex((d) => d.id === division.id) : -1;
+  const targets = clipTargets(design, Math.max(0, index));
+  const clip = division.clip ?? null;
+  if (targets.length === 0 && !clip) return null;
+  const choose = (key: string) => {
+    const target = targets.find((t) => partKey(t.ref) === key);
+    actions.updateDivision(division.id, { clip: target ? target.ref : null });
+  };
+  return (
+    <div className='flex flex-col gap-3 border-t border-line pt-3.5'>
+      <Setting label='Only inside'>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type='button'
+              className='flex h-8 w-full cursor-pointer items-center justify-between gap-2 rounded-[9px] bg-foreground/[0.05] px-2.5 text-[13px] font-medium outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring'
+            >
+              <span className='truncate'>{clip ? (partLabel(design, clip) ?? 'Nothing') : 'Nothing'}</span>
+              <ChevronDown className='size-3.5 shrink-0 text-muted-foreground' />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align='start' className='max-h-(--radix-dropdown-menu-content-available-height) w-(--radix-dropdown-menu-trigger-width) overflow-y-auto'>
+            <DropdownMenuRadioGroup value={clip ? partKey(clip) : 'none'} onValueChange={choose}>
+              <DropdownMenuRadioItem value='none'>Nothing</DropdownMenuRadioItem>
+              {targets.length > 0 && <DropdownMenuSeparator />}
+              {targets.map((t) => (
+                <DropdownMenuRadioItem key={partKey(t.ref)} value={partKey(t.ref)}>
+                  <span className='truncate'>{t.label}</span>
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </Setting>
+    </div>
   );
 }
 
@@ -793,6 +851,9 @@ export function LayersPanel({ studio }: { studio: Studio }) {
       <div className='flex flex-col gap-0.5'>
         {ordered.map((layer, row) => {
           const active = selection.includes(layer.id);
+          const index = design.layers.length - 1 - row;
+          const clippedBelow = clipsBelow(layer) && clipBaseIndex(design.layers, index) >= 0;
+          const clippedTo = layer.clip?.kind === 'part' ? partLabel(design, layer.clip) : null;
           return (
             <div
               key={layer.id}
@@ -806,8 +867,18 @@ export function LayersPanel({ studio }: { studio: Studio }) {
               )}
             >
               {reorder.marker(row)}
+              {clippedBelow && (
+                <span title='Clipped to the layer below' className='-mr-1 shrink-0 text-muted-foreground'>
+                  <ClippedBelow className='size-3.5' />
+                </span>
+              )}
               <LayerThumb layer={layer} />
               <LayerName layer={layer} onRename={(name) => actions.rename(layer.id, name)} />
+              {clippedTo && (
+                <span title={`Clipped to ${clippedTo}`} className='shrink-0 text-muted-foreground'>
+                  <ClipMask className='size-3.5' />
+                </span>
+              )}
               <button
                 type='button'
                 aria-label={layer.locked ? 'Unlock' : 'Lock'}

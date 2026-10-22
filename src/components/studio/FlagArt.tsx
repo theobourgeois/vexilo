@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import type { StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
+import type { FieldPartRef, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
+import { clipGroups } from './clip';
 import { layerImage } from './cutout';
 import { divisionGeometry } from './divisions';
 import { useRecolored } from './images';
@@ -74,21 +75,78 @@ export function FlagArt({
       </defs>
       <g clipPath={`url(#${id}-clip)`}>
         <FieldArt field={design.field} W={W} href={hrefs?.field} id={id} />
-        {design.layers.map((layer) =>
-          layer.hidden ? null : layer.shape ? (
-            <ShapeArt key={layer.id} layer={layer} W={W} filter={layer.outline ? `url(#${id}-o-${layer.id})` : undefined} />
-          ) : (
-            <LayerArt
-              key={layer.id}
-              layer={layer}
-              W={W}
-              filter={layer.outline ? `url(#${id}-o-${layer.id})` : undefined}
-              href={hrefs?.layers?.[layer.id]}
-            />
-          ),
-        )}
+        {clipGroups(design.layers).map((group) => (
+          <ClipGroup key={group[0].id} group={group} field={design.field} W={W} hrefs={hrefs} id={id} />
+        ))}
       </g>
     </svg>
+  );
+}
+
+/**
+ * A layer and the layers clipped to it, which only show where it does. Hiding it hides them too.
+ * The mask draws it again without its outline, so they stay inside its own edge.
+ */
+function ClipGroup({ group, field, W, hrefs, id }: { group: StudioLayer[]; field: StudioField; W: number; hrefs?: Hrefs; id: string }) {
+  const [base, ...rest] = group;
+  if (base.hidden) return null;
+  const art = (layer: StudioLayer, outline = true) => {
+    const filter = outline && layer.outline ? `url(#${id}-o-${layer.id})` : undefined;
+    return layer.shape ? (
+      <ShapeArt key={layer.id} layer={layer} W={W} filter={filter} />
+    ) : (
+      <LayerArt key={layer.id} layer={layer} W={W} filter={filter} href={hrefs?.layers?.[layer.id]} />
+    );
+  };
+  const clipped = rest.filter((layer) => !layer.hidden);
+  const maskId = `${id}-m-${base.id}`;
+  return (
+    <PartClip target={partTarget(field, base.clip?.kind === 'part' ? base.clip : null)} W={W} id={`${id}-c-${base.id}`}>
+      {art(base)}
+      {clipped.length > 0 && (
+        <>
+          <mask id={maskId} maskUnits='userSpaceOnUse' x={0} y={0} width={W} height={1} style={{ maskType: 'alpha' }}>
+            {art(base, false)}
+          </mask>
+          <g mask={`url(#${maskId})`}>{clipped.map((layer) => art(layer))}</g>
+        </>
+      )}
+    </PartClip>
+  );
+}
+
+type PartTarget = { division: StudioDivision; part: number } | null;
+
+function partTarget(field: StudioField, ref: FieldPartRef | null | undefined): PartTarget {
+  const division = ref && field.kind === 'stack' ? field.divisions.find((d) => d.id === ref.divisionId) : null;
+  return division ? { division, part: ref!.part } : null;
+}
+
+/**
+ * Shows its children only inside a part of a division, and that division's box if it has one.
+ * A part that's gone clips nothing.
+ */
+function PartClip({ target, W, id, children }: { target: PartTarget; W: number; id: string; children: React.ReactNode }) {
+  const geometry = target && divisionGeometry(target.division, W);
+  const part = geometry?.parts[target!.part];
+  if (!geometry || !part) return <>{children}</>;
+  const { clip } = geometry;
+  const inner = (
+    <>
+      <clipPath id={`${id}-p`}>
+        <path d={part.d} />
+      </clipPath>
+      <g clipPath={`url(#${id}-p)`}>{children}</g>
+    </>
+  );
+  if (!target!.division.box) return inner;
+  return (
+    <>
+      <clipPath id={`${id}-b`}>
+        <rect x={clip.x} y={clip.y} width={clip.w} height={clip.h} />
+      </clipPath>
+      <g clipPath={`url(#${id}-b)`}>{inner}</g>
+    </>
   );
 }
 
@@ -97,7 +155,11 @@ function FieldArt({ field, W, href, id }: { field: StudioField; W: number; href?
   return (
     <>
       <rect width={W} height={1} fill={field.color} />
-      {field.divisions.map((division) => (division.hidden ? null : <DivisionArt key={division.id} division={division} W={W} id={id} />))}
+      {field.divisions.map((division) => {
+        if (division.hidden) return null;
+        const target = partTarget(field, division.clip);
+        return <DivisionArt key={division.id} division={division} W={W} id={id} clipTo={target?.division} clipPart={target?.part} />;
+      })}
     </>
   );
 }
@@ -105,8 +167,21 @@ function FieldArt({ field, W, href, id }: { field: StudioField; W: number; href?
 /**
  * A division, clipped to its box. A charge's fimbriation is a stroke twice as wide under its
  * fill, so `width` shows outside it; a tiling's runs centred along the edges between its parts.
+ * `clipTo` and `clipPart` are the part of another division it only shows inside.
  */
-const DivisionArt = React.memo(function DivisionArt({ division, W, id }: { division: StudioDivision; W: number; id: string }) {
+const DivisionArt = React.memo(function DivisionArt({
+  division,
+  W,
+  id,
+  clipTo,
+  clipPart = 0,
+}: {
+  division: StudioDivision;
+  W: number;
+  id: string;
+  clipTo?: StudioDivision;
+  clipPart?: number;
+}) {
   const geometry = divisionGeometry(division, W);
   const { clip, tiling } = geometry;
   const fim = division.fimbriation && division.fimbriation.width > 0 ? division.fimbriation : null;
@@ -114,7 +189,7 @@ const DivisionArt = React.memo(function DivisionArt({ division, W, id }: { divis
   const clipId = `${id}-d-${division.id}`;
   const color = (i: number) => division.colors[i % division.colors.length] ?? '#888888';
   return (
-    <>
+    <PartClip target={clipTo ? { division: clipTo, part: clipPart } : null} W={W} id={`${id}-c-d${division.id}`}>
       {division.box && (
         <clipPath id={clipId}>
           <rect x={clip.x} y={clip.y} width={clip.w} height={clip.h} />
@@ -136,7 +211,7 @@ const DivisionArt = React.memo(function DivisionArt({ division, W, id }: { divis
             <path key={`f${i}`} d={part.d} fill='none' stroke={fim.color} strokeWidth={fim.width} strokeLinejoin={join} strokeMiterlimit={20} />
           ))}
       </g>
-    </>
+    </PartClip>
   );
 });
 

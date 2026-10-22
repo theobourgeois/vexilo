@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import type { DivisionKind, PathContour, StudioDesign, StudioDivision, StudioLayer, StudioOutline, StudioRepeat, StudioShape } from '@/lib/studio-design';
+import type { DivisionKind, PathContour, StudioClip, StudioDesign, StudioDivision, StudioLayer, StudioOutline, StudioRepeat, StudioShape } from '@/lib/studio-design';
+import { clipsBelow } from './clip';
 import { contrastRatio, luminance, matchToPalette, sameColor } from './colors';
 import { fieldAnchors, type FieldPart } from './divisions';
 import { divisionFor, recolorStack, stackColors, swapStackColor, templateField, type FieldTemplate, type StackField } from './field';
@@ -440,6 +441,14 @@ export function useStudio(initial: StudioDoc) {
     },
     setOutline: (patch: Partial<StudioOutline>, opts?: Opts) =>
       updateLayers(editable, (l) => (l.outline ? { ...l, outline: { ...l.outline, ...patch } } : l), opts),
+
+    /** Shows the selection only inside a field part or the layer under it; null shows all of it. */
+    setClip: (clip: StudioClip | null) => updateLayers(editable, (l) => ({ ...l, clip })),
+    /** Clips the selection to the layer under it, or releases it when it all already is. */
+    toggleClipBelow() {
+      const on = selectedLayers.some((l) => !clipsBelow(l));
+      updateLayers(editable, (l) => ({ ...l, clip: on ? { kind: 'below' } : null }));
+    },
 
     setRepeatMode(mode: StudioRepeat['mode'] | null) {
       updateLayers(editable, (l) => {

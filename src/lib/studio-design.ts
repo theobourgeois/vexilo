@@ -51,6 +51,16 @@ export type DivisionKind =
 
 export type EdgeStyle = 'wavy' | 'zigzag' | 'serrated' | 'stepped';
 
+/** One part of a division, like a canton, a disc or a stripe. */
+export type FieldPartRef = { divisionId: string; part: number };
+
+/**
+ * What a layer only shows inside: the layer under it (or, when that one is clipped to the layer
+ * under it too, the first one down that isn't), or a part of the field. A clip whose part is
+ * gone shows the whole layer.
+ */
+export type StudioClip = { kind: 'below' } | ({ kind: 'part' } & FieldPartRef);
+
 /**
  * One part of a flag's field, painted over the ones below it. Its geometry is drawn inside
  * `box` (fractions of the flag, [x0, y0, x1, y1]; absent is the whole flag) and clipped to it.
@@ -65,6 +75,8 @@ export type StudioDivision = {
   fimbriation?: { color: string; width: number } | null;
   /** Edges that aren't straight; depth and period are fractions of flag height. */
   edge?: { style: EdgeStyle; depth: number; period: number } | null;
+  /** Only shows inside this part of another division. */
+  clip?: FieldPartRef | null;
   name?: string;
   hidden?: boolean;
   locked?: boolean;
@@ -169,6 +181,7 @@ export type StudioLayer = {
   flipY: boolean;
   outline: StudioOutline | null;
   repeat: StudioRepeat | null;
+  clip?: StudioClip | null;
   hidden?: boolean;
   locked?: boolean;
 };
