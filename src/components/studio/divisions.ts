@@ -133,7 +133,7 @@ const SIDE_OPTIONS = [
  * A frame turned so that `side` is at u = 0: E is how far it reaches from that side, L the
  * side's length, and map takes (u along the reach, v along the side) to frame units.
  */
-function sideFrame(lw: number, side: number) {
+export function sideFrame(lw: number, side: number) {
   switch (Math.round(side)) {
     case 1:
       return { E: lw, L: 1, map: ([u, v]: Pt): Pt => [lw - u, v] };

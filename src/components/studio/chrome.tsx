@@ -49,12 +49,16 @@ import {
   ClippedBelow,
   FlagTriangleRight,
   Shapes,
+  Ruler,
 } from '@/components/icons';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Segmented } from '@/components/ui/segmented';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@/lib/studio-design';
-import { blobToDataUrl, designToPng, designToSvg, download, encodeDoc, fileName } from './export';
+import { autoUnits, construction } from './construction';
+import { ConstructionSheet, type SheetOptions } from './ConstructionSheet';
+import { blobToDataUrl, constructionToPng, constructionToSvg, designToPng, designToSvg, download, encodeDoc, fileName } from './export';
 import { FlagArt } from './FlagArt';
 import { clipsBelow, clipTargets, samePart } from './clip';
 import { fieldPartAt } from './divisions';
@@ -172,25 +176,111 @@ export function useExport(studio: Studio) {
 
 export function ExportMenu({ studio, children, side = 'bottom' }: { studio: Studio; children: React.ReactNode; side?: 'top' | 'bottom' }) {
   const exporter = useExport(studio);
+  const [sheet, setSheet] = React.useState(false);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align='end' sideOffset={8} className='w-48'>
-        <DropdownMenuItem onSelect={exporter.png}>
-          <FileImage /> PNG
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={exporter.svg}>
-          <FileSvg /> SVG
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={exporter.copyImage}>
-          <ClipboardIcon /> Copy image
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={exporter.link}>
-          <LinkIcon /> Copy link
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+        <DropdownMenuContent side={side} align='end' sideOffset={8} className='w-52'>
+          <DropdownMenuItem onSelect={exporter.png}>
+            <FileImage /> PNG
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={exporter.svg}>
+            <FileSvg /> SVG
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setSheet(true)}>
+            <Ruler /> Construction sheet…
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={exporter.copyImage}>
+            <ClipboardIcon /> Copy image
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={exporter.link}>
+            <LinkIcon /> Copy link
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConstructionDialog studio={studio} open={sheet} onOpenChange={setSheet} />
+    </>
+  );
+}
+
+/** The flag with its construction measured out, to check against and to download. */
+function ConstructionDialog({ studio, open, onOpenChange }: { studio: Studio; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className='w-[calc(100%-2rem)] max-w-[920px] sm:max-w-[920px] max-h-[calc(100dvh-2rem)] overflow-y-auto gap-4'>
+        <ConstructionSheetPanel studio={studio} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConstructionSheetPanel({ studio }: { studio: Studio }) {
+  const { design, doc } = studio;
+  const [show, setShow] = React.useState({ field: true, emblems: true, colors: true });
+  const [unitsText, setUnitsText] = React.useState('');
+  const auto = React.useMemo(() => autoUnits(design, construction(design, show)), [design, show]);
+  const typed = Number(unitsText);
+  const units = unitsText.trim() && typed > 0 && typed <= 10000 ? typed : auto.units;
+  const options: SheetOptions = { ...show, units };
+  const name = doc.name.trim() || 'Untitled flag';
+  const save = async (kind: 'svg' | 'png') => {
+    try {
+      const blob =
+        kind === 'svg'
+          ? new Blob([(await constructionToSvg(design, name, options)).svg], { type: 'image/svg+xml' })
+          : await constructionToPng(design, name, options);
+      download(blob, `${fileName(doc.name)}-construction.${kind}`);
+    } catch {
+      toast.error('Could not export the construction sheet');
+    }
+  };
+  const toggle = (key: keyof typeof show, label: string) => (
+    <label className='flex items-center gap-2 text-[13px] text-subtle'>
+      <Switch checked={show[key]} onCheckedChange={(on) => setShow({ ...show, [key]: on })} />
+      {label}
+    </label>
+  );
+  return (
+    <>
+      <div>
+        <DialogTitle className='text-[17px]'>Construction sheet</DialogTitle>
+        <DialogDescription className='mt-1 text-[13px] text-subtle'>
+          {auto.whole && !unitsText.trim()
+            ? `Every length is a whole number of units, with ${units} units to the hoist.`
+            : `Lengths are in units, with ${units} to the hoist${auto.whole ? '' : '; some aren’t whole, so they’re given to two places'}.`}
+        </DialogDescription>
+      </div>
+      <div className='overflow-hidden rounded-[12px] border border-line bg-white'>
+        <ConstructionSheet design={design} name={name} options={options} className='mx-auto block h-auto max-h-[58dvh] w-auto max-w-full' />
+      </div>
+      <div className='flex flex-wrap items-center gap-x-5 gap-y-3'>
+        <label className='flex items-center gap-2 text-[13px] text-subtle'>
+          Hoist
+          <Input
+            inputMode='decimal'
+            aria-label='Units to the hoist'
+            value={unitsText}
+            placeholder={String(auto.units)}
+            onChange={(e) => setUnitsText(e.target.value.replace(/[^\d.]/g, ''))}
+            className='h-8 w-16 tabular-nums'
+          />
+          units
+        </label>
+        {toggle('field', 'Field')}
+        {toggle('emblems', 'Emblems')}
+        {toggle('colors', 'Colours')}
+        <div className='ml-auto flex gap-2'>
+          <Button variant='neutral' size='sm' onClick={() => save('svg')}>
+            <FileSvg /> SVG
+          </Button>
+          <Button size='sm' onClick={() => save('png')}>
+            <FileImage /> PNG
+          </Button>
+        </div>
+      </div>
+    </>
   );
 }
 

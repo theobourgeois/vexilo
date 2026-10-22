@@ -150,6 +150,7 @@ export const SendBackward = bold(Ph.ArrowLineDown, 'SendBackward');
 export const SwapColors = bold(Ph.Swap, 'SwapColors');
 export const FileSvg = bold(Ph.FileSvg, 'FileSvg');
 export const FileImage = bold(Ph.FileImage, 'FileImage');
+export const Ruler = bold(Ph.PencilRuler, 'Ruler');
 export const ClipboardIcon = bold(Ph.Clipboard, 'ClipboardIcon');
 export const SelectAll = bold(Ph.Selection, 'SelectAll');
 export const AlignLeft = bold(Ph.AlignLeft, 'AlignLeft');

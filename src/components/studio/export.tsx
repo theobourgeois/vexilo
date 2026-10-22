@@ -1,17 +1,19 @@
 'use client';
 
+import type React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import type { StudioDesign } from '@/lib/studio-design';
 import { studioDesignSchema } from '@/lib/studio-design-schema';
-import { FlagArt } from './FlagArt';
+import { ConstructionSheet, sheetLayout, type SheetOptions } from './ConstructionSheet';
+import { FlagArt, type Hrefs } from './FlagArt';
 import { layerImage } from './cutout';
 import { migrateDesign } from './field';
 import { recolor, toDataUrl } from './images';
 import { flagWidth, type StudioDoc } from './model';
 
-/** A standalone SVG of the design, with every image embedded. */
-export async function designToSvg(design: StudioDesign, width = 1200) {
+/** The design's images, recoloured and embedded, for an SVG that stands alone. */
+async function embeddedImages(design: StudioDesign): Promise<Hrefs> {
   const layers: Record<string, string> = {};
   await Promise.all(
     design.layers
@@ -25,20 +27,29 @@ export async function designToSvg(design: StudioDesign, width = 1200) {
     design.field.kind === 'image'
       ? await toDataUrl(await recolor(design.field.src, design.field.palette, design.field.colors))
       : undefined;
+  return { field, layers };
+}
 
+function renderSvg(element: React.ReactElement) {
   const container = document.createElement('div');
   const root = createRoot(container);
-  flushSync(() => {
-    root.render(<FlagArt design={design} hrefs={{ field, layers }} width={width} height={Math.round(width / flagWidth(design))} />);
-  });
+  flushSync(() => root.render(element));
   const svg = container.innerHTML;
   root.unmount();
   return `<?xml version="1.0" encoding="UTF-8"?>\n${svg}`;
 }
 
+/** A standalone SVG of the design, with every image embedded. */
+export async function designToSvg(design: StudioDesign, width = 1200) {
+  const hrefs = await embeddedImages(design);
+  return renderSvg(<FlagArt design={design} hrefs={hrefs} width={width} height={Math.round(width / flagWidth(design))} />);
+}
+
 export async function designToPng(design: StudioDesign, width = 2000): Promise<Blob> {
-  const height = Math.round(width / flagWidth(design));
-  const svg = await designToSvg(design, width);
+  return svgToPng(await designToSvg(design, width), width, Math.round(width / flagWidth(design)));
+}
+
+async function svgToPng(svg: string, width: number, height: number): Promise<Blob> {
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
   try {
     const img = new Image();
@@ -54,6 +65,22 @@ export async function designToPng(design: StudioDesign, width = 2000): Promise<B
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/** The design's construction sheet as a standalone SVG, at its own size times `scale`. */
+export async function constructionToSvg(design: StudioDesign, name: string, options: SheetOptions, scale = 1) {
+  const { width, height } = sheetLayout(design, options);
+  const hrefs = await embeddedImages(design);
+  return {
+    svg: renderSvg(<ConstructionSheet design={design} name={name} options={options} hrefs={hrefs} width={width * scale} height={height * scale} />),
+    width: Math.round(width * scale),
+    height: Math.round(height * scale),
+  };
+}
+
+export async function constructionToPng(design: StudioDesign, name: string, options: SheetOptions, scale = 2) {
+  const { svg, width, height } = await constructionToSvg(design, name, options, scale);
+  return svgToPng(svg, width, height);
 }
 
 export const blobToDataUrl = (blob: Blob) =>

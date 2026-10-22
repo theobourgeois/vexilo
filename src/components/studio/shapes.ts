@@ -49,6 +49,30 @@ function radial(count: number, inner?: number) {
   return normalize(pts);
 }
 
+/**
+ * The circle a star's or polygon's points lie on, in a w × h box centred on the origin: its
+ * centre sits off the box's when the points don't reach every side, as on a five-pointed star.
+ */
+export function radialCircle(shape: StudioShape, w: number, h: number) {
+  if (shape.kind !== 'star' && shape.kind !== 'polygon') return null;
+  const count = shape.points ?? (shape.kind === 'star' ? 5 : 6);
+  const inner = shape.kind === 'star' ? (shape.inner ?? 0.382) : undefined;
+  // As `radial` lays them out.
+  const n = inner === undefined ? count : count * 2;
+  const pts = Array.from({ length: n }, (_, i) => {
+    const r = inner === undefined || i % 2 === 0 ? 1 : inner;
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    return [r * Math.cos(a), r * Math.sin(a)];
+  });
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  // The path's box, inside the stroke.
+  const [bw, bh] = [Math.max(0, w - shape.stroke), Math.max(0, h - shape.stroke)];
+  const [sx, sy] = [bw / (x1 - x0), bh / (y1 - y0)];
+  return { cx: (-(x0 + x1) / 2) * sx, cy: (-(y0 + y1) / 2) * sy, rx: sx, ry: sy };
+}
+
 function normalize(pts: Pt[]) {
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);

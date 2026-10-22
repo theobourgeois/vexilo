@@ -18,6 +18,7 @@ import {
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { pixelSize } from './model';
+import { evaluate, formatShare } from './numbers';
 import { DivisionSettings } from './panels';
 import {
   AlignControls,
@@ -163,31 +164,71 @@ function LayersInspector({ studio }: { studio: Studio }) {
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-/** Where the selection sits and how big it is, in export pixels, typed in exactly. */
+type Units = 'px' | 'flag';
+const UNITS_KEY = 'vexilo-studio-units';
+
+/** Pixels, or shares of the flag, kept between visits. */
+function useUnits() {
+  const [units, setUnits] = React.useState<Units>(() => (typeof window !== 'undefined' && localStorage.getItem(UNITS_KEY) === 'flag' ? 'flag' : 'px'));
+  return [units, (next: Units) => (setUnits(next), localStorage.setItem(UNITS_KEY, next))] as const;
+}
+
+/**
+ * Where the selection sits and how big it is, typed in exactly: in export pixels, or as shares of
+ * the flag, across for X and W and down for Y and H, so "1/3" puts it a third of the way along.
+ */
 function PositionSection({ studio }: { studio: Studio }) {
   const { design, W, actions, selectedGroup } = studio;
   const [linked, setLinked] = React.useState(true);
+  const [units, setUnits] = useUnits();
   const layers = studio.selectedLayers.filter((l) => !l.locked && !l.hidden);
   const frame = selectionFrame(design, layers, W);
   if (!frame) return null;
   const px = pixelSize(W);
-  const [x, y] = [(frame.cx - frame.w / 2) / px, (frame.cy - frame.h / 2) / px];
-  const [w, h] = [frame.w / px, frame.h / px];
+  // Flag units in one of each field's units, across and down.
+  const [ux, uy] = units === 'px' ? [px, px] : [W, 1];
+  const [x, y] = [(frame.cx - frame.w / 2) / ux, (frame.cy - frame.h / 2) / uy];
+  const [w, h] = [frame.w / ux, frame.h / uy];
   // A lone layer's frame turns with it; anything more is boxed square to the flag.
   const turns = layers.length === 1 && !selectedGroup;
   const size = (next: { w?: number; h?: number }) => {
-    if (!linked) return actions.setFrame({ w: next.w !== undefined ? next.w * px : undefined, h: next.h !== undefined ? next.h * px : undefined });
+    if (!linked) return actions.setFrame({ w: next.w !== undefined ? next.w * ux : undefined, h: next.h !== undefined ? next.h * uy : undefined });
     const k = next.w !== undefined ? next.w / w : next.h! / h;
     actions.setFrame({ w: frame.w * k, h: frame.h * k });
   };
+  const field = units === 'px' ? { format: (n: number) => String(round(n)), precision: 0.1, step: 1 } : { format: formatShare, precision: 1e-6, step: 0.01 };
+  const across = { ...field, percent: W / ux, px: px / ux };
+  const down = { ...field, percent: 1 / uy, px: px / uy };
   return (
-    <Section title='Position'>
+    <Section
+      title='Position'
+      action={
+        <div role='radiogroup' aria-label='Units' className='flex gap-0.5'>
+          {(['px', 'flag'] as const).map((u) => (
+            <button
+              key={u}
+              type='button'
+              role='radio'
+              aria-checked={units === u}
+              title={u === 'px' ? 'Export pixels' : 'Shares of the flag: across for X and W, down for Y and H'}
+              onClick={() => setUnits(u)}
+              className={cn(
+                'h-6 cursor-pointer rounded-[6px] px-1.5 text-[11.5px] font-medium text-muted-foreground hover:text-foreground',
+                units === u && 'bg-foreground/[0.07] text-foreground',
+              )}
+            >
+              {u === 'px' ? 'px' : 'Flag'}
+            </button>
+          ))}
+        </div>
+      }
+    >
       <div className='grid grid-cols-2 gap-2'>
-        <NumberField label='X' value={round(x)} onCommit={(v) => actions.setFrame({ x: v * px })} />
-        <NumberField label='Y' value={round(y)} onCommit={(v) => actions.setFrame({ y: v * px })} />
-        <NumberField label='W' value={round(w)} min={1} onCommit={(v) => size({ w: v })} />
+        <NumberField label='X' value={x} {...across} onCommit={(v) => actions.setFrame({ x: v * ux })} />
+        <NumberField label='Y' value={y} {...down} onCommit={(v) => actions.setFrame({ y: v * uy })} />
+        <NumberField label='W' value={w} {...across} min={field.precision * 10} onCommit={(v) => size({ w: v })} />
         <div className='relative'>
-          <NumberField label='H' value={round(h)} min={1} onCommit={(v) => size({ h: v })} />
+          <NumberField label='H' value={h} {...down} min={field.precision * 10} onCommit={(v) => size({ h: v })} />
           <button
             type='button'
             aria-label={linked ? 'Unlink width and height' : 'Link width and height'}
@@ -202,7 +243,7 @@ function PositionSection({ studio }: { studio: Studio }) {
             <Proportions />
           </button>
         </div>
-        {turns ? <NumberField label='°' value={round(frame.rotation)} step={1} wrap onCommit={(v) => actions.setFrame({ rotation: v })} /> : <span />}
+        {turns ? <NumberField label='°' value={frame.rotation} wrap onCommit={(v) => actions.setFrame({ rotation: v })} /> : <span />}
         <div className='flex items-center justify-end gap-0.5'>
           <ToolButton label='Flip horizontally' onClick={() => actions.flip('x')}>
             <FlipHorizontal />
@@ -220,8 +261,8 @@ function PositionSection({ studio }: { studio: Studio }) {
 }
 
 /**
- * A number typed in and set on Enter or leaving the field. Arrow keys step it by one, or ten with
- * Shift; Escape puts it back.
+ * A number typed in and set on Enter or leaving the field. It takes sums ("1200 - 80", "2/3"), and
+ * "%" or "px" after a number. Arrow keys step it, ten steps with Shift; Escape puts it back.
  */
 function NumberField({
   label,
@@ -230,6 +271,10 @@ function NumberField({
   step = 1,
   min,
   wrap,
+  precision = 0.1,
+  format = (n) => String(round(n)),
+  percent = 1,
+  px = 1,
 }: {
   label: string;
   value: number;
@@ -238,21 +283,25 @@ function NumberField({
   min?: number;
   /** Angles: kept between -180 and 180. */
   wrap?: boolean;
+  /** What it rounds to. */
+  precision?: number;
+  format?: (value: number) => string;
+  /** What "100%" and "1px" come to in its units. */
+  percent?: number;
+  px?: number;
 }) {
   const [draft, setDraft] = React.useState<string | null>(null);
   const tidy = (n: number) => {
     let v = min !== undefined ? Math.max(min, n) : n;
     if (wrap) v = ((((v + 180) % 360) + 360) % 360) - 180;
-    return round(v);
+    return Math.round(v / precision) * precision;
   };
-  const parse = (text: string) => {
-    const n = Number(text.replace(/[^\d.+-]/g, ''));
-    return text.trim() !== '' && Number.isFinite(n) ? n : null;
-  };
+  const changed = (n: number) => Math.abs(n - value) >= precision / 2;
+  const parse = (text: string) => evaluate(text, { percent, px });
   const commit = () => {
     const n = draft === null ? null : parse(draft);
     setDraft(null);
-    if (n !== null && tidy(n) !== value) onCommit(tidy(n));
+    if (n !== null && changed(tidy(n))) onCommit(tidy(n));
   };
   return (
     <label className='vx-well flex h-8 min-w-0 cursor-text items-center gap-1.5 rounded-[9px] pl-2.5 pr-2 text-[13px] focus-within:ring-2 focus-within:ring-ring'>
@@ -260,7 +309,7 @@ function NumberField({
       <input
         inputMode='decimal'
         aria-label={label === '°' ? 'Rotation' : label}
-        value={draft ?? String(value)}
+        value={draft ?? format(value)}
         onFocus={(e) => e.currentTarget.select()}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
@@ -275,7 +324,7 @@ function NumberField({
             const from = (draft === null ? null : parse(draft)) ?? value;
             const next = tidy(from + (e.key === 'ArrowUp' ? 1 : -1) * step * (e.shiftKey ? 10 : 1));
             setDraft(null);
-            if (next !== value) onCommit(next);
+            if (changed(next)) onCommit(next);
           }
         }}
         className='min-w-0 flex-1 bg-transparent tabular-nums outline-none'

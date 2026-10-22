@@ -11,7 +11,7 @@ import { flagWidth, layerBounds, layerCopies, layerWidth } from './model';
 import { outlineD } from './outline';
 import { shapePath } from './shapes';
 
-type Hrefs = { field?: string; layers?: Record<string, string> };
+export type Hrefs = { field?: string; layers?: Record<string, string> };
 
 /**
  * A design as an SVG in flag units (W wide, 1 tall). `hrefs` replaces the live, recoloured
