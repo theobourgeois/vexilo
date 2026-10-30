@@ -13,6 +13,7 @@ import { saveFlagColorsLater } from '@/lib/flag-palette';
 import { upsertFlagMetadataMirror } from './flag-ai-metadata';
 import { findExistingFlags } from './batch-flags';
 import { MAKER_TAGS } from '@/lib/studio-design';
+import { expireCache, FLAGS_TAG } from '@/lib/cache-tags';
 
 // Helper function to update tag counts when tags are added or removed
 async function updateTagCounts(oldTags: string[], newTags: string[]) {
@@ -304,6 +305,7 @@ async function publishNewFlagRequest(flagRequest: FlagRequestRow) {
     })
     .where(eq(flagRequests.id, flagRequest.id));
 
+  expireCache(FLAGS_TAG);
   await redis.del('leaderboard', TOP_CONTRIBUTORS_CACHE_KEY);
   await redis.del('tags');
 
@@ -401,6 +403,7 @@ async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
     })
     .where(eq(flagRequests.id, flagRequest.id));
 
+  expireCache(FLAGS_TAG);
   await redis.del('leaderboard', TOP_CONTRIBUTORS_CACHE_KEY);
   await redis.del('tags');
   await redis.del(`flag-${flagRequest.flagId}`);

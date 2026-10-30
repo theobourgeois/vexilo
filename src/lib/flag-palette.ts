@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { unstable_cache } from 'next/cache';
 import { after } from 'next/server';
 import sharp from 'sharp';
 import { db } from '@/db';
@@ -259,6 +260,17 @@ export async function moveFlagColors(flagId: string, fromUrl: string, toUrl: str
 
 /** The flag's stored colours, read from its image the first time (or after the image changes). */
 export async function getFlagColors(flag: { id: string; image: string }): Promise<PaletteColor[]> {
+  return getCachedFlagColors(flag.id, flag.image);
+}
+
+// Keyed by the image, so a new image gets its colours read again.
+const getCachedFlagColors = unstable_cache(
+  (id: string, image: string) => readFlagColors({ id, image }),
+  ['flag-colors-v1'],
+  { revalidate: 60 * 60 * 24 * 7 },
+);
+
+async function readFlagColors(flag: { id: string; image: string }): Promise<PaletteColor[]> {
   try {
     const [row] = await db.select().from(flagColors).where(eq(flagColors.flagId, flag.id)).limit(1);
     if (row && row.image === flag.image) return row.colors;

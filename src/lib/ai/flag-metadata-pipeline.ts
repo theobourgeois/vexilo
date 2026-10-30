@@ -1,4 +1,5 @@
 import { db } from '@/db';
+import { expireCache, FLAGS_TAG } from '@/lib/cache-tags';
 import {
   flagAiMetadata,
   type FlagAiResearchSource,
@@ -934,6 +935,7 @@ async function upsertStatus(
         updatedAt: new Date(),
       },
     });
+  if (payload) expireCache(FLAGS_TAG);
 }
 
 export async function generateAndStoreFlagAiMetadata(

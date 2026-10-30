@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { db } from '@/db';
 import { type FlagTimelineEvent, flagTimelines } from '@/db/schema';
 import { buildUsageLog } from '@/lib/ai/flag-metadata-pipeline';
+import { expireCache, FLAGS_TAG } from '@/lib/cache-tags';
 
 // Builds a dated history for one flag from two places:
 //   1. Its older versions already in the catalogue ("Libya (1972–1977)"), which link to their own pages.
@@ -268,4 +269,5 @@ export async function saveFlagTimeline(result: TimelineResult) {
     .insert(flagTimelines)
     .values({ flagId: result.flag.id, ...row })
     .onConflictDoUpdate({ target: flagTimelines.flagId, set: row });
+  expireCache(FLAGS_TAG);
 }

@@ -3,6 +3,8 @@
 import { db } from '@/db';
 import { type FlagTimelineEvent, flagTimelines, flags } from '@/db/schema';
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import { unstable_cache } from 'next/cache';
+import { FLAGS_TAG } from '@/lib/cache-tags';
 
 type LinkedFlag = { id: string; name: string; image: string };
 
@@ -19,6 +21,15 @@ export type FlagTimelineView = {
  * shows the timeline of the flag it belongs to. Version links are resolved here, so renamed flags still link.
  */
 export async function getFlagTimeline(flagId: string): Promise<FlagTimelineView | null> {
+  return getCachedFlagTimeline(flagId);
+}
+
+const getCachedFlagTimeline = unstable_cache(readFlagTimeline, ['flag-timeline-v1'], {
+  revalidate: 60 * 60 * 24,
+  tags: [FLAGS_TAG],
+});
+
+async function readFlagTimeline(flagId: string): Promise<FlagTimelineView | null> {
   const columns = { flagId: flagTimelines.flagId, events: flagTimelines.events };
   const ok = eq(flagTimelines.status, 'ok');
 

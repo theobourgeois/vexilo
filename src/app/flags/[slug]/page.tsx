@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getCollectionFlags, getFavoritedFlagIds } from '@/actions/collections';
+import { getCollectionFlags, getLiveFavorites } from '@/actions/collections';
 import FlagCard from '@/components/FlagCard';
 import { ChevronRight } from '@/components/icons';
 import { COLLECTIONS, collectionPath, getCollection } from '@/lib/collections';
@@ -26,7 +26,7 @@ export default async function CollectionPage({ params }: Props) {
   if (!collection) notFound();
   const result = await getCollectionFlags(collection.slug);
   if (!result) notFound();
-  const favorited = await getFavoritedFlagIds(result.flags.map((flag) => flag.id));
+  const live = await getLiveFavorites(result.flags.map((flag) => flag.id));
   const url = absoluteUrl(collectionPath(collection.slug));
   const others = COLLECTIONS.filter((other) => other.slug !== collection.slug);
   // Same kind first, so a colour collection leads to the other colours.
@@ -99,8 +99,8 @@ export default async function CollectionPage({ params }: Props) {
               flagName={flag.name}
               flagImage={flag.image}
               sources={flag.sources}
-              favorites={flag.favorites}
-              isFavorite={favorited.has(flag.id)}
+              favorites={live?.get(flag.id)?.favorites ?? flag.favorites}
+              isFavorite={live?.get(flag.id)?.isFavorite ?? false}
               link={flag.link}
               index={flag.index}
               tags={flag.tags}

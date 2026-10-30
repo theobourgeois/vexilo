@@ -9,6 +9,7 @@ import { getServerAuthSession } from '@/lib/auth';
 import { CONTEST_TAG, contestPhase, slugify, type ContestPhase } from '@/lib/contest';
 import { CUSTOM_TAG } from '@/lib/studio-design';
 import { approveFlagRequests } from './requests';
+import { CONTESTS_TAG, expireCache } from '@/lib/cache-tags';
 
 async function isAdmin() {
   const session = await getServerAuthSession();
@@ -109,9 +110,11 @@ export async function saveContest(input: ContestInput) {
       .update(contests)
       .set({ ...data, slug, updatedAt: new Date() })
       .where(eq(contests.id, id));
+    expireCache(CONTESTS_TAG);
     return { success: true as const, id, slug };
   }
   const [created] = await db.insert(contests).values({ ...data, slug }).returning({ id: contests.id });
+  expireCache(CONTESTS_TAG);
   return { success: true as const, id: created.id, slug };
 }
 
@@ -121,6 +124,7 @@ export async function deleteContest(id: string) {
   const [entries] = await db.select({ count: count() }).from(contestEntries).where(eq(contestEntries.contestId, id));
   if (entries.count > 0) return { success: false as const, message: 'People have entered this contest. Unpublish it instead.' };
   await db.delete(contests).where(eq(contests.id, id));
+  expireCache(CONTESTS_TAG);
   return { success: true as const };
 }
 
@@ -368,6 +372,7 @@ export async function setContestWinner(contestId: string, entryId: string | null
     .update(contests)
     .set({ winnerEntryId: entryId, ...(entryId ? {} : { announcedAt: null }), updatedAt: new Date() })
     .where(eq(contests.id, contestId));
+  expireCache(CONTESTS_TAG);
   return { success: true as const };
 }
 
@@ -385,6 +390,7 @@ export async function announceContest(contestId: string, announce: boolean) {
     .update(contests)
     .set({ announcedAt: announce ? new Date() : null, updatedAt: new Date() })
     .where(eq(contests.id, contestId));
+  expireCache(CONTESTS_TAG);
   return { success: true as const };
 }
 
@@ -464,5 +470,6 @@ export async function featureContestWinner(contestId: string) {
   if (!winner.flagId) return { success: false as const, message: 'Publish the winner to Browse first.' };
   await db.insert(flagOfTheDay).values({ flagId: winner.flagId });
   await redis.del('fotd');
+  expireCache(CONTESTS_TAG);
   return { success: true as const };
 }
