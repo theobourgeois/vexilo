@@ -16,9 +16,12 @@ import {
 } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { relatedFlagsCacheKey } from '@/lib/cache-keys';
+import { expireCache, FLAGS_TAG, toDate } from '@/lib/cache-tags';
 import { saveFlagColorsLater } from '@/lib/flag-palette';
 import { getTrait, isColorFamily, parseFlagQuery } from '@/lib/flag-search-terms';
 import { Flag } from '@/lib/types';
+import { unstable_cache } from 'next/cache';
+import { getLiveFavorites } from './collections';
 import {
   and,
   asc,
@@ -32,6 +35,9 @@ import {
   sql,
 } from 'drizzle-orm';
 
+// Shared flag data is cached this long, or until a flag edit expires FLAGS_TAG.
+const FLAG_PAGE_CACHE_SECONDS = 60 * 60 * 24;
+const BROWSE_CACHE_SECONDS = 60 * 10;
 const EXPERIMENTAL_RECOMMENDATION_LIMIT = 8;
 const EXPERIMENTAL_RECOMMENDATION_CACHE_TTL_SECONDS = 60 * 60 * 24;
 const EXPERIMENTAL_RECOMMENDATION_CACHE_VERSION = 'v1';
@@ -344,39 +350,48 @@ function scoreMetadataRecommendation(
   return score;
 }
 
-async function getFlagsByIds(flagIds: string[], userId?: string) {
+const getCachedFlagsByIds = unstable_cache(
+  (flagIds: string[]) =>
+    db
+      .select({
+        id: flags.id,
+        name: flags.name,
+        image: flags.image,
+        link: flags.link,
+        sources: flags.sources,
+        index: flags.index,
+        tags: flags.tags,
+        description: flags.description,
+        favorites: flags.favorites,
+        relatedFlags: flags.relatedFlags,
+      })
+      .from(flags)
+      .where(inArray(flags.id, flagIds)),
+  ['flags-by-ids-v1'],
+  { revalidate: FLAG_PAGE_CACHE_SECONDS, tags: [FLAGS_TAG] },
+);
+
+/** Puts live favorite counts and marks (see getLiveFavorites) on cached flag rows. */
+function withFavorites<T extends { id: string; favorites: number }>(
+  rows: T[],
+  overlay: Awaited<ReturnType<typeof getLiveFavorites>>,
+) {
+  return rows.map((row) => {
+    const live = overlay?.get(row.id);
+    return { ...row, favorites: live?.favorites ?? row.favorites, isFavorite: live?.isFavorite ?? false };
+  });
+}
+
+/** Flags in the given order. The rows are shared and cached; only the favorites are per user. */
+async function getFlagsByIds(flagIds: string[]) {
   if (flagIds.length === 0) {
     return [];
   }
 
-  const rows = await db
-    .select({
-      id: flags.id,
-      name: flags.name,
-      image: flags.image,
-      link: flags.link,
-      sources: flags.sources,
-      index: flags.index,
-      tags: flags.tags,
-      description: flags.description,
-      favorites: flags.favorites,
-      relatedFlags: flags.relatedFlags,
-      isFavorite: userId
-        ? sql<boolean>`EXISTS (
-				SELECT 1 FROM vexilo_favorite 
-				WHERE vexilo_favorite.flag_id = vexilo_flag.id 
-				AND vexilo_favorite.user_id = ${userId}
-			)`
-        : sql<boolean>`false`,
-    })
-    .from(flags)
-    .where(inArray(flags.id, flagIds));
-
+  const [rows, overlay] = await Promise.all([getCachedFlagsByIds(flagIds), getLiveFavorites(flagIds)]);
   const order = new Map(flagIds.map((id, index) => [id, index]));
 
-  return rows.sort((left, right) => {
-    return (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0);
-  });
+  return withFavorites(rows, overlay).sort((left, right) => (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0));
 }
 
 // Helper function to update tag counts when tags are added or removed
@@ -611,7 +626,7 @@ function buildResolvedFlagMetadata(
   };
 }
 
-async function getFlagDetailFromNameQuery(flagName: string, userId?: string) {
+async function getFlagDetailFromNameQuery(flagName: string) {
   return db
     .select({
       id: flags.id,
@@ -627,13 +642,6 @@ async function getFlagDetailFromNameQuery(flagName: string, userId?: string) {
       createdAt: flags.createdAt,
       relatedFlags: flags.relatedFlags,
       remixOf: flags.remixOf,
-      isFavorite: userId
-        ? sql<boolean>`EXISTS (
-				SELECT 1 FROM vexilo_favorite
-				WHERE vexilo_favorite.flag_id = vexilo_flag.id
-				AND vexilo_favorite.user_id = ${userId}
-			)`
-        : sql<boolean>`false`,
       metadataId: flagAiMetadata.id,
       metadataFlagId: flagAiMetadata.flagId,
       metadataGenerationStatus: flagAiMetadata.generationStatus,
@@ -657,15 +665,26 @@ async function getFlagDetailFromNameQuery(flagName: string, userId?: string) {
     .limit(1);
 }
 
-export async function getFlagDetailFromName(flagName: string) {
-  const session = await getServerAuthSession();
-  const userId = session?.user?.id;
-  const rows = await getFlagDetailFromNameQuery(flagName, userId);
-  const row = rows[0];
+/** A flag page's shared data, cached for a day or until a flag is edited. */
+const getCachedFlagDetailRow = unstable_cache(
+  async (flagName: string) => (await getFlagDetailFromNameQuery(flagName))[0] ?? null,
+  ['flag-detail-v1'],
+  { revalidate: FLAG_PAGE_CACHE_SECONDS, tags: [FLAGS_TAG] },
+);
 
-  if (!row) {
+export async function getFlagDetailFromName(flagName: string) {
+  const cached = await getCachedFlagDetailRow(flagName);
+  if (!cached) {
     return null;
   }
+
+  const row = {
+    ...cached,
+    createdAt: toDate(cached.createdAt),
+    metadataGeneratedAt: toDate(cached.metadataGeneratedAt),
+    metadataUpdatedAt: toDate(cached.metadataUpdatedAt),
+  };
+  const favoriteState = (await getLiveFavorites([row.id]))?.get(row.id);
 
   const metadata = buildResolvedFlagMetadata(row);
   const displayDescription =
@@ -684,12 +703,12 @@ export async function getFlagDetailFromName(flagName: string) {
     sources: row.sources,
     tags: row.tags,
     description: row.description,
-    favorites: row.favorites,
+    favorites: favoriteState?.favorites ?? row.favorites,
     views: row.views,
     createdAt: row.createdAt,
     relatedFlags: row.relatedFlags,
     remixOf: row.remixOf,
-    isFavorite: row.isFavorite,
+    isFavorite: favoriteState?.isFavorite ?? false,
     metadata,
     displayDescription,
     displayTags,
@@ -729,11 +748,8 @@ async function getFlagIdsBySharedTags(flagId: string, tags: string[], limit: num
  * when the flag has them, otherwise by shared tags). Only IDs are cached, so favorites stay per user.
  */
 export async function getRelatedFlags(flagId: string) {
-  const session = await getServerAuthSession();
-  const userId = session?.user?.id;
-
   const cached = await redis.get<string[]>(relatedFlagsCacheKey(flagId)).catch(() => null);
-  if (Array.isArray(cached)) return getFlagsByIds(cached, userId);
+  if (Array.isArray(cached)) return getFlagsByIds(cached);
 
   const [flag] = await db
     .select({ relatedFlags: flags.relatedFlags, tags: flags.tags })
@@ -758,7 +774,7 @@ export async function getRelatedFlags(flagId: string) {
   const ids = Array.from(new Set([...linked, ...similar])).slice(0, Math.max(RELATED_LIMIT, linked.length));
 
   await redis.set(relatedFlagsCacheKey(flagId), ids, { ex: RELATED_CACHE_SECONDS }).catch(() => null);
-  return getFlagsByIds(ids, userId);
+  return getFlagsByIds(ids);
 }
 
 const recommendationMetadataColumns = {
@@ -815,13 +831,11 @@ export async function getExperimentalRecommendedFlags(flagId: string) {
     return getRelatedFlags(flagId);
   }
 
-  const session = await getServerAuthSession();
-  const userId = session?.user?.id;
   const cacheKey = `experimental-recommendations-${EXPERIMENTAL_RECOMMENDATION_CACHE_VERSION}-${flagId}`;
   const cachedRecommendationIds = await redis.get<string[]>(cacheKey);
 
   if (Array.isArray(cachedRecommendationIds) && cachedRecommendationIds.length > 0) {
-    return getFlagsByIds(cachedRecommendationIds, userId);
+    return getFlagsByIds(cachedRecommendationIds);
   }
 
   const rankedIds = await rankSimilarByMetadata(flagId, sourceMetadata, EXPERIMENTAL_RECOMMENDATION_LIMIT);
@@ -833,7 +847,7 @@ export async function getExperimentalRecommendedFlags(flagId: string) {
     ex: EXPERIMENTAL_RECOMMENDATION_CACHE_TTL_SECONDS,
   });
 
-  return getFlagsByIds(rankedIds, userId);
+  return getFlagsByIds(rankedIds);
 }
 
 export async function getRandomFlagsForQuiz() {
@@ -872,6 +886,13 @@ async function isFavorite(userId?: string) {
 }
 
 export async function getFlagOfTheDay() {
+  const flag = await readFlagOfTheDay();
+  if (!flag) return flag;
+  return withFavorites([flag], await getLiveFavorites([flag.id]))[0];
+}
+
+/** Today's flag, cached in Redis for everyone. */
+async function readFlagOfTheDay() {
   const cachedFotd = await redis.get('fotd');
   if (cachedFotd) {
     return cachedFotd as (typeof flag)[0];
@@ -907,7 +928,6 @@ export async function getFlagOfTheDay() {
       description: flags.description,
       sources: flags.sources,
       favorites: flags.favorites,
-      isFavorite: await isFavorite(),
     })
     .from(flags)
     .where(eq(flags.id, fotdId))
@@ -1002,6 +1022,53 @@ function orderByClause(
   return desc(flags[orderBy]);
 }
 
+/** A page of Browse results, the same for everyone; favorite marks are added per user. */
+const getCachedFlagsPage = unstable_cache(
+  async (
+    page: number,
+    limit: number,
+    query: string | undefined,
+    orderBy: keyof typeof flags.$inferSelect,
+    orderDirection: 'asc' | 'desc',
+    tag: string | undefined,
+    filters: FlagFilters | undefined,
+  ) => {
+    const search = buildFlagSearch(query, filters);
+    return db
+      .select({
+        id: flags.id,
+        favorites: flags.favorites,
+        name: flags.name,
+        image: flags.image,
+        link: flags.link,
+        index: flags.index,
+        tags: flags.tags,
+        description: flags.description,
+        sources: flags.sources,
+      })
+      .from(flags)
+      .where(and(search.where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`))
+      .orderBy(...search.orderBy(orderByClause(orderBy, orderDirection)))
+      .limit(limit)
+      .offset((page - 1) * limit);
+  },
+  ['browse-flags-v1'],
+  { revalidate: BROWSE_CACHE_SECONDS, tags: [FLAGS_TAG] },
+);
+
+const getCachedFlagsCount = unstable_cache(
+  async (query: string | undefined, tag: string | undefined, filters: FlagFilters | undefined) => {
+    const { where } = buildFlagSearch(query, filters);
+    const [{ count: total }] = await db
+      .select({ count: count() })
+      .from(flags)
+      .where(and(where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`));
+    return total;
+  },
+  ['browse-flags-count-v1'],
+  { revalidate: BROWSE_CACHE_SECONDS, tags: [FLAGS_TAG] },
+);
+
 export async function getFlags(
   page: number,
   limit: number,
@@ -1011,49 +1078,8 @@ export async function getFlags(
   tag?: string,
   filters?: FlagFilters,
 ) {
-  const search = buildFlagSearch(query, filters);
-
-  const boundedLimit = Math.min(limit, 100);
-
-  // const isHomePage =
-  //   page === 1 &&
-  //   !query &&
-  //   !tag &&
-  //   orderBy === 'favorites' &&
-  //   orderDirection === 'desc';
-  // if (isHomePage) {
-  //   const cachedResults = await redis.get(`flags:home`);
-  //   if (cachedResults) {
-  //     return cachedResults as typeof results;
-  //   }
-  // }
-
-  const results = await db
-    .select({
-      id: flags.id,
-      favorites: flags.favorites,
-      name: flags.name,
-      image: flags.image,
-      link: flags.link,
-      index: flags.index,
-      tags: flags.tags,
-      description: flags.description,
-      sources: flags.sources,
-      isFavorite: await isFavorite(),
-    })
-    .from(flags)
-    .where(
-      and(search.where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`),
-    )
-    .orderBy(...search.orderBy(orderByClause(orderBy, orderDirection)))
-    .limit(boundedLimit)
-    .offset((page - 1) * boundedLimit);
-
-  // if (isHomePage) {
-  //   await redis.set(`flags:home`, results);
-  // }
-
-  return results;
+  const results = await getCachedFlagsPage(page, Math.min(limit, 100), query, orderBy, orderDirection, tag, filters);
+  return withFavorites(results, await getLiveFavorites(results.map((flag) => flag.id)));
 }
 
 export async function getUserFavorites(
@@ -1148,16 +1174,7 @@ export async function getFavouriteFlags(
 }
 
 export async function getFlagsCount(query?: string, tag?: string, filters?: FlagFilters) {
-  const { where } = buildFlagSearch(query, filters);
-
-  const cnt = await db
-    .select({ count: count() })
-    .from(flags)
-    .where(
-      and(where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`),
-    );
-
-  return cnt[0].count;
+  return getCachedFlagsCount(query, tag, filters);
 }
 
 export async function getFavoriteFlagsCount(query?: string, tag?: string, filters?: FlagFilters) {
@@ -1219,6 +1236,7 @@ export async function createAdminFlags(flagList: Flag[]) {
       .values(validatedFlags)
       .returning({ id: flags.id, image: flags.image });
     for (const flag of created) saveFlagColorsLater(flag.id, flag.image);
+    expireCache(FLAGS_TAG);
 
     // Update tag counts for all created flags
     for (const flag of validatedFlags) {
@@ -1565,33 +1583,41 @@ export async function getUserEditedFlags(userNumber: string, page: number) {
   };
 }
 
+const getCachedFlagEditHistory = unstable_cache(
+  (flagId: string) =>
+    db
+      .select({
+        id: flagRequests.id,
+        userId: flagRequests.userId,
+        oldFlag: flagRequests.oldFlag,
+        newFlag: flagRequests.flag,
+        createdAt: flagRequests.createdAt,
+        userName: users.name,
+        userImage: users.image,
+        userNumber: users.userNumber,
+        isAnonymous: users.isAnonymous,
+      })
+      .from(flagRequests)
+      .innerJoin(users, eq(flagRequests.userId, users.id))
+      .where(
+        and(
+          eq(flagRequests.flagId, flagId),
+          eq(flagRequests.isEdit, true),
+          eq(flagRequests.approved, true),
+        ),
+      )
+      .orderBy(desc(flagRequests.createdAt))
+      .limit(50),
+  ['flag-edit-history-v1'],
+  { revalidate: FLAG_PAGE_CACHE_SECONDS, tags: [FLAGS_TAG] },
+);
+
 export async function getFlagEditHistory(flagId: string) {
-  const history = await db
-    .select({
-      id: flagRequests.id,
-      userId: flagRequests.userId,
-      oldFlag: flagRequests.oldFlag,
-      newFlag: flagRequests.flag,
-      createdAt: flagRequests.createdAt,
-      userName: users.name,
-      userImage: users.image,
-      userNumber: users.userNumber,
-      isAnonymous: users.isAnonymous,
-    })
-    .from(flagRequests)
-    .innerJoin(users, eq(flagRequests.userId, users.id))
-    .where(
-      and(
-        eq(flagRequests.flagId, flagId),
-        eq(flagRequests.isEdit, true),
-        eq(flagRequests.approved, true),
-      ),
-    )
-    .orderBy(desc(flagRequests.createdAt))
-    .limit(50);
+  const history = await getCachedFlagEditHistory(flagId);
 
   return history.map((item) => ({
     ...item,
+    createdAt: toDate(item.createdAt),
     userName: item.isAnonymous ? 'Anonymous User' : item.userName,
     userImage: item.isAnonymous ? '/logo.svg' : item.userImage,
   }));
@@ -1616,6 +1642,7 @@ export async function deleteFlag(flagId: string) {
   const oldTags = flagToDelete[0].tags;
 
   await db.delete(flags).where(eq(flags.id, flagId));
+  expireCache(FLAGS_TAG);
   await removeTagsFromCount(oldTags);
 
   return true;
@@ -1657,6 +1684,7 @@ export async function updateFlag(
     })
     .where(eq(flags.id, flagId));
   if (data.image && data.image !== flagToUpdate[0].image) saveFlagColorsLater(flagId, data.image);
+  expireCache(FLAGS_TAG);
 
   await updateTagCounts(oldTags, newTags);
 
@@ -1768,6 +1796,7 @@ export async function bulkEditFlagTags(
     updated += 1;
   }
 
+  if (updated) expireCache(FLAGS_TAG);
   await redis.del('tags');
   return updated;
 }
@@ -1800,6 +1829,7 @@ export async function relateFlags(flagIds: string[]) {
     await redis.del(`recommendations-${row.id}`, relatedFlagsCacheKey(row.id));
   }
 
+  expireCache(FLAGS_TAG);
   return rows.length;
 }
 
@@ -1830,6 +1860,7 @@ export async function deleteFlags(flagIds: string[]) {
       });
     }
   }
+  if (deleted.length) expireCache(FLAGS_TAG);
 
   await redis.del('tags');
   return { deleted, failed };
@@ -1903,6 +1934,7 @@ export async function updateAdminFlag(
     })
     .where(eq(flags.id, flagId));
   if (data.image.trim() !== existing.image) saveFlagColorsLater(flagId, data.image.trim());
+  expireCache(FLAGS_TAG);
   await updateTagCounts(existing.tags, tags);
   await redis.del('tags');
 

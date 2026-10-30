@@ -1,6 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { flags } from '@/db/schema';
+import { expireCache, FLAGS_TAG } from '@/lib/cache-tags';
 import { storeFlagColors } from '@/lib/flag-palette';
 import { ensureFlagImageSelfHosted } from '@/lib/storage/flag-image-mirror';
 
@@ -149,6 +150,7 @@ export async function replaceFlagImage(flagId: string, newImage: string, expecte
     .where(and(eq(flags.id, flagId), expectedImage ? inArray(flags.image, [expectedImage, newImage]) : undefined))
     .returning({ id: flags.id, name: flags.name, index: flags.index });
   if (!flag) return null;
+  expireCache(FLAGS_TAG);
 
   const hosted = await ensureFlagImageSelfHosted({ ...flag, image: newImage });
   const colors = await storeFlagColors(flagId, hosted);

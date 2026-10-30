@@ -1,12 +1,14 @@
 'use server';
 
 import { createHash } from 'crypto';
+import { unstable_cache } from 'next/cache';
 import { headers } from 'next/headers';
 import { and, count, desc, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
 import { bannedUsers, contestEntries, contests, contestVotes, users } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
+import { CONTESTS_TAG, toDate } from '@/lib/cache-tags';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { contestPhase, seededShuffle, STATEMENT_MAX, type ContestPhase } from '@/lib/contest';
 import type { StoredStudioDesign, StudioDesign } from '@/lib/studio-design';
@@ -113,7 +115,28 @@ async function contestBySlug(slug: string) {
  * The contest to promote right now: one that's running, else the next one coming up,
  * else the latest finished one.
  */
-export async function getCurrentContest(): Promise<(ContestSummary & { winnerImage: string | null; announcedAt: Date | null }) | null> {
+type CurrentContest = ContestSummary & { winnerImage: string | null; announcedAt: Date | null };
+
+export async function getCurrentContest(): Promise<CurrentContest | null> {
+  const contest = await getCachedCurrentContest();
+  return (
+    contest && {
+      ...contest,
+      startsAt: toDate(contest.startsAt),
+      votingStartsAt: toDate(contest.votingStartsAt),
+      endsAt: toDate(contest.endsAt),
+      announcedAt: toDate(contest.announcedAt),
+    }
+  );
+}
+
+// Shown on Browse for everyone, so it's cached briefly; contest admin actions expire it.
+const getCachedCurrentContest = unstable_cache(readCurrentContest, ['current-contest-v1'], {
+  revalidate: 60 * 5,
+  tags: [CONTESTS_TAG],
+});
+
+async function readCurrentContest(): Promise<CurrentContest | null> {
   const rows = await db.select().from(contests).where(eq(contests.published, true)).orderBy(desc(contests.startsAt)).limit(12);
   if (!rows.length) return null;
   const withPhase = rows.map((row) => ({ row, phase: contestPhase(row) }));

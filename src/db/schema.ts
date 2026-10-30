@@ -262,6 +262,12 @@ export const flags = createTable(
   },
   (table) => ({
     indexUnique: uniqueIndex('index_unique').on(table.index),
+    nameIdx: index('flag_name_idx').on(table.name),
+    favoritesIdx: index('flag_favorites_idx').on(table.favorites.desc()),
+    updatedAtIdx: index('flag_updated_at_idx').on(table.updatedAt.desc()),
+    viewsIdx: index('flag_views_idx').on(table.views.desc(), table.favorites.desc()),
+    tagsIdx: index('flag_tags_idx').using('gin', table.tags),
+    relatedFlagsIdx: index('flag_related_flags_idx').using('gin', table.relatedFlags.op('jsonb_path_ops')),
   }),
 );
 
@@ -446,6 +452,7 @@ export const flagAiMetadata = createTable(
     generationStatusIdx: index('flag_ai_metadata_generation_status_idx').on(
       table.generationStatus,
     ),
+    searchTokensIdx: index('flag_ai_metadata_search_tokens_idx').using('gin', table.searchTokens),
   }),
 );
 
@@ -469,7 +476,11 @@ export const flagRequests = createTable('flag_request', {
   userMessage: text('user_message').notNull().default(''),
   // When the request was published; the homepage's weekly top contributors count from it.
   approvedAt: timestamp('approved_at', { mode: 'date' }),
-}, (table) => [index('flag_request_approved_at_idx').on(table.approvedAt)]);
+}, (table) => [
+  index('flag_request_approved_at_idx').on(table.approvedAt),
+  index('flag_request_flag_idx').on(table.flagId),
+  index('flag_request_user_idx').on(table.userId),
+]);
 
 export const bannedUsers = createTable('banned_user', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -486,7 +497,7 @@ export const flagOfTheDay = createTable('flag_of_the_day', {
     .notNull()
     .references(() => flags.id),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (table) => [index('flag_of_the_day_created_at_idx').on(table.createdAt.desc())]);
 
 export const leaderboard = createTable('leaderboard', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -496,7 +507,10 @@ export const leaderboard = createTable('leaderboard', {
   contributions: integer('contributions').notNull().default(0),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (table) => [
+  index('leaderboard_user_idx').on(table.userId),
+  index('leaderboard_contributions_idx').on(table.contributions.desc()),
+]);
 
 /**
  * One finished daily game per player (a browser, signed in or not), so a result can be compared
@@ -617,7 +631,10 @@ export const favorites = createTable('favorite', {
     .notNull()
     .references(() => flags.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex('favorite_user_flag_idx').on(table.userId, table.flagId),
+  index('favorite_flag_idx').on(table.flagId),
+]);
 
 export const favoritesRelations = relations(favorites, ({ one }) => ({
   user: one(users, { fields: [favorites.userId], references: [users.id] }),
@@ -630,7 +647,7 @@ export const flagTags = createTable('flag_tag', {
   count: integer('count').notNull().default(0),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
-});
+}, (table) => [index('flag_tag_tag_idx').on(table.tag), index('flag_tag_count_idx').on(table.count.desc())]);
 
 export const flagTagsRelations = relations(flagTags, ({ many }) => ({
   flags: many(flags),

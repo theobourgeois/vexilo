@@ -1,9 +1,9 @@
 'use server';
 
 import { unstable_cache } from 'next/cache';
-import { and, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, desc, inArray, type SQL, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { favorites, flagAiMetadata, flagColors, flagEmblems, flags } from '@/db/schema';
+import { flagAiMetadata, flagColors, flagEmblems, flags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { getCollection, type CollectionCriteria } from '@/lib/collections';
 import { getTrait } from '@/lib/flag-search-terms';
@@ -83,13 +83,22 @@ export async function getCollectionFlags(slug: string) {
   return getCachedCollectionFlags(slug);
 }
 
-/** Which of these flags the signed-in user has favorited; the flag lists themselves are shared. */
-export async function getFavoritedFlagIds(flagIds: string[]) {
+/**
+ * Live favorite counts and the signed-in user's own marks; the flag lists themselves are shared
+ * and cached. Without this a flag you just favorited would show a filled heart next to the old
+ * count. Visitors who aren't signed in can't favorite, so they get null and the cached counts.
+ */
+export async function getLiveFavorites(flagIds: string[]) {
   const session = await getServerAuthSession();
-  if (!session?.user || flagIds.length === 0) return new Set<string>();
+  if (!session?.user || flagIds.length === 0) return null;
   const rows = await db
-    .select({ flagId: favorites.flagId })
-    .from(favorites)
-    .where(and(eq(favorites.userId, session.user.id), inArray(favorites.flagId, flagIds)));
-  return new Set(rows.map((row) => row.flagId));
+    .select({
+      id: flags.id,
+      favorites: flags.favorites,
+      // Spelled out: Drizzle leaves selected columns unqualified, so `id` here would mean the favorite's.
+      isFavorite: sql<boolean>`EXISTS (SELECT 1 FROM vexilo_favorite WHERE vexilo_favorite.flag_id = vexilo_flag.id AND vexilo_favorite.user_id = ${session.user.id})`,
+    })
+    .from(flags)
+    .where(inArray(flags.id, flagIds));
+  return new Map(rows.map((row) => [row.id, row]));
 }

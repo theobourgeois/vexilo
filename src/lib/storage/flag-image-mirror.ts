@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { flags } from '@/db/schema';
+import { expireCache, FLAGS_TAG } from '@/lib/cache-tags';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { moveFlagColors } from '@/lib/flag-palette';
 
@@ -242,6 +243,8 @@ async function mirrorFlagImage(flag: MirrorableFlag): Promise<string> {
       image: targetUrl,
     })
     .where(and(eq(flags.id, flag.id), eq(flags.image, flag.image)));
+  // Cached flag pages still point at the old link and would keep re-mirroring it.
+  expireCache(FLAGS_TAG);
   await moveFlagColors(flag.id, flag.image, targetUrl);
 
   return targetUrl;
