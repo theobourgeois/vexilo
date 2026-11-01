@@ -115,24 +115,28 @@ export function RemixPill({ remix }: { remix: Remix }) {
   return (
     <Link
       href={`/flag/${encodeURIComponent(remix.name)}`}
+      title={`Remix of ${remix.name.replace(/^the /, '')}`}
       className='inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-[rgb(225_120_50/0.13)] px-2.5 text-[12px] font-semibold text-[#b4541d] hover:brightness-110 dark:bg-[rgb(240_163_107/0.14)] dark:text-[#f0a36b]'
     >
       <Shuffle className='size-3' />
-      <span className='max-w-[220px] truncate'>Remix of {remix.name.replace(/^the /, '')}</span>
+      <span className='max-w-[220px] truncate md:hidden xl:inline'>Remix of {remix.name.replace(/^the /, '')}</span>
+      <span className='hidden min-[900px]:inline xl:hidden'>Remix</span>
     </Link>
   );
 }
 
-/** Shown while designing an entry, linking back to the brief. */
+/** Shown while designing an entry, linking back to the brief. The desktop toolbar shortens it as it narrows, down to just the trophy. */
 export function ContestPill({ contest }: { contest: Contest }) {
   if (!contest) return null;
   return (
     <Link
       href={`/contest/${contest.slug}`}
+      title={`Contest entry · ${contest.theme}`}
       className='inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-[rgb(217_154_11/0.14)] px-2.5 text-[12px] font-semibold text-[#9a6a00] hover:brightness-110 dark:text-[#f2c14e]'
     >
       <Trophy className='size-3' />
-      <span className='max-w-[240px] truncate'>Contest entry · {contest.theme}</span>
+      <span className='max-w-[240px] truncate md:hidden xl:inline'>Contest entry · {contest.theme}</span>
+      <span className='hidden min-[900px]:inline xl:hidden'>Contest entry</span>
     </Link>
   );
 }
