@@ -1,12 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { getCurrentContest } from '@/actions/contests';
 import { ArrowRight, Trophy } from '@/components/icons';
 import FlagImage from '@/components/FlagImage';
 import { TODAY_CARD, TODAY_THUMB, TodayCardText } from '@/components/today-card';
-import { formatContestDate, timeLeft } from '@/lib/contest';
+import { CONTEST_ART, formatContestDate, timeLeft } from '@/lib/contest';
 import { cn } from '@/lib/utils';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -18,6 +19,7 @@ export function ContestLink({ className }: { className?: string }) {
 
   const now = new Date();
   const { phase } = contest;
+  const art = CONTEST_ART[contest.slug];
   if (phase === 'upcoming' && contest.startsAt.getTime() - now.getTime() > WEEK) return null;
   if (phase === 'results' && (!contest.announcedAt || now.getTime() - contest.announcedAt.getTime() > WEEK)) return null;
 
@@ -34,9 +36,11 @@ export function ContestLink({ className }: { className?: string }) {
 
   return (
     <Link href={`/contest/${contest.slug}`} className={cn(TODAY_CARD, className)}>
-      <span className={cn(TODAY_THUMB, !contest.winnerImage && 'bg-[rgb(217_154_11/0.14)]', contest.winnerImage && 'flag-stage')}>
+      <span className={cn(TODAY_THUMB, !contest.winnerImage && !art && 'bg-[rgb(217_154_11/0.14)]', contest.winnerImage && 'flag-stage')}>
         {contest.winnerImage ? (
           <FlagImage src={contest.winnerImage} alt='' maxHeight={30} area={46 * 30} />
+        ) : art ? (
+          <Image src={art} alt='' width={105} height={55} className='h-[55px] w-[105px] max-w-none self-start justify-self-start' />
         ) : (
           <Trophy className='size-5 text-[#b07c00] dark:text-[#f2c14e]' />
         )}
