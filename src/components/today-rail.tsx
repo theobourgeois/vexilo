@@ -6,7 +6,7 @@ import { ArrowRight, CheckCircle } from '@/components/icons';
 import { ContestLink } from '@/components/contest-link';
 import { FlagOfTheDayLink } from '@/components/flag-of-the-day-link';
 import { TopContributorsLink } from '@/components/top-contributors-link';
-import { GridArt, UnfurlArt } from '@/components/games/art';
+import { UnfurlArt } from '@/components/games/art';
 import { useDoneToday } from '@/components/games/shared';
 import { TODAY_CARD, TODAY_THUMB, TodayCardText } from '@/components/today-card';
 import { localDate, puzzleNumber } from '@/lib/games/daily';
@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils';
 
 const PUZZLES = [
   { game: 'unfurl', href: '/play/unfurl', title: 'Unfurl', art: <UnfurlArt className='h-[30px]' /> },
-  { game: 'grid', href: '/play/grid', title: 'Vexigrid', art: <span className='scale-[0.72]'><GridArt small /></span> },
 ] as const;
 
 const CARD = 'w-[244px] shrink-0 snap-start lg:w-auto';
@@ -34,7 +33,7 @@ function PuzzleCard({ puzzle, number }: { puzzle: (typeof PUZZLES)[number]; numb
   );
 }
 
-/** Flag of the day, the design contest, today's puzzles and the week's top contributors, between the Browse title and search. */
+/** Flag of the day, the design contest, today's puzzle and the week's top contributors, between the Browse title and search. */
 export function TodayRail({ className }: { className?: string }) {
   // The puzzle number follows the player's own day, which the server can't know.
   const [number, setNumber] = React.useState<number | null>(null);
