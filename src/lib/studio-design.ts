@@ -171,7 +171,7 @@ export type StudioShape = {
   points?: number;
   /** A star's inner radius, as a fraction of its outer one. */
   inner?: number;
-  /** A rectangle's corner rounding, 0 (square) to 1 (fully round). */
+  /** How rounded the shape's corners are, 0 (sharp) to 1 (as round as they'll go). */
   corner?: number;
   /** A brush stroke's points, as fractions of the box inside its stroke. */
   path?: [number, number][];
@@ -186,10 +186,13 @@ export type StudioShape = {
   gradient?: ShapeGradient | null;
   /** How the stroke is drawn; absent is solid. */
   strokeStyle?: StrokeStyle;
+  /** Where the stroke sits: outside the outline, past the box, or absent for centred on it and inside the box. */
+  strokeAlign?: StrokeAlign;
 };
 
 export type ShapeGradient = { kind: 'linear' | 'radial'; /** Degrees clockwise from left to right. */ angle: number };
 export type StrokeStyle = 'dashed' | 'dotted' | 'double';
+export type StrokeAlign = 'outside';
 
 export type TextFont = 'inter' | 'garamond' | 'cinzel' | 'oswald' | 'slab' | 'fraktur' | 'script' | 'cairo';
 

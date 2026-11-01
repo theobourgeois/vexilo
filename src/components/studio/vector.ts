@@ -1,7 +1,7 @@
-import type { PathContour, StudioLayer } from '@/lib/studio-design';
+import type { PathContour, StrokeAlign, StudioLayer } from '@/lib/studio-design';
 import { layerCopies, layerWidth, uid, type Copy } from './model';
 import { applyVector, compose, fitContours, makeNode, mapContours, rotation, scaling, translate, type Affine } from './paths';
-import { shapeContours } from './shapes';
+import { shapeContours, strokeInset } from './shapes';
 
 const MIN_SIDE = 0.002;
 
@@ -29,8 +29,8 @@ export const localContours = (layer: StudioLayer) => shapeContours(layer.shape!,
 export function withContours(layer: StudioLayer, contours: PathContour[], W: number): StudioLayer {
   const shape = layer.shape!;
   const fit = fitContours(contours);
-  const w = Math.max(MIN_SIDE, fit.w + shape.stroke);
-  const h = Math.max(MIN_SIDE, fit.h + shape.stroke);
+  const w = Math.max(MIN_SIDE, fit.w + strokeInset(shape));
+  const h = Math.max(MIN_SIDE, fit.h + strokeInset(shape));
   const [dx, dy] = applyVector(layerAffine(layer, W), [fit.cx, fit.cy]);
   return {
     ...layer,
@@ -40,13 +40,23 @@ export function withContours(layer: StudioLayer, contours: PathContour[], W: num
     aspect: w / h,
     stretch: undefined,
     text: undefined,
-    shape: { kind: 'path', fill: shape.fill, stroke: shape.stroke, contours: fit.contours, ...(shape.nonzero && { nonzero: true }) },
+    shape: { kind: 'path', fill: shape.fill, stroke: shape.stroke, contours: fit.contours, ...(shape.nonzero && { nonzero: true }), ...(shape.strokeAlign && { strokeAlign: shape.strokeAlign }) },
   };
 }
 
-/** The same shape, as a path whose points can be moved; text becomes its letters' outlines. */
+/** The same shape, as a path whose points can be moved; text becomes its letters' outlines. Rounding becomes part of them. */
 export const toPath = (layer: StudioLayer, W: number) =>
-  layer.text ? { ...layer, text: undefined } : layer.shape?.kind === 'path' ? layer : withContours(layer, localContours(layer), W);
+  layer.text ? { ...layer, text: undefined } : layer.shape?.kind === 'path' && !layer.shape.corner ? layer : withContours(layer, localContours(layer), W);
+
+/** Moves a shape's stroke outside its outline or back. The box changes around the outline, which stays where it is. */
+export function withStrokeAlign(layer: StudioLayer, strokeAlign: StrokeAlign | undefined): StudioLayer {
+  const shape = layer.shape;
+  if (!shape || shape.kind === 'brush' || shape.strokeAlign === strokeAlign) return layer;
+  const change = strokeInset({ stroke: shape.stroke, strokeAlign }) - strokeInset(shape);
+  const w = Math.max(MIN_SIDE, layerWidth(layer) + change);
+  const h = Math.max(MIN_SIDE, layer.size + change);
+  return { ...layer, size: h, aspect: w / h / (layer.stretch ?? 1), shape: { ...shape, strokeAlign } };
+}
 
 /** Every copy of a shape layer's outline, in flag units. */
 export function worldContours(layer: StudioLayer, W: number): PathContour[] {
@@ -128,17 +138,17 @@ export async function combineContours(layers: StudioLayer[], op: BooleanOp, W: n
 
 /** A path layer for combined shapes, painted like the bottom one. */
 export function combinedLayer(base: StudioLayer, contours: PathContour[], op: BooleanOp, W: number): StudioLayer {
-  const stroke = base.shape!.stroke;
+  const { stroke, strokeAlign } = base.shape!;
   const fit = fitContours(contours);
-  const w = Math.max(MIN_SIDE, fit.w + stroke);
-  const h = Math.max(MIN_SIDE, fit.h + stroke);
+  const w = Math.max(MIN_SIDE, fit.w + strokeInset(base.shape!));
+  const h = Math.max(MIN_SIDE, fit.h + strokeInset(base.shape!));
   const fill = base.shape!.fill || stroke === 0;
   return {
     id: uid(),
     emblemId: 'shape',
     name: op === 'unite' ? 'Merged shape' : `${BOOLEAN_LABELS[op]}ed shape`,
     src: '',
-    shape: { kind: 'path', fill, stroke, contours: fit.contours },
+    shape: { kind: 'path', fill, stroke, contours: fit.contours, ...(strokeAlign && { strokeAlign }) },
     aspect: w / h,
     palette: [...base.colors],
     colors: [...base.colors],

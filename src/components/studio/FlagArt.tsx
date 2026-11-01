@@ -368,26 +368,46 @@ export const ShapeArt = React.memo(function ShapeArt({ layer, W, filter, id }: {
   const stroke = s > 0 ? (layer.colors[1] ?? layer.colors[0]) : 'none';
   // A double stroke is the whole stroke with its middle third cut out, so it's drawn apart from the fill.
   const double = style === 'double';
+  // An outside stroke is drawn twice as wide, its inner half hidden under the fill or masked away.
+  const outside = s > 0 && shape.strokeAlign === 'outside';
+  const width = outside ? s * 2 : s;
+  const outsideMask = outside && (double || !shape.fill);
   const line = {
     stroke,
-    strokeWidth: s,
+    strokeWidth: width,
     strokeLinecap: brush || style === 'dotted' ? ('round' as const) : ('butt' as const),
     strokeLinejoin: round ? ('round' as const) : ('miter' as const),
-    strokeDasharray: style === 'dashed' ? `${s * 3} ${s * 2}` : style === 'dotted' ? `0 ${s * 2}` : undefined,
+    strokeDasharray: style === 'dashed' ? `${s * 3} ${s * 2}` : style === 'dotted' ? `0 ${width * 2}` : undefined,
   };
   return (
     <g filter={filter}>
-      {(gradient || double) && (
+      {(gradient || double || outsideMask) && (
         <defs>
           {gradient && <Gradient id={`${id}-g`} gradient={gradient} w={w} h={h} from={layer.colors[0]} to={layer.colors[2] ?? layer.colors[0]} />}
-          {double && (
+          {outsideMask && (
+            // Wide enough for a stroke's sharp tips, which reach past the box.
+            <mask id={`${id}-d`} maskUnits='userSpaceOnUse' x={-w - s * 6} y={-h - s * 6} width={w * 2 + s * 12} height={h * 2 + s * 12}>
+              {double ? (
+                // The lines are the outer third and inner third of the half that shows.
+                <>
+                  <path d={d} fill='none' stroke='#fff' strokeWidth={s * 2} strokeLinejoin={line.strokeLinejoin} strokeLinecap={line.strokeLinecap} />
+                  <path d={d} fill='none' stroke='#000' strokeWidth={(s * 4) / 3} strokeLinejoin={line.strokeLinejoin} strokeLinecap={line.strokeLinecap} />
+                  <path d={d} fill='none' stroke='#fff' strokeWidth={(s * 2) / 3} strokeLinejoin={line.strokeLinejoin} strokeLinecap={line.strokeLinecap} />
+                </>
+              ) : (
+                <rect x={-w - s * 6} y={-h - s * 6} width={w * 2 + s * 12} height={h * 2 + s * 12} fill='#fff' />
+              )}
+              {!shape.fill && <path d={d} fill='#000' fillRule={shape.nonzero ? 'nonzero' : 'evenodd'} />}
+            </mask>
+          )}
+          {double && !outside && (
             // In each copy's own space, as the gradient is.
             <mask id={`${id}-d`} maskUnits='userSpaceOnUse' x={-w} y={-h} width={w * 2} height={h * 2}>
               <path d={d} fill='none' stroke='#fff' strokeWidth={s} strokeLinejoin={line.strokeLinejoin} strokeLinecap={line.strokeLinecap} />
               <path d={d} fill='none' stroke='#000' strokeWidth={s / 3} strokeLinejoin={line.strokeLinejoin} strokeLinecap={line.strokeLinecap} />
             </mask>
           )}
-          {double && shape.fill && (
+          {double && !outside && shape.fill && (
             // The gap between the lines shows what's behind, not the fill.
             <mask id={`${id}-f`} maskUnits='userSpaceOnUse' x={-w} y={-h} width={w * 2} height={h * 2}>
               <rect x={-w} y={-h} width={w * 2} height={h * 2} fill='#fff' />
@@ -399,7 +419,12 @@ export const ShapeArt = React.memo(function ShapeArt({ layer, W, filter, id }: {
       {layerCopies(layer, W).map((copy, i) => {
         const transform = `translate(${copy.cx} ${copy.cy}) rotate(${copy.rot}) scale(${layer.flipX ? -1 : 1} ${layer.flipY ? -1 : 1})`;
         const fillRule = shape.nonzero ? ('nonzero' as const) : ('evenodd' as const);
-        return double ? (
+        return outside ? (
+          <React.Fragment key={i}>
+            <path d={d} fill='none' {...line} mask={outsideMask ? `url(#${id}-d)` : undefined} transform={transform} />
+            {shape.fill && <path d={d} fill={fill} fillRule={fillRule} transform={transform} />}
+          </React.Fragment>
+        ) : double ? (
           <React.Fragment key={i}>
             {shape.fill && <path d={d} fill={fill} fillRule={fillRule} mask={`url(#${id}-f)`} transform={transform} />}
             <path d={d} fill='none' {...line} mask={`url(#${id}-d)`} transform={transform} />

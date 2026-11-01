@@ -295,6 +295,98 @@ export function toggleSmooth(contours: PathContour[], key: string): PathContour[
   return contours.map((x, i) => (i === ci ? { ...x, nodes: x.nodes.map((n, j) => (j === ni ? next : n)) } : x));
 }
 
+// ---- rounding ----
+
+/** A corner turning less than this, in radians, already reads as smooth. */
+const MIN_TURN = 0.05;
+const reversed = ([a, b, c, d]: Cubic): Cubic => [d, c, b, a];
+
+/** Which way a curve leaves its start, or null if it has no length there. */
+function leaving([p0, p1, p2, p3]: Cubic): Pt | null {
+  for (const p of [p1, p2, p3]) {
+    const v = sub(p, p0);
+    const length = Math.hypot(...v);
+    if (length > EPS) return [v[0] / length, v[1] / length];
+  }
+  return null;
+}
+
+/** How far along a curve `distance` is, as a t value; with no distance, its whole length. */
+function walk(curve: Cubic, distance = Infinity) {
+  let travelled = 0;
+  let from = curve[0];
+  for (let i = 1; i <= 32; i++) {
+    const to = pointOn(curve, i / 32);
+    const step = Math.hypot(...sub(to, from));
+    if (travelled + step >= distance) return { t: (i - 1 + (distance - travelled) / (step || 1)) / 32, length: distance };
+    travelled += step;
+    from = to;
+  }
+  return { t: 1, length: travelled };
+}
+
+/**
+ * Rounds every sharp corner with the same radius, as arcs that meet the lines either side.
+ * `amount` runs from none (0) to the widest radius any corner can take, at most half the shape's
+ * shorter side (1). A corner runs out of room halfway along its lines, so neighbours never overlap.
+ */
+export function roundCorners(contours: PathContour[], amount: number): PathContour[] {
+  const parts = contours.map((contour) => {
+    const count = contour.nodes.length;
+    // Straight lines as curves, so that a t value is a fraction of their length.
+    const curves = segments(contour).map(({ curve, straight }): Cubic => (straight ? [curve[0], lerp(curve[0], curve[3], 1 / 3), lerp(curve[0], curve[3], 2 / 3), curve[3]] : curve));
+    const lengths = curves.map((curve) => walk(curve).length);
+    const before = (i: number) => (contour.closed ? (i - 1 + count) % count : i > 0 ? i - 1 : -1);
+    const after = (i: number) => (i < curves.length ? i : -1);
+    const corners = contour.nodes.map((_, i) => {
+      const [a, b] = [before(i), after(i)];
+      if (a < 0 || b < 0 || a === b) return null;
+      const [into, out] = [leaving(reversed(curves[a])), leaving(curves[b])];
+      if (!into || !out) return null;
+      const turn = Math.atan2(into[0] * out[1] - into[1] * out[0], -(into[0] * out[0] + into[1] * out[1]));
+      if (Math.abs(turn) < MIN_TURN) return null;
+      // A hair under half, so that the line between two corners keeps a direction.
+      return { slope: Math.tan(Math.abs(turn) / 2), room: Math.min(lengths[a], lengths[b]) * 0.499 };
+    });
+    return { contour, curves, before, after, corners };
+  });
+
+  const widest = Math.max(0, ...parts.flatMap(({ corners }) => corners.map((c) => (c ? c.room / c.slope : 0))));
+  const box = contoursBounds(contours);
+  const radius = amount * Math.min(widest, box ? Math.min(box.x1 - box.x0, box.y1 - box.y0) / 2 : 0);
+  if (radius <= 0) return contours;
+
+  return parts.map(({ contour, curves, before, after, corners }) => {
+    const trims = corners.map((c) => (c ? Math.min(c.room, radius * c.slope) : 0));
+    const trimmed = segments(contour).map((seg, i) => {
+      const curve = curves[i];
+      const end = 1 - walk(reversed(curve), trims[seg.to]).t;
+      const [kept] = splitCubic(curve, end);
+      return splitCubic(kept, walk(kept, trims[seg.from]).t)[1];
+    });
+    const straight = segments(contour).map((seg) => seg.straight);
+    return {
+      closed: contour.closed,
+      nodes: contour.nodes.flatMap((node, i) => {
+        const [a, b] = [before(i), after(i)];
+        const handleIn = a >= 0 && !straight[a] ? sub(trimmed[a][2], trimmed[a][3]) : undefined;
+        const handleOut = b >= 0 && !straight[b] ? sub(trimmed[b][1], trimmed[b][0]) : undefined;
+        if (trims[i] <= EPS) return [makeNode(at(node), handleIn, handleOut)];
+        const [p, q] = [trimmed[a][3], trimmed[b][0]];
+        const [into, out] = [leaving(reversed(trimmed[a])), leaving(trimmed[b])];
+        if (!into || !out) return [makeNode(at(node), handleIn, handleOut)];
+        // The handles of a cubic that follows a circular arc, from the chord and how far it turns.
+        const turn = Math.acos(Math.max(-1, Math.min(1, -(into[0] * out[0] + into[1] * out[1]))));
+        const reach = Math.hypot(...sub(q, p)) / (3 * Math.cos(turn / 4) ** 2);
+        return [
+          makeNode(p, handleIn, [-into[0] * reach, -into[1] * reach]),
+          makeNode(q, [-out[0] * reach, -out[1] * reach], handleOut),
+        ];
+      }),
+    };
+  });
+}
+
 // ---- SVG path data ----
 
 const NUMBER = /[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?/y;

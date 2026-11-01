@@ -1,6 +1,6 @@
 import type { PathContour, ShapeKind, StudioLayer, StudioShape } from '@/lib/studio-design';
 import { uid } from './model';
-import { contoursD, fitContours, hitsContours, mapContours, parsePathD, segmentDistance, type Affine } from './paths';
+import { contoursD, fitContours, hitsContours, mapContours, parsePathD, roundCorners, segmentDistance, type Affine } from './paths';
 
 type Pt = [number, number];
 
@@ -29,6 +29,12 @@ export const SHAPE_PRESETS: ShapePreset[] = [
 
 /** Lines and arrows are drawn from end to end; their height is their weight. */
 export const isLinear = (kind: ShapeKind) => kind === 'line' || kind === 'arrow';
+
+/** Whether a shape has corners its `corner` setting can round. */
+export const hasCorners = (kind: ShapeKind) => kind !== 'ellipse' && kind !== 'line' && kind !== 'brush';
+
+/** How much of a shape's box its stroke takes up; a stroke outside the outline takes none. */
+export const strokeInset = (shape: Pick<StudioShape, 'stroke' | 'strokeAlign'>) => (shape.strokeAlign === 'outside' ? 0 : shape.stroke);
 
 /** Weight a fresh line or arrow starts at, as a fraction of flag height. */
 export const LINE_WEIGHT: Record<'line' | 'arrow', number> = { line: 0.025, arrow: 0.09 };
@@ -68,7 +74,8 @@ export function radialCircle(shape: StudioShape, w: number, h: number) {
   const ys = pts.map((p) => p[1]);
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   // The path's box, inside the stroke.
-  const [bw, bh] = [Math.max(0, w - shape.stroke), Math.max(0, h - shape.stroke)];
+  const inset = strokeInset(shape);
+  const [bw, bh] = [Math.max(0, w - inset), Math.max(0, h - inset)];
   const [sx, sy] = [bw / (x1 - x0), bh / (y1 - y0)];
   return { cx: (-(x0 + x1) / 2) * sx, cy: (-(y0 + y1) / 2) * sy, rx: sx, ry: sy };
 }
@@ -120,12 +127,19 @@ export function naturalAspect(shape: Pick<StudioShape, 'kind' | 'points' | 'inne
 
 /**
  * The shape's outline in a w × h box centred on the origin. A stroke is kept inside the box, so
- * the box is the shape's whole extent with or without one.
+ * the box is the shape's whole extent with or without one, unless it's set outside the outline.
  */
 export function shapePath(shape: StudioShape, w: number, h: number): string {
+  const d = sharpPath(shape, w, h);
+  // A rectangle draws its own, with true arcs.
+  return shape.corner && shape.kind !== 'rect' && hasCorners(shape.kind) ? contoursD(roundCorners(parsePathD(d), shape.corner)) : d;
+}
+
+/** The outline before any rounding, but for a rectangle's. */
+function sharpPath(shape: StudioShape, w: number, h: number): string {
   if (shape.kind === 'brush') return brushPath(shape.path ?? [], w, h, shape.stroke);
-  if (shape.kind === 'path') return contoursD(mapContours(shape.contours ?? [], insetBox(w, h, shape.stroke)));
-  const s = shape.stroke;
+  if (shape.kind === 'path') return contoursD(mapContours(shape.contours ?? [], insetBox(w, h, strokeInset(shape))));
+  const s = strokeInset(shape);
   const bw = Math.max(0, w - s);
   const bh = Math.max(0, h - s);
   const x0 = -bw / 2;
@@ -188,13 +202,13 @@ const insetBox = (w: number, h: number, stroke: number): Affine => {
 
 /** Any shape's outline as editable contours, in its w × h box centred on the origin. */
 export function shapeContours(shape: StudioShape, w: number, h: number): PathContour[] {
-  if (shape.kind === 'path') return mapContours(shape.contours ?? [], insetBox(w, h, shape.stroke));
+  if (shape.kind === 'path' && !shape.corner) return mapContours(shape.contours ?? [], insetBox(w, h, strokeInset(shape)));
   return parsePathD(shapePath(shape, w, h));
 }
 
 /** Whether a point in a path layer's own box (centred, unrotated) is on it. */
 export const hitsPath = (shape: StudioShape, w: number, h: number, point: Pt, reach: number) =>
-  hitsContours(shapeContours(shape, w, h), point, { fill: shape.fill, reach: shape.stroke / 2 + reach });
+  hitsContours(shapeContours(shape, w, h), point, { fill: shape.fill, reach: (shape.strokeAlign === 'outside' ? shape.stroke : shape.stroke / 2) + reach });
 
 /** Where a brush stroke's points sit in a w × h box: inside it by half the stroke. */
 export function brushPoints(path: Pt[], w: number, h: number, stroke: number): Pt[] {
