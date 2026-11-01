@@ -32,7 +32,7 @@ import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel, PanelTitle } from './panels';
 import { StudioCanvas, type View } from './StudioCanvas';
 import { Inspector } from './inspector';
-import { ColorPicker, ToolDivider } from './ui';
+import { ColorPicker } from './ui';
 import { useShortcuts, type Panel } from './use-shortcuts';
 import type { Studio } from './use-studio';
 
@@ -130,7 +130,7 @@ export function DesktopStudio({
       )}
 
       {/* Rail */}
-      <nav className='vx-tile absolute left-5 top-5 flex flex-col gap-1 p-1.5'>
+      <nav className='vx-tile absolute left-5 top-[84px] flex flex-col gap-1 p-1.5'>
         {RAIL.map(({ panel: id, label, icon }) => (
           <button
             key={id}
@@ -149,7 +149,7 @@ export function DesktopStudio({
 
       {/* Drawer */}
       {drawerOpen && (
-        <aside className='vx-tile absolute bottom-5 left-[100px] top-5 flex w-[316px] flex-col gap-3.5 p-4 shadow-pop'>
+        <aside className='vx-tile absolute bottom-5 left-[100px] top-[84px] flex w-[316px] flex-col gap-3.5 p-4 shadow-pop'>
           <div className='flex items-center justify-between'>
             <PanelTitle>{RAIL.find((r) => r.panel === panel)?.label}</PanelTitle>
             <button type='button' aria-label='Close' onClick={() => setPanel(null)} className='grid size-7 cursor-pointer place-items-center rounded-[8px] text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground'>
@@ -163,26 +163,28 @@ export function DesktopStudio({
         </aside>
       )}
 
-      {/* Toolbar */}
-      <header className='absolute right-5 top-5 flex h-[52px] items-center gap-1.5 rounded-[14px] bg-surface py-1.5 pl-2 pr-1.5 shadow-pop' style={{ left }}>
-        <FlagName studio={studio} className='h-9 max-w-[360px] text-[18px]' />
-        <RemixPill remix={remix} />
-        <ContestPill contest={contest} />
-        <StartOver remix={remix} onStartOver={onStartOver} />
-        <span className='min-w-2 flex-1' />
+      {/* Toolbar: the full width, so opening the drawer never squeezes it. */}
+      <header className='absolute left-5 right-5 top-5 grid h-[52px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 rounded-[14px] bg-surface py-1.5 pl-2 pr-1.5 shadow-pop'>
+        <div className='flex min-w-0 items-center gap-1.5'>
+          <FlagName studio={studio} className='h-9 max-w-[360px] text-[18px]' />
+          <RemixPill remix={remix} />
+          <ContestPill contest={contest} />
+          <StartOver remix={remix} onStartOver={onStartOver} />
+        </div>
         <ToolPicker tool={draw.tool} onChange={setTool} />
-        <ToolDivider />
-        <UndoRedo studio={studio} />
-        <ExportMenu studio={studio}>
-          <Button variant='neutral' size='sm'>
-            <Download />
-            Export
+        <div className='flex items-center justify-end gap-1.5'>
+          <UndoRedo studio={studio} />
+          <ExportMenu studio={studio}>
+            <Button variant='neutral' size='sm' aria-label='Export'>
+              <Download />
+              <span className='hidden min-[900px]:inline'>Export</span>
+            </Button>
+          </ExportMenu>
+          <Button size='sm' onClick={() => setPosting(true)}>
+            {contest ? <Trophy /> : <Send />}
+            {contest ? (contest.entry ? 'Update entry' : 'Submit entry') : 'Post'}
           </Button>
-        </ExportMenu>
-        <Button size='sm' onClick={() => setPosting(true)}>
-          {contest ? <Trophy /> : <Send />}
-          {contest ? (contest.entry ? 'Update entry' : 'Submit entry') : 'Post'}
-        </Button>
+        </div>
       </header>
 
       {/* Centred over the canvas, clear of the drawer and inspector. */}
