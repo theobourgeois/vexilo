@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -17,7 +18,7 @@ import FlagImage from '@/components/FlagImage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { DEFAULT_RULES, formatContestDate } from '@/lib/contest';
+import { CONTEST_ART, DEFAULT_RULES, formatContestDate } from '@/lib/contest';
 import { openSignIn } from '@/lib/sign-in';
 import { cn } from '@/lib/utils';
 import { ContestDate, ContestTimeline, initials } from './contest-ui';
@@ -57,6 +58,7 @@ function Prompt({ view }: { view: ContestView }) {
   const [withdrawing, setWithdrawing] = React.useState(false);
   const open = contest.phase === 'open';
   const entered = open ? myEntry : null;
+  const art = CONTEST_ART[contest.slug];
 
   async function withdraw() {
     if (!confirm('Withdraw your entry? You can enter again until entries close.')) return;
@@ -117,6 +119,13 @@ function Prompt({ view }: { view: ContestView }) {
             <p className='mt-px text-[12.5px] text-muted-foreground'>
               Your entry · voters see it <ContestDate date={contest.votingStartsAt} />
             </p>
+          </div>
+        </div>
+      ) : art ? (
+        <div className='mt-[26px] grid items-start gap-6 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] sm:gap-8'>
+          <div>{copy}</div>
+          <div className='order-first aspect-[1200/502] overflow-hidden rounded-[14px] sm:order-none'>
+            <Image src={art} alt='' width={1200} height={630} priority sizes='(min-width: 640px) 380px, 100vw' className='w-full' />
           </div>
         </div>
       ) : (

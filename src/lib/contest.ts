@@ -24,6 +24,9 @@ export const DEFAULT_RULES = [
   'Vote with your account only, and not for your own entry. Suspicious votes are removed.',
 ];
 
+/** Artwork for a contest until it has a winning flag to show. The bottom band repeats the theme, so the site crops it off and share previews keep it. */
+export const CONTEST_ART: Record<string, string> = { 'hometown-flag-redesign': '/contests/hometown-flag-redesign.png' };
+
 export function contestPhase(contest: ContestTiming, now = new Date()): ContestPhase {
   if (!contest.published) return 'draft';
   if (contest.announcedAt && contest.winnerEntryId) return 'results';

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getContestArchive, getContestView } from '@/actions/contests';
 import ContestPage from '@/components/contest/ContestPage';
+import { CONTEST_ART } from '@/lib/contest';
 import { absoluteUrl, contestPath } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
@@ -25,12 +26,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? `${winner.title} by ${winner.designer.name} won the ${contest.title} contest.`
     : briefSnippet(contest.brief) || `Design a flag for “${contest.theme}” in the ${contest.title} contest on Vexilo.`;
   const url = absoluteUrl(contestPath(contest.slug));
+  const shareImage = CONTEST_ART[contest.slug];
   return {
     title,
     description,
     alternates: { canonical: url },
     // Replaces the site-wide Open Graph tags, which would share this page as the home page.
-    openGraph: { title, description, url, siteName: 'Vexilo', images: [winner ? { url: winner.image, alt: winner.title } : { url: '/logo.png', alt: 'Vexilo' }] },
+    openGraph: { title, description, url, siteName: 'Vexilo', images: [winner ? { url: winner.image, alt: winner.title } : shareImage ? { url: shareImage, alt: contest.theme } : { url: '/logo.png', alt: 'Vexilo' }] },
   };
 }
 
