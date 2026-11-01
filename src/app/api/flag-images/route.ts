@@ -1,4 +1,4 @@
-import { uploadFile } from "@/actions/s3";
+import { UnsafeImageError, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
 import { MAX_FLAG_IMAGE_BYTES } from "@/lib/batch-flags";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
@@ -44,12 +44,19 @@ export async function POST(request: Request) {
   }
 
   const key = `images/${crypto.randomUUID()}.${extension}`;
-  await uploadFile(
-    Buffer.from(await file.arrayBuffer()),
-    process.env.S3_BUCKET_NAME!,
-    key,
-    file.type,
-  );
+  try {
+    await uploadFile(
+      Buffer.from(await file.arrayBuffer()),
+      process.env.S3_BUCKET_NAME!,
+      key,
+      file.type,
+    );
+  } catch (error) {
+    if (error instanceof UnsafeImageError) {
+      return NextResponse.json({ message: error.message }, { status: 415 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({ url: `${CLOUD_FRONT_URL}/${key}` });
 }

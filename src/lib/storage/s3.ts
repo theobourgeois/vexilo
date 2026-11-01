@@ -1,5 +1,5 @@
-"use server";
-
+// Not a "use server" file: everything exported from one of those can be called from the browser,
+// and these take any bucket key. Server code calls them after its own checks.
 import { getServerAuthSession } from "@/lib/auth";
 import {
   S3Client,
@@ -7,6 +7,9 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
+import { IMAGE_EXTENSIONS, UnsafeImageError, safeImageBody } from "@/lib/storage/safe-image";
+
+export { UnsafeImageError };
 
 const bucketName = process.env.S3_BUCKET_NAME!;
 
@@ -31,7 +34,7 @@ export const uploadFile = async (
   const uploadParams = {
     Bucket: bucketName,
     Key: key,
-    Body: file,
+    Body: safeImageBody(file, contentType),
     ContentType: contentType,
   };
 
@@ -68,24 +71,15 @@ export async function base64ImageToS3URI(base64Image: string): Promise<string> {
     throw new Error('Invalid base64 image data');
   }
 
-  const contentType = header.split(':')[1].split(';')[0];
+  const contentType = header.split(':')[1]?.split(';')[0]?.trim().toLowerCase() ?? '';
   const imageBuffer = Buffer.from(base64Data, 'base64');
-  let fileExtension = contentType.split('/')[1];
-  if (fileExtension === "svg+xml") {
-    fileExtension = "svg";
+  const fileExtension = IMAGE_EXTENSIONS[contentType];
+  if (!fileExtension) {
+    throw new UnsafeImageError("That file type isn't supported.");
   }
-  const fileName = `images/image-${Date.now()}.${fileExtension}`;
+  const fileName = `images/${crypto.randomUUID()}.${fileExtension}`;
 
   await uploadFile(imageBuffer, bucketName, fileName, contentType);
 
   return `${CLOUD_FRONT_URL}/${fileName}`;
-}
-
-export async function uploadImageToS3(base64Image: string) {
-  const session = await getServerAuthSession();
-  if (!session) {
-    throw new Error("Unauthorized");
-  }
-
-  return await base64ImageToS3URI(base64Image)
 }

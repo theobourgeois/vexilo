@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import sharp, { type OverlayOptions } from 'sharp';
 import {
   defaultParams,
   LAYOUT_VARIANTS,
@@ -734,7 +734,7 @@ export async function extractRaster(source: Buffer): Promise<RasterResult> {
       `Too many disconnected objects (${objects.length}); needs review`,
     );
   const parts: RasterPart[] = [],
-    overlays: sharp.OverlayOptions[] = [];
+    overlays: OverlayOptions[] = [];
   for (const o of objects) {
     const [x0, y0, x1, y1] = o.box,
       ow = x1 - x0,

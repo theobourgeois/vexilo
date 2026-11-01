@@ -5,7 +5,7 @@ import { flagRequests, flags, leaderboard, users, flagTags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { Flag, RelatedFlag } from '@/lib/types';
 import { and, count, eq, inArray, max, ne, sql } from 'drizzle-orm';
-import { base64ImageToS3URI, deleteFileFromUrl } from './s3';
+import { UnsafeImageError, base64ImageToS3URI, deleteFileFromUrl } from '@/lib/storage/s3';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { redis } from '@/db/redis';
 import { relatedFlagsCacheKey, TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
@@ -540,7 +540,14 @@ export async function createFlagRequest(
     flag.flagImage.startsWith('data:image') ||
     flag.flagImage.startsWith('blob:')
   ) {
-    imageUrl = await base64ImageToS3URI(flag.flagImage);
+    try {
+      imageUrl = await base64ImageToS3URI(flag.flagImage);
+    } catch (error) {
+      if (error instanceof UnsafeImageError) {
+        return { success: false, message: error.message };
+      }
+      throw error;
+    }
   }
 
   let oldFlag = null;

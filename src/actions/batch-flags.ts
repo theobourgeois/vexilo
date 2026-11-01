@@ -11,7 +11,7 @@ import {
 } from '@/lib/batch-flags';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
-import { uploadFile } from './s3';
+import { UnsafeImageError, uploadFile } from '@/lib/storage/s3';
 
 const WIKIMEDIA_USER_AGENT = 'VexiloBot/1.0 (https://vexilo.org)';
 
@@ -117,12 +117,19 @@ export async function resolveWikimediaFlag(
   }
 
   const key = `images/${crypto.randomUUID()}.${extension}`;
-  await uploadFile(
-    Buffer.from(await imageResponse.arrayBuffer()),
-    process.env.S3_BUCKET_NAME!,
-    key,
-    info.mime,
-  );
+  try {
+    await uploadFile(
+      Buffer.from(await imageResponse.arrayBuffer()),
+      process.env.S3_BUCKET_NAME!,
+      key,
+      info.mime,
+    );
+  } catch (error) {
+    if (error instanceof UnsafeImageError) {
+      return { success: false, message: error.message };
+    }
+    throw error;
+  }
 
   const fileName = title.replace(/^File:/, '');
   return {

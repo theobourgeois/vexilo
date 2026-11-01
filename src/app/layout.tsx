@@ -56,9 +56,9 @@ export const metadata: Metadata = {
     siteName: 'Vexilo',
     images: [
       {
-        url: '/logo.png',
-        width: 1200,
-        height: 630,
+        url: '/icon-512x512.png',
+        width: 512,
+        height: 512,
         alt: 'Vexilo - Discover Flags from Around the World',
       },
     ],
@@ -66,13 +66,13 @@ export const metadata: Metadata = {
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',
-    apple: '/logo.png',
+    apple: '/icon-192x192.png',
     other: [
       {
         rel: 'icon',
         type: 'image/png',
         sizes: '512x512',
-        url: '/logo.png',
+        url: '/icon-512x512.png',
       },
     ],
   },

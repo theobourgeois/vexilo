@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
+import sharp, { type OverlayOptions } from 'sharp';
 
 /** A numbered contact sheet of thumbnails on grey, for looking through candidates by eye. */
 export async function drawSheet(
@@ -11,7 +11,7 @@ export async function drawSheet(
 ) {
   const rows = Math.ceil(tiles.length / cols);
   const pad = 6;
-  const inputs: sharp.OverlayOptions[] = [];
+  const inputs: OverlayOptions[] = [];
   for (const [i, t] of tiles.entries()) {
     const left = (i % cols) * tile;
     const top = Math.floor(i / cols) * tile;

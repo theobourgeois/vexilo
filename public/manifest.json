@@ -1,7 +1,7 @@
 {
-  "name": "DalSearch",
-  "short_name": "DalSearch",
-  "description": "DalSearch is a search engine for Dalhousie University students.",
+  "name": "Vexilo",
+  "short_name": "Vexilo",
+  "description": "Explore, discover, and learn about flags from around the world with Vexilo.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
