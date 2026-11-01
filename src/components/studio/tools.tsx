@@ -74,7 +74,7 @@ import { PartPreview } from './FlagArt';
 import { documentColors, fieldColors, flagWidth, gridCount, gridShape, layerWidth } from './model';
 import { guideLine } from './repeats';
 import { alignScopes, type AlignScope } from './regions';
-import { defaultStroke, isLinear, naturalAspect } from './shapes';
+import { defaultStroke, hasCorners, isLinear, naturalAspect } from './shapes';
 import { ColorPicker, Slider, Swatch, ToolButton, ToolDivider, type Side } from './ui';
 import type { AlignEdge, ColorSlot, SelectionColor, Studio } from './use-studio';
 import { fontChoice } from './text';
@@ -504,6 +504,17 @@ export function ShapeControls({ studio, layers, side = 'top', inlineSettings }: 
               max={brushes ? 0.08 : 0.06}
               onChange={(stroke) => actions.setShape({ stroke }, { transient: true })}
             />
+            {!brushes && (
+              <Segmented
+                label='Stroke position'
+                value={shape.strokeAlign ?? 'centre'}
+                options={[
+                  { value: 'centre', label: 'Centre' },
+                  { value: 'outside', label: 'Outside' },
+                ]}
+                onChange={(align) => actions.setStrokeAlign(align === 'centre' ? undefined : align)}
+              />
+            )}
             <Segmented
               label='Stroke style'
               value={shape.strokeStyle ?? 'solid'}
@@ -710,12 +721,13 @@ export function PointEditBar({ studio, side = 'top' }: { studio: Studio; side?: 
 /** Whether a shape has settings of its own: points, sides, corners or weight. */
 export const hasShapeSettings = (layer: StudioLayer) => {
   const kind = layer.shape?.kind;
-  return kind === 'star' || kind === 'polygon' || kind === 'rect' || (kind !== undefined && isLinear(kind));
+  return !layer.text && kind !== undefined && (hasCorners(kind) || isLinear(kind));
 };
 
 /** Points, sides, corners or weight, for the shapes that have them. */
 function ShapeSettings({ studio, layer }: { studio: Studio; layer: StudioLayer }) {
-  if (!hasShapeSettings(layer)) return null;
+  // Rounding while points are being edited would move them.
+  if (!hasShapeSettings(layer) || studio.pathEdit) return null;
   return (
     <ToolPopover label='Shape' icon={<SlidersHorizontal />} iconOnly>
       <ShapeSettingsFields studio={studio} layer={layer} className='w-[220px]' />
@@ -759,9 +771,17 @@ export function ShapeSettingsFields({ studio, layer, className }: { studio: Stud
           <Slider label='Thickness' min={0.15} max={0.95} step={0.01} value={shape.inner ?? 0.382} onChange={(inner) => reshape({ inner })} onCommit={history.commit} />
         </Field>
       )}
-      {kind === 'rect' && (
+      {hasCorners(kind) && (
         <Field label='Corners'>
-          <Slider label='Corners' min={0} max={1} step={0.01} value={shape.corner ?? 0} onChange={(corner) => reshape({ corner })} onCommit={history.commit} />
+          <Slider
+            label='Corners'
+            min={0}
+            max={1}
+            step={0.01}
+            value={shape.corner ?? 0}
+            onChange={(corner) => studio.updateLayers([layer.id], (l) => ({ ...l, shape: { ...l.shape!, corner } }), { transient: true })}
+            onCommit={history.commit}
+          />
         </Field>
       )}
       {isLinear(kind) && (

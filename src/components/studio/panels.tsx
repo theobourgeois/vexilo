@@ -917,7 +917,8 @@ function ShapeThumb({ layer }: { layer: StudioLayer }) {
   const k = Math.max(w, h);
   // Thin strokes would vanish at this size.
   const stroke = shape.stroke > 0 ? Math.max(shape.stroke, k * (shape.kind === 'brush' ? 0.1 : 0.05)) : 0;
-  const drawn = { ...shape, stroke };
+  // The thumbnail keeps the stroke inside its box, wherever it really sits.
+  const drawn = { ...shape, stroke, strokeAlign: undefined };
   return (
     <span className={cn('relative grid size-8 shrink-0 place-items-center overflow-hidden rounded-[7px]', tileTone(layerColors(layer)))}>
       <svg viewBox={`${-k / 2} ${-k / 2} ${k} ${k}`} className='size-[72%]' style={{ transform: `rotate(${layer.rotation}deg)` }}>

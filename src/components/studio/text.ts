@@ -2,6 +2,7 @@ import type { Font } from 'opentype.js';
 import type { PathContour, StudioLayer, StudioText, TextFont } from '@/lib/studio-design';
 import { uid } from './model';
 import { applyVector, fitContours, parsePathD } from './paths';
+import { strokeInset } from './shapes';
 import { layerAffine } from './vector';
 
 export type FontChoice = { id: TextFont; label: string; bold: boolean; italic: boolean; hint?: string };
@@ -162,7 +163,7 @@ function shaped(spec: StudioText, fontSize: number, stroke: number) {
 
 /** Where the text's origin sits in a layer's own box. */
 function originIn(layer: StudioLayer, ink: StudioText['ink'], size: number, width: number) {
-  const stroke = layer.shape?.stroke ?? 0;
+  const stroke = layer.shape ? strokeInset(layer.shape) : 0;
   const [bw, bh] = [Math.max(0, width - stroke), Math.max(0, size - stroke)];
   const [x0, y0, w, h] = ink;
   return [-bw / 2 + (w > 0 ? -x0 / w : 0.5) * bw, -bh / 2 + (h > 0 ? -y0 / h : 0.5) * bh] as [number, number];
@@ -202,7 +203,7 @@ export function newTextLayer(spec: Omit<StudioText, 'ink'>, at: { x: number; y: 
  */
 export function retypeset(layer: StudioLayer, patch: Partial<StudioText>, W: number): StudioLayer {
   if (!layer.text || !layer.shape) return layer;
-  const stroke = layer.shape.stroke;
+  const stroke = strokeInset(layer.shape);
   const fontSize = Math.max(1e-4, (layer.size - stroke) / layer.text.ink[3]);
   const s = shaped({ ...layer.text, ...patch }, fontSize, stroke);
   const stretch = layer.stretch ?? 1;
@@ -222,4 +223,4 @@ export function retypeset(layer: StudioLayer, patch: Partial<StudioText>, W: num
 }
 
 /** The font size a text layer is set at, as a fraction of flag height. */
-export const fontSizeOf = (layer: StudioLayer) => (layer.text ? (layer.size - (layer.shape?.stroke ?? 0)) / layer.text.ink[3] : 0);
+export const fontSizeOf = (layer: StudioLayer) => (layer.text ? (layer.size - (layer.shape ? strokeInset(layer.shape) : 0)) / layer.text.ink[3] : 0);

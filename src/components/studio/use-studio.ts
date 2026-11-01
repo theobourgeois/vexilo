@@ -13,6 +13,7 @@ import type {
   StudioLayer,
   StudioOutline,
   StudioRepeat,
+  StrokeAlign,
   StudioShape,
   StudioText,
 } from '@/lib/studio-design';
@@ -55,7 +56,7 @@ import {
 import { applyVector, invert, mapContours, removeNodes, scaling } from './paths';
 import { canGuide, syncTracks } from './repeats';
 import { applyPoses, boxCentre, poseOf, rotatePoses, scalePoses, selectionFrame } from './transform';
-import { canEditPoints, combinedLayer, isOutline, combineContours, layerAffine, localContours, toPath, withContours, worldContours, type BooleanOp } from './vector';
+import { canEditPoints, combinedLayer, isOutline, combineContours, layerAffine, localContours, toPath, withContours, withStrokeAlign, worldContours, type BooleanOp } from './vector';
 import { isPlainRect, newOutline, OUTLINES } from './outline';
 import { DEFAULT_TEXT, loadTextFont, newTextLayer, retypeset, textReady } from './text';
 
@@ -391,6 +392,8 @@ export function useStudio(initial: StudioDoc, vectorEmblems: ReadonlySet<string>
         (l) => (l.shape ? { ...l, shape: { ...l.shape, ...patch, fill: l.shape.kind === 'brush' ? false : (patch.fill ?? l.shape.fill) } } : l),
         opts,
       ),
+    /** Moves the selected shapes' strokes outside their outlines or back. */
+    setStrokeAlign: (strokeAlign: StrokeAlign | undefined) => updateLayers(editable, (l) => withStrokeAlign(l, strokeAlign)),
     /** Paints the selected shapes' fill (0), stroke (1) or where their gradient ends (2). A brush's one colour is both. */
     setShapeColor: (index: 0 | 1 | 2, color: string, opts?: Opts) =>
       updateLayers(editable, (l) => (l.shape ? { ...l, colors: l.shape.kind === 'brush' ? [color, color] : withColor(l.colors, index, color) } : l), opts),
@@ -415,7 +418,7 @@ export function useStudio(initial: StudioDoc, vectorEmblems: ReadonlySet<string>
     editPoints(id = selectedLayers.length === 1 ? selectedLayers[0].id : undefined) {
       const layer = design.layers.find((l) => l.id === id);
       if (!layer || layer.locked || !canEditPoints(layer)) return;
-      if (layer.shape!.kind !== 'path') updateLayers([layer.id], (l) => toPath(l, W));
+      if (layer.shape!.kind !== 'path' || layer.shape!.corner) updateLayers([layer.id], (l) => toPath(l, W));
       setSelectionState([layer.id]);
       setPathEdit({ id: layer.id, nodes: [] });
     },
@@ -450,7 +453,7 @@ export function useStudio(initial: StudioDoc, vectorEmblems: ReadonlySet<string>
     },
     selectAllNodes() {
       if (!pathEdit) return;
-      const contours = pathEdit.layer.shape!.contours ?? [];
+      const contours = localContours(pathEdit.layer);
       setPathEdit({ id: pathEdit.id, nodes: contours.flatMap((c, ci) => c.nodes.map((_, ni) => `${ci}:${ni}`)) });
     },
 

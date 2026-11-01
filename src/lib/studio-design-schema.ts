@@ -105,6 +105,7 @@ const shape = z.object({
   nonzero: z.boolean().optional(),
   gradient: z.object({ kind: z.enum(['linear', 'radial']), angle: z.number().min(-360).max(360) }).nullable().optional(),
   strokeStyle: z.enum(['dashed', 'dotted', 'double']).optional(),
+  strokeAlign: z.literal('outside').optional(),
 });
 
 const text = z.object({
