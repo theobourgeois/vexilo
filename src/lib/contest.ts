@@ -33,14 +33,6 @@ export function contestPhase(contest: ContestTiming, now = new Date()): ContestP
   return 'judging';
 }
 
-/** When the current phase ends, or null when nothing is scheduled next. */
-export function phaseEndsAt(contest: Pick<ContestTiming, 'startsAt' | 'votingStartsAt' | 'endsAt'>, phase: ContestPhase) {
-  if (phase === 'upcoming') return contest.startsAt;
-  if (phase === 'open') return contest.votingStartsAt;
-  if (phase === 'voting') return contest.endsAt;
-  return null;
-}
-
 export const PHASE_LABEL: Record<ContestPhase, string> = {
   draft: 'Draft',
   upcoming: 'Coming soon',
@@ -60,17 +52,6 @@ export function timeLeft(date: Date, now = new Date()) {
   if (hours >= 2) return `${hours} hours`;
   if (hours === 1) return '1 hour';
   return minutes === 1 ? '1 minute' : `${Math.max(minutes, 1)} minutes`;
-}
-
-/** The parts of a countdown clock. */
-export function countdownParts(date: Date, now = new Date()) {
-  const seconds = Math.max(0, Math.floor((date.getTime() - now.getTime()) / 1000));
-  return {
-    days: Math.floor(seconds / 86_400),
-    hours: Math.floor((seconds % 86_400) / 3600),
-    minutes: Math.floor((seconds % 3600) / 60),
-    seconds: seconds % 60,
-  };
 }
 
 export function formatContestDate(date: Date, withTime = false) {

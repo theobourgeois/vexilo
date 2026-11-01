@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { countdownParts, PHASE_LABEL, type ContestPhase } from '@/lib/contest';
+import { formatContestDate, PHASE_LABEL, timeLeft, type ContestPhase, type ContestTiming } from '@/lib/contest';
 import { cn } from '@/lib/utils';
 
 const PHASE_TONE: Record<ContestPhase, string> = {
@@ -22,63 +22,85 @@ export function PhasePill({ phase, className }: { phase: ContestPhase; className
   );
 }
 
-/** The current time, ticking every second; null until mounted so server and browser agree. */
+/** The current time, updated every 30 seconds; null until mounted so server and browser agree. */
 function useNow() {
   const [now, setNow] = React.useState<Date | null>(null);
   React.useEffect(() => {
     setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, []);
   return now;
 }
 
-/** A big "13 : 06 : 22" clock. Seconds only show on the last day. */
-export function Countdown({ to, className }: { to: Date; className?: string }) {
-  const now = useNow();
-  const parts = now ? countdownParts(to, now) : null;
-  const cells: [string, number | undefined][] =
-    parts && parts.days === 0
-      ? [
-          ['hrs', parts.hours],
-          ['min', parts.minutes],
-          ['sec', parts.seconds],
-        ]
-      : [
-          ['days', parts?.days],
-          ['hrs', parts?.hours],
-          ['min', parts?.minutes],
-        ];
-  return (
-    <div className={cn('flex items-start gap-2.5 sm:gap-3.5', className)} role='timer'>
-      {cells.map(([label, value], index) => (
-        <React.Fragment key={label}>
-          {index > 0 && <span className='pt-0.5 text-[22px] leading-none opacity-35 sm:text-[28px]'>:</span>}
-          <span className='flex flex-col items-center'>
-            <span className='text-[28px] font-semibold leading-none tabular-nums tracking-[-0.03em] sm:text-[34px]'>
-              {value === undefined ? '––' : String(value).padStart(2, '0')}
-            </span>
-            <span className='mt-1.5 text-[10.5px] uppercase tracking-[0.08em] opacity-60'>{label}</span>
-          </span>
-        </React.Fragment>
-      ))}
-    </div>
-  );
+/** A contest date in the viewer's time zone, so it only renders in the browser. */
+export function ContestDate({ date }: { date: Date }) {
+  return useNow() && formatContestDate(date);
 }
 
-/** "3d 14h 22m" until `to`. */
-export function CountdownText({ to, className }: { to: Date; className?: string }) {
+const DAY_MS = 86_400_000;
+// The winner is announced by hand, so this stretch of the bar is just a short fixed one.
+const WINNER_DAYS = 3;
+
+function dateRange(from: Date, to: Date) {
+  const end = from.getMonth() === to.getMonth() ? to.getDate() : formatContestDate(to);
+  return `${formatContestDate(from)} – ${end}`;
+}
+
+type TimelineContest = Pick<ContestTiming, 'startsAt' | 'votingStartsAt' | 'endsAt'> & { phase: ContestPhase };
+
+/** The schedule as a bar: each stage sized by its length, filled up to today. */
+export function ContestTimeline({ contest }: { contest: TimelineContest }) {
   const now = useNow();
-  const parts = now ? countdownParts(to, now) : null;
-  const text = !parts
-    ? '–'
-    : parts.days > 0
-      ? `${parts.days}d ${parts.hours}h ${parts.minutes}m`
-      : `${parts.hours}h ${parts.minutes}m ${parts.seconds}s`;
+  const { phase, startsAt, votingStartsAt, endsAt } = contest;
+  const elapsed = (from: Date, to: Date) => (now ? Math.min(1, Math.max(0, (now.getTime() - from.getTime()) / (to.getTime() - from.getTime()))) : 0);
+  const closed = phase === 'voting' || phase === 'judging';
+
+  const stages = [
+    {
+      days: (votingStartsAt.getTime() - startsAt.getTime()) / DAY_MS,
+      fill: closed ? 1 : phase === 'open' ? elapsed(startsAt, votingStartsAt) : 0,
+      active: phase === 'open',
+      title: phase === 'open' ? 'Entries open now' : 'Entries',
+      note:
+        now &&
+        (phase === 'open'
+          ? `Until ${formatContestDate(votingStartsAt)} · ${timeLeft(votingStartsAt, now)} left`
+          : closed
+            ? `Closed ${formatContestDate(votingStartsAt)}`
+            : `Opens ${formatContestDate(startsAt)}`),
+    },
+    {
+      days: (endsAt.getTime() - votingStartsAt.getTime()) / DAY_MS,
+      fill: phase === 'judging' ? 1 : phase === 'voting' ? elapsed(votingStartsAt, endsAt) : 0,
+      active: phase === 'voting',
+      title: phase === 'voting' ? 'Voting now' : 'Voting',
+      note:
+        now &&
+        (phase === 'voting' ? `${timeLeft(endsAt, now)} left` : phase === 'judging' ? `Closed ${formatContestDate(endsAt)}` : dateRange(votingStartsAt, endsAt)),
+    },
+    {
+      days: WINNER_DAYS,
+      fill: 0,
+      active: phase === 'judging',
+      title: 'Winner',
+      note: now && (phase === 'judging' ? 'Coming soon' : formatContestDate(new Date(endsAt.getTime() + DAY_MS))),
+    },
+  ];
+
   return (
-    <span className={cn('tabular-nums', className)} role='timer'>
-      {text}
-    </span>
+    <ol className='mt-[22px] grid gap-[3px]' style={{ gridTemplateColumns: stages.map(({ days }) => `minmax(min-content, ${Math.max(days, 1)}fr)`).join(' ') }}>
+      {stages.map(({ title, note, fill, active }, index) => (
+        // Only the first stage is wide enough to wrap on a phone.
+        <li key={title} className={cn('group text-[12.5px] text-subtle', index > 0 && 'whitespace-nowrap')}>
+          <span className='block h-2 overflow-hidden bg-foreground/10 group-first:rounded-l group-last:rounded-r'>
+            <span className='block h-full bg-main transition-[width] duration-500' style={{ width: `${fill * 100}%` }} />
+          </span>
+          <span className={cn('mt-2 block pr-2 font-semibold', active ? 'text-main' : 'text-foreground')}>{title}</span>
+          <span className='block pr-2'>{note || '\u00a0'}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
