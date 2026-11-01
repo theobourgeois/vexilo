@@ -1,7 +1,7 @@
 import { db } from '@/db';
 import { flagTags } from '@/db/schema';
 import { findExistingFlags, resolveWikimediaFlag, type ExistingFlagMatch } from '@/actions/batch-flags';
-import { uploadFile } from '@/actions/s3';
+import { uploadFile } from '@/lib/storage/s3';
 import { buildUsageLog } from '@/lib/ai/flag-metadata-pipeline';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { openai } from '@ai-sdk/openai';

@@ -11,7 +11,7 @@ import { extractPalette } from '@/lib/flag-palette';
 import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG, type StoredStudioDesign } from '@/lib/studio-design';
 import { studioDesignSchema } from '@/lib/studio-design-schema';
 import { createFlagRequest } from './requests';
-import { uploadFile } from './s3';
+import { uploadFile } from '@/lib/storage/s3';
 
 const postSchema = z.object({
   name: z.string().trim().min(1).max(120),

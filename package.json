@@ -24,11 +24,12 @@
     "emblems:review": "tsx scripts/emblems/build-review.ts",
     "parts:backfill": "tsx scripts/parts/backfill-flag-parts.ts",
     "parts:raster": "tsx scripts/parts/backfill-raster-parts.ts",
-    "parts:raster:test": "tsx --test scripts/parts/raster-extractor.test.ts"
+    "parts:raster:test": "tsx --test scripts/parts/raster-extractor.test.ts",
+    "test": "tsx --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.58",
-    "@auth/drizzle-adapter": "^1.10.0",
+    "@auth/drizzle-adapter": "^1.11.3",
     "@aws-sdk/client-s3": "^3.840.0",
     "@neondatabase/serverless": "^1.0.1",
     "@phosphor-icons/react": "^2.1.10",
@@ -50,24 +51,26 @@
     "ai": "^6.0.174",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "domhandler": "^6.0.1",
     "dotenv": "^17.0.0",
-    "drizzle-orm": "^0.44.2",
+    "drizzle-orm": "^0.45.4",
     "fuse.js": "^7.1.0",
-    "next": "15.3.8",
-    "next-auth": "^4.24.11",
+    "htmlparser2": "^12.0.0",
+    "next": "15.5.28",
+    "next-auth": "^4.24.15",
     "next-themes": "^0.4.6",
     "opentype.js": "^2.0.0",
     "paper": "^0.12.18",
     "pg": "^8.16.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.5",
     "sonner": "^2.0.5",
     "tailwind-merge": "^3.3.1",
     "three": "^0.186.1",
     "use-debounce": "^10.0.5",
     "vaul": "^1.1.2",
-    "zod": "^4.4.2",
+    "zod": "^4.6.7",
     "zustand": "^5.0.6"
   },
   "devDependencies": {
@@ -80,11 +83,14 @@
     "@types/three": "^0.186.0",
     "drizzle-kit": "^0.31.4",
     "eslint": "^9",
-    "eslint-config-next": "15.3.4",
+    "eslint-config-next": "15.5.28",
     "playwright-core": "^1.64.1",
     "tailwindcss": "^4",
     "tsx": "^4.20.3",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "^8.5.32"
   }
 }

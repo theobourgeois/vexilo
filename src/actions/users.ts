@@ -3,7 +3,7 @@
 import { db } from "@/db";
 import { redis } from "@/db/redis";
 import { flags, users } from "@/db/schema";
-import { deleteFileFromUrl, uploadFile } from "@/actions/s3";
+import { deleteFileFromUrl, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
 import { eq } from "drizzle-orm";

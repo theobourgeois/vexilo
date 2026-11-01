@@ -13,7 +13,7 @@ import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { contestPhase, seededShuffle, STATEMENT_MAX, type ContestPhase } from '@/lib/contest';
 import type { StoredStudioDesign, StudioDesign } from '@/lib/studio-design';
 import { studioDesignSchema } from '@/lib/studio-design-schema';
-import { deleteFileFromUrl, uploadFile } from './s3';
+import { deleteFileFromUrl, uploadFile } from '@/lib/storage/s3';
 
 type ContestRow = typeof contests.$inferSelect;
 

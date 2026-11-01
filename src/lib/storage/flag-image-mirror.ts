@@ -1,4 +1,5 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { sanitizeSvg } from '@/lib/svg-sanitize';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
@@ -224,6 +225,13 @@ async function mirrorFlagImage(flag: MirrorableFlag): Promise<string> {
   }
 
   const download = await downloadExternalImage(flag.image);
+  const body =
+    download.contentType === 'image/svg+xml'
+      ? sanitizeSvg(Buffer.from(download.bytes).toString())
+      : Buffer.from(download.bytes);
+  if (!body) {
+    throw new Error('Downloaded SVG is not valid');
+  }
   const key = getTargetKey(flag, download.extension);
   const targetUrl = `${CLOUD_FRONT_URL}/${key}`;
 
@@ -231,7 +239,7 @@ async function mirrorFlagImage(flag: MirrorableFlag): Promise<string> {
     new PutObjectCommand({
       Bucket: getBucketName(),
       Key: key,
-      Body: Buffer.from(download.bytes),
+      Body: body,
       ContentType: download.contentType,
       CacheControl: 'public, max-age=31536000, immutable',
     }),
