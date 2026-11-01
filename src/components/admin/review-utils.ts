@@ -1,5 +1,6 @@
 import type { ReviewQueueItem } from '@/actions/requests';
 import { checkFileLikeName } from '@/lib/batch-flags';
+import { MAKER_TAGS } from '@/lib/studio-design';
 import { diffLists } from '@/lib/text-diff';
 
 export type ReviewFilter = 'all' | 'new' | 'edits' | 'attention';
@@ -47,6 +48,10 @@ export function groupQueueItems(items: ReviewQueueItem[]): ReviewGroup[] {
 export function needsLook(item: ReviewQueueItem): string | null {
   if (item.duplicateOf) {
     return 'Already on Vexilo';
+  }
+  // Flags made in the flag maker are named by hand and are someone's own design, so there's nothing to cite.
+  if ((item.flag.tags ?? []).some((tag) => MAKER_TAGS.includes(tag))) {
+    return null;
   }
   if (!item.isEdit && checkFileLikeName(item.flag.flagName)) {
     return 'Name looks like a file name';
