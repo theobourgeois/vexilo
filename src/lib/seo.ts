@@ -2,6 +2,8 @@ export const SITE_URL = 'https://vexilo.org';
 
 export const flagPath = (name: string) => `/flag/${encodeURIComponent(name)}`;
 
+export const contestPath = (slug: string) => `/contest/${slug}`;
+
 export const absoluteUrl = (path: string) => new URL(path, SITE_URL).toString();
 
 // Names that already say what kind of flag they are ("Eureka Flag", "Presidential Standard of Yemen").
