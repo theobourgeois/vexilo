@@ -11,30 +11,24 @@ import { useRouter } from 'next/navigation';
 import React from 'react';
 import { useSession } from 'next-auth/react';
 import { ReportDialog } from '@/components/ReportDialog';
-import { RelatedFlag } from '@/lib/types';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
+import { useLiveFavorites } from '@/hooks/useLiveFavorites';
 
 type FlagActionsProps = {
-  flag: {
-    id: string;
-    name: string;
-    image: string;
-    link: string;
-    index: number;
-    tags: string[];
-    description: string;
-    favorites?: number;
-    isFavorite?: boolean;
-    relatedFlags?: RelatedFlag[];
-    sources: string[];
-  };
+  /** `favorites` is the cached count every visitor gets; the live one comes from the browser. */
+  flag: { id: string; name: string; favorites: number };
 };
 
 export default function FlagActions({ flag }: FlagActionsProps) {
   const queryClient = useQueryClient();
   const session = useSession();
   const router = useRouter();
-  const [isFavorite, setIsFavorite] = React.useState(flag.isFavorite || false);
+  const { live, pending: favoritePending } = useLiveFavorites([flag.id]);
+  const liveFavorite = live?.get(flag.id);
+  const savedFavorite = liveFavorite?.isFavorite ?? false;
+  // What the visitor picked on this page; null until they toggle.
+  const [favoriteChoice, setFavoriteChoice] = React.useState<boolean | null>(null);
+  const isFavorite = favoriteChoice ?? savedFavorite;
   const [isSettingProfileFlag, setIsSettingProfileFlag] = React.useState(false);
 
   const { data: userData } = useQuery({
@@ -51,11 +45,13 @@ export default function FlagActions({ flag }: FlagActionsProps) {
       toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
-    const wasFavorite = isFavorite;
-    setIsFavorite(!wasFavorite);
+    // Toggling flips whatever is saved, so wait until we know what that is.
+    if (favoritePending) return;
+    const previousChoice = favoriteChoice;
+    setFavoriteChoice(!isFavorite);
     toggleFavoriteFlag(flag.id).then((isSuccess) => {
       if (!isSuccess) {
-        setIsFavorite(wasFavorite);
+        setFavoriteChoice(previousChoice);
         return;
       }
       queryClient.invalidateQueries({ queryKey: ['flags'], refetchType: 'none' });
@@ -116,7 +112,7 @@ export default function FlagActions({ flag }: FlagActionsProps) {
 
   const favoriteCount = Math.max(
     0,
-    (flag.favorites ?? 0) + (isFavorite === Boolean(flag.isFavorite) ? 0 : isFavorite ? 1 : -1),
+    (liveFavorite?.favorites ?? flag.favorites) + (isFavorite === savedFavorite ? 0 : isFavorite ? 1 : -1),
   );
 
   return (
