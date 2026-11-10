@@ -11,9 +11,21 @@ const SECURITY_HEADERS = [
   { key: 'Content-Security-Policy', value: "frame-ancestors 'self'; object-src 'none'; base-uri 'self'" },
 ];
 
+/**
+ * Flag pages are the same for every visitor (favorites are filled in by the browser), and nearly
+ * all of their traffic is crawlers, so Vercel's CDN keeps each one for a day instead of rendering
+ * it per request. Only the CDN reads this header; browsers still get Next's "don't store". The
+ * page tags itself `flags`, so a flag edit clears the copies. Not the edit form (`?mode=edit`).
+ */
+const FLAG_PAGE_CDN_CACHE = {
+  source: '/flag/:flagName',
+  missing: [{ type: 'query' as const, key: 'mode' }],
+  headers: [{ key: 'Vercel-CDN-Cache-Control', value: 's-maxage=86400' }],
+};
+
 const nextConfig: NextConfig = {
   async headers() {
-    return [{ source: '/:path*', headers: SECURITY_HEADERS }];
+    return [{ source: '/:path*', headers: SECURITY_HEADERS }, FLAG_PAGE_CDN_CACHE];
   },
   turbopack: {
     resolveAlias: Object.fromEntries(PAPER_NODE_ONLY.map((name) => [name, './src/lib/stubs/empty.cjs'])),

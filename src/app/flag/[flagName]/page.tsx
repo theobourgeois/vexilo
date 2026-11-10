@@ -6,17 +6,20 @@ import {
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, ChevronRight } from '@/components/icons';
 import { after } from 'next/server';
+import { addCacheTag } from '@vercel/functions';
+import { FLAGS_TAG } from '@/lib/cache-tags';
 import { Button } from '@/components/ui/button';
 import { notFound } from 'next/navigation';
 import Contributors, { type Contributor, type EditEntry } from './Contributors';
 import FlagActions from './FlagActions';
+import FavoriteCount from './FavoriteCount';
+import RelatedFlagCards from './RelatedFlagCards';
 import ExpandableDescription from './ExpandableDescription';
 import FlagViewer from './FlagViewer';
 import FlagViewTracker from './FlagViewTracker';
 import FlagTimeline from './FlagTimeline';
 import { getFlagTimeline } from '@/actions/flag-timeline';
 import type { FlagAiResearchSource, FlagAiStructuredData } from '@/db/schema';
-import FlagCard from '@/components/FlagCard';
 import { Metadata } from 'next';
 import Tag from '@/components/Tag';
 import { Suspense } from 'react';
@@ -212,23 +215,19 @@ async function RelatedFlagsSection({ flagId }: { flagId: string }) {
   return (
     <section className='mt-14'>
       <h2 className='mb-4 text-[17px] font-semibold tracking-[-0.02em]'>Related flags</h2>
-      <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-        {relatedFlags.map((relatedFlag) => (
-          <FlagCard
-            key={relatedFlag.id}
-            id={relatedFlag.id}
-            flagName={relatedFlag.name}
-            flagImage={relatedFlag.image}
-            sources={relatedFlag.sources}
-            favorites={relatedFlag.favorites}
-            isFavorite={relatedFlag.isFavorite}
-            link={relatedFlag.link}
-            index={relatedFlag.index}
-            tags={relatedFlag.tags}
-            description={relatedFlag.description}
-          />
-        ))}
-      </div>
+      <RelatedFlagCards
+        flags={relatedFlags.map((relatedFlag) => ({
+          id: relatedFlag.id,
+          flagName: relatedFlag.name,
+          flagImage: relatedFlag.image,
+          sources: relatedFlag.sources,
+          favorites: relatedFlag.favorites,
+          link: relatedFlag.link,
+          index: relatedFlag.index,
+          tags: relatedFlag.tags,
+          description: relatedFlag.description,
+        }))}
+      />
     </section>
   );
 }
@@ -375,6 +374,10 @@ export default async function FlagPage({
   params: Promise<{ flagName: string }>;
   searchParams: Promise<{ mode: string }>;
 }) {
+  // The CDN keeps this page (see next.config.ts); the tag is what lets a flag edit throw its copies
+  // away, the same way it expires the cached data. First, so a "not found" answer is tagged too.
+  await addCacheTag(FLAGS_TAG);
+
   const { flagName: flagNameRaw } = await params;
   const flagName = decodeURIComponent(flagNameRaw);
   const flag = await getFlagDetailFromName(flagName);
@@ -437,7 +440,7 @@ export default async function FlagPage({
   const firstTag = flag.displayTags.find((t) => t.toLowerCase() !== flag.name.toLowerCase());
   const details: [string, React.ReactNode][] = [
     ['Catalogue', <span key='i' className='tabular-nums'>#{String(flag.index).padStart(4, '0')}</span>],
-    ['Favorites', <span key='f' className='tabular-nums'>{flag.favorites}</span>],
+    ['Favorites', <FavoriteCount key='f' flagId={flag.id} cached={flag.favorites} />],
     ['Added', formatDate(flag.createdAt)],
   ];
   if (flag.link) {
@@ -513,7 +516,7 @@ export default async function FlagPage({
             </div>
           )}
           <div className='mt-5'>
-            <FlagActions flag={{ ...flag, relatedFlags: [] }} />
+            <FlagActions flag={{ id: flag.id, name: flag.name, favorites: flag.favorites }} />
           </div>
           {flag.displayTags.length > 0 && (
             <div className='mt-6 flex flex-wrap gap-1.5'>

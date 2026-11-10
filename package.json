@@ -48,6 +48,7 @@
     "@tavily/core": "^0.7.3",
     "@upstash/redis": "^1.35.1",
     "@vercel/analytics": "^1.5.0",
+    "@vercel/functions": "^3.11.1",
     "ai": "^6.0.174",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

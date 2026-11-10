@@ -382,16 +382,22 @@ function withFavorites<T extends { id: string; favorites: number }>(
   });
 }
 
-/** Flags in the given order. The rows are shared and cached; only the favorites are per user. */
-async function getFlagsByIds(flagIds: string[]) {
+/** Flags in the given order, as every visitor sees them: shared, cached rows with no one's favorites. */
+async function getSharedFlagsByIds(flagIds: string[]) {
   if (flagIds.length === 0) {
     return [];
   }
 
-  const [rows, overlay] = await Promise.all([getCachedFlagsByIds(flagIds), getLiveFavorites(flagIds)]);
+  const rows = await getCachedFlagsByIds(flagIds);
   const order = new Map(flagIds.map((id, index) => [id, index]));
 
-  return withFavorites(rows, overlay).sort((left, right) => (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0));
+  return [...rows].sort((left, right) => (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0));
+}
+
+/** Flags in the given order, with live favorites for whoever is signed in (see getLiveFavorites). */
+async function getFlagsByIds(flagIds: string[]) {
+  const [rows, overlay] = await Promise.all([getSharedFlagsByIds(flagIds), getLiveFavorites(flagIds)]);
+  return withFavorites(rows, overlay);
 }
 
 // Helper function to update tag counts when tags are added or removed
@@ -672,6 +678,11 @@ const getCachedFlagDetailRow = unstable_cache(
   { revalidate: FLAG_PAGE_CACHE_SECONDS, tags: [FLAGS_TAG] },
 );
 
+/**
+ * A flag page's data, the same for every visitor so the rendered page can be cached and shared.
+ * The favorite count is the cached one; the page gets the live count and the visitor's own mark
+ * from the browser (see useLiveFavorites).
+ */
 export async function getFlagDetailFromName(flagName: string) {
   const cached = await getCachedFlagDetailRow(flagName);
   if (!cached) {
@@ -684,7 +695,6 @@ export async function getFlagDetailFromName(flagName: string) {
     metadataGeneratedAt: toDate(cached.metadataGeneratedAt),
     metadataUpdatedAt: toDate(cached.metadataUpdatedAt),
   };
-  const favoriteState = (await getLiveFavorites([row.id]))?.get(row.id);
 
   const metadata = buildResolvedFlagMetadata(row);
   const displayDescription =
@@ -703,12 +713,11 @@ export async function getFlagDetailFromName(flagName: string) {
     sources: row.sources,
     tags: row.tags,
     description: row.description,
-    favorites: favoriteState?.favorites ?? row.favorites,
+    favorites: row.favorites,
     views: row.views,
     createdAt: row.createdAt,
     relatedFlags: row.relatedFlags,
     remixOf: row.remixOf,
-    isFavorite: favoriteState?.isFavorite ?? false,
     metadata,
     displayDescription,
     displayTags,
@@ -745,11 +754,16 @@ async function getFlagIdsBySharedTags(flagId: string, tags: string[], limit: num
 
 /**
  * Related flags: the ones people linked first, then the most similar flags (by generated traits
- * when the flag has them, otherwise by shared tags). Only IDs are cached, so favorites stay per user.
+ * when the flag has them, otherwise by shared tags). The same for every visitor, like the flag
+ * page they appear on; the page adds each visitor's favorites from the browser.
  */
 export async function getRelatedFlags(flagId: string) {
+  return getSharedFlagsByIds(await getRelatedFlagIds(flagId));
+}
+
+async function getRelatedFlagIds(flagId: string) {
   const cached = await redis.get<string[]>(relatedFlagsCacheKey(flagId)).catch(() => null);
-  if (Array.isArray(cached)) return getFlagsByIds(cached);
+  if (Array.isArray(cached)) return cached;
 
   const [flag] = await db
     .select({ relatedFlags: flags.relatedFlags, tags: flags.tags })
@@ -774,7 +788,7 @@ export async function getRelatedFlags(flagId: string) {
   const ids = Array.from(new Set([...linked, ...similar])).slice(0, Math.max(RELATED_LIMIT, linked.length));
 
   await redis.set(relatedFlagsCacheKey(flagId), ids, { ex: RELATED_CACHE_SECONDS }).catch(() => null);
-  return getFlagsByIds(ids);
+  return ids;
 }
 
 const recommendationMetadataColumns = {
@@ -828,7 +842,7 @@ export async function getExperimentalRecommendedFlags(flagId: string) {
     .limit(1);
 
   if (!hasRecommendationMetadata(sourceMetadata ?? null)) {
-    return getRelatedFlags(flagId);
+    return getFlagsByIds(await getRelatedFlagIds(flagId));
   }
 
   const cacheKey = `experimental-recommendations-${EXPERIMENTAL_RECOMMENDATION_CACHE_VERSION}-${flagId}`;
@@ -840,7 +854,7 @@ export async function getExperimentalRecommendedFlags(flagId: string) {
 
   const rankedIds = await rankSimilarByMetadata(flagId, sourceMetadata, EXPERIMENTAL_RECOMMENDATION_LIMIT);
   if (rankedIds.length === 0) {
-    return getRelatedFlags(flagId);
+    return getFlagsByIds(await getRelatedFlagIds(flagId));
   }
 
   await redis.set(cacheKey, rankedIds, {

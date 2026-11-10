@@ -16,16 +16,21 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
 import FlagImage from '@/components/FlagImage';
 import { cn } from '@/lib/utils';
+import { useHydrated } from '@/hooks/useHydrated';
 import { MakerBadge } from '@/components/MakerBadge';
 
-type FlagCardProps = Flag;
+type FlagCardProps = Flag & {
+  /** The visitor's own favorites are still loading (see useLiveFavorites), so the heart waits. */
+  favoritesPending?: boolean;
+};
 
 export default function FlagCard({
   id,
   flagName,
   flagImage,
   favorites,
-  isFavorite: initialIsFavorite,
+  isFavorite: savedFavorite = false,
+  favoritesPending,
   link,
   index,
   tags,
@@ -34,11 +39,14 @@ export default function FlagCard({
   sources,
 }: FlagCardProps) {
   const { data: session } = useSession();
-  const [favoriteCount, setFavoriteCount] = React.useState(favorites || 0);
+  // Signed-in controls wait for hydration: the server renders every card signed out.
+  const showUserControls = useHydrated() && Boolean(session?.user);
   const queryClient = useQueryClient();
-  const [isFavorite, setIsFavorite] = React.useState(
-    initialIsFavorite || false,
-  );
+  // What the visitor picked on this card; null until they toggle. The heart and the count are
+  // worked out from the props, which can arrive after the card does.
+  const [favoriteChoice, setFavoriteChoice] = React.useState<boolean | null>(null);
+  const isFavorite = favoriteChoice ?? savedFavorite;
+  const favoriteCount = Math.max(0, (favorites ?? 0) + (isFavorite === savedFavorite ? 0 : isFavorite ? 1 : -1));
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isSettingProfileFlag, setIsSettingProfileFlag] = React.useState(false);
   const router = useRouter();
@@ -57,14 +65,12 @@ export default function FlagCard({
       toastErrorWithLogin('You must be logged in to favorite a flag');
       return;
     }
-    const wasFavorite = isFavorite;
-    const delta = wasFavorite ? -1 : 1;
-    setFavoriteCount((prev) => prev + delta);
-    setIsFavorite(!wasFavorite);
+    if (favoritesPending) return;
+    const previousChoice = favoriteChoice;
+    setFavoriteChoice(!isFavorite);
     toggleFavoriteFlag(id, true).then((isSuccess) => {
       if (!isSuccess) {
-        setFavoriteCount((prev) => prev - delta);
-        setIsFavorite(wasFavorite);
+        setFavoriteChoice(previousChoice);
         return;
       }
       // Mark lists stale without refetching the one on screen, so the grid doesn't
@@ -130,7 +136,7 @@ export default function FlagCard({
         >
           <Shuffle />
         </Button>
-        {session?.user && (
+        {showUserControls && (
           <>
             <Button
               variant='neutral'
@@ -186,7 +192,7 @@ export default function FlagCard({
       {card}
 
       {/* Edit Dialog */}
-      {session?.user && (
+      {showUserControls && (
         <Dialog
           open={isDialogOpen}
           onOpenChange={(val) => {
