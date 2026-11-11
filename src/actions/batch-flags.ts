@@ -173,9 +173,13 @@ export async function findExistingFlags(
       ),
     ),
   );
+  // Only links to a specific Wikimedia file identify a flag. Bare links like
+  // "https://commons.wikimedia.org" are shared by unrelated flags.
+  const fileSources = (sources: string[]) =>
+    sources.filter((source) => parseWikimediaFileTitle(source) !== null);
   const sourceUrls = Array.from(
-    new Set(named.flatMap((candidate) => candidate.sources)),
-  ).filter((source) => /wikimedia\.org|wikipedia\.org/i.test(source));
+    new Set(named.flatMap((candidate) => fileSources(candidate.sources))),
+  );
 
   const lowerNameList = sql.join(
     lowerNames.map((name) => sql`${name}`),
@@ -216,10 +220,11 @@ export async function findExistingFlags(
   const matches: ExistingFlagMatch[] = [];
   for (const candidate of named) {
     const normalizedName = normalizeFlagNameForComparison(candidate.name);
+    const candidateFileSources = fileSources(candidate.sources);
     const live = liveFlags.find(
       (flag) =>
         normalizeFlagNameForComparison(flag.name) === normalizedName ||
-        flag.sources.some((source) => candidate.sources.includes(source)),
+        flag.sources.some((source) => candidateFileSources.includes(source)),
     );
     if (live) {
       matches.push({ key: candidate.key, name: live.name, status: 'live' });
