@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { toggleFavoriteFlag } from '@/actions/flags';
+import { getRandomFlagsForQuiz, toggleFavoriteFlag } from '@/actions/flags';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
 import FlagImage from '@/components/FlagImage';
 import { Button } from '@/components/ui/button';
@@ -25,11 +25,13 @@ import { COUNTRIES, PLACES, type GameFlag } from '@/lib/games/pool';
 import { cn } from '@/lib/utils';
 
 type Mode = 'name' | 'find';
-type QuizSet = 'countries' | 'us' | 'more' | 'all';
+type QuizSet = 'countries' | 'us' | 'more' | 'every';
+
+type QuizFlag = Pick<GameFlag, 'id' | 'name' | 'href' | 'image'>;
 
 type Question = {
-  answer: GameFlag;
-  options: GameFlag[];
+  answer: QuizFlag;
+  options: QuizFlag[];
 };
 
 const BEST_KEY = 'vexilo-quiz-best';
@@ -42,11 +44,18 @@ const GROUPS = {
   more: PLACES.filter((f) => f.set !== 'us-state'),
 };
 const groupOf = (flag: GameFlag) => (flag.set === 'country' ? GROUPS.countries : flag.set === 'us-state' ? GROUPS.us : GROUPS.more);
-const SETS: Record<QuizSet, GameFlag[]> = { ...GROUPS, all: [...COUNTRIES, ...PLACES] };
+const SETS: Record<Exclude<QuizSet, 'every'>, GameFlag[]> = GROUPS;
+
+const SET_OPTIONS: { value: QuizSet; label: string }[] = [
+  { value: 'countries', label: 'Countries' },
+  { value: 'us', label: 'US states' },
+  { value: 'more', label: 'More places' },
+  { value: 'every', label: 'Every flag' },
+];
 
 const pickFrom = <T,>(items: T[]) => items[Math.floor(Math.random() * items.length)];
 
-function makeQuestion(set: QuizSet, recent: string[]): Question {
+function makeQuestion(set: Exclude<QuizSet, 'every'>, recent: string[]): Question {
   const pool = SETS[set];
   const fresh = pool.filter((f) => !recent.includes(f.id));
   const answer = pickFrom(fresh.length ? fresh : pool);
@@ -56,7 +65,40 @@ function makeQuestion(set: QuizSet, recent: string[]): Question {
     const flag = pickFrom(group);
     picked.set(flag.id, flag);
   }
-  return { answer, options: [...picked.values()].sort(() => Math.random() - 0.5) };
+  return { answer, options: shuffle([...picked.values()]) };
+}
+
+function shuffle<T>(items: T[]) {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+/** "Every flag" draws from the whole library, a batch at a time from the server. */
+const EVERY_REFILL_AT = 16;
+
+/** Four flags off the front of the bank with different names, or null if it runs dry. */
+function takeQuestion(bank: QuizFlag[]): Question | null {
+  const options: QuizFlag[] = [];
+  const names = new Set<string>();
+  const skipped: QuizFlag[] = [];
+  while (bank.length && options.length < 4) {
+    const flag = bank.shift()!;
+    const key = flag.name.trim().toLowerCase();
+    if (names.has(key)) skipped.push(flag);
+    else {
+      names.add(key);
+      options.push(flag);
+    }
+  }
+  bank.unshift(...skipped);
+  if (options.length < 4) {
+    bank.unshift(...options);
+    return null;
+  }
+  return { answer: pickFrom(options), options };
 }
 
 export default function FlagQuiz() {
@@ -65,6 +107,11 @@ export default function FlagQuiz() {
   const [mode, setMode] = React.useState<Mode>('name');
   const [set, setSet] = React.useState<QuizSet>('countries');
   const recent = React.useRef<string[]>([]);
+  const bank = React.useRef<QuizFlag[]>([]);
+  const refilling = React.useRef<Promise<boolean> | null>(null);
+  /** Bumped by every next(), so a slow "Every flag" load can't overwrite a newer question. */
+  const turn = React.useRef(0);
+  const [loadFailed, setLoadFailed] = React.useState(false);
   const [question, setQuestion] = React.useState<Question | null>(null);
   const [selected, setSelected] = React.useState<string | null>(null);
   const [score, setScore] = React.useState(0);
@@ -74,16 +121,70 @@ export default function FlagQuiz() {
   const [history, setHistory] = React.useState<boolean[]>([]);
   const [isFavorite, setIsFavorite] = React.useState(false);
 
-  const next = React.useCallback((from: QuizSet = set) => {
-    const question = makeQuestion(from, recent.current);
-    recent.current = [question.answer.id, ...recent.current].slice(0, Math.floor(SETS[from].length / 2));
-    setQuestion(question);
-    setSelected(null);
-    setIsFavorite(false);
-  }, [set]);
+  const refill = React.useCallback(() => {
+    refilling.current ??= getRandomFlagsForQuiz()
+      .then((rows) => {
+        const have = new Set(bank.current.map((f) => f.id));
+        const fresh = rows
+          .filter((row) => row.name && row.image && !have.has(row.id))
+          .map((row) => ({ ...row, href: `/flag/${encodeURIComponent(row.name)}` }));
+        bank.current.push(...shuffle(fresh));
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => {
+        refilling.current = null;
+      });
+    return refilling.current;
+  }, []);
+
+  const next = React.useCallback(
+    (from: QuizSet = set) => {
+      const ticket = ++turn.current;
+      setSelected(null);
+      setIsFavorite(false);
+      setLoadFailed(false);
+      if (from !== 'every') {
+        const question = makeQuestion(from, recent.current);
+        recent.current = [question.answer.id, ...recent.current].slice(0, Math.floor(SETS[from].length / 2));
+        setQuestion(question);
+        return;
+      }
+      const ready = takeQuestion(bank.current);
+      if (bank.current.length < EVERY_REFILL_AT) void refill();
+      if (ready) {
+        setQuestion(ready);
+        return;
+      }
+      setQuestion(null);
+      void (async () => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const ok = await refill();
+          if (ticket !== turn.current) return;
+          const question = ok ? takeQuestion(bank.current) : null;
+          if (question) {
+            setQuestion(question);
+            return;
+          }
+        }
+        setLoadFailed(true);
+      })();
+    },
+    [set, refill],
+  );
 
   React.useEffect(() => {
-    next();
+    // /play/quiz?set=every opens straight into a set, so a mode can be shared.
+    const linked = new URLSearchParams(window.location.search).get('set');
+    const start = SET_OPTIONS.some((o) => o.value === linked) ? (linked as QuizSet) : set;
+    setSet(start);
+    next(start);
+    // On phones the set picker scrolls sideways; bring a linked set into view.
+    requestAnimationFrame(() =>
+      document
+        .querySelector(`[aria-label='Which flags'] [aria-checked='true']`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' }),
+    );
     setBest(Number(localStorage.getItem(BEST_KEY) || 0));
     // Only the first question; later ones come from answering.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,6 +269,21 @@ export default function FlagQuiz() {
     </div>
   );
 
+  const waiting = !question && (
+    <div className='grid min-h-[120px] place-items-center text-[13.5px] text-subtle'>
+      {loadFailed ? (
+        <span className='inline-flex items-center gap-3'>
+          Couldn’t load flags.
+          <Button variant='ghost' onClick={() => next()}>
+            Try again
+          </Button>
+        </span>
+      ) : (
+        'Shuffling the library…'
+      )}
+    </div>
+  );
+
   const footer = answered && question && (
     <div className='mt-[18px] flex flex-wrap items-center gap-3 border-t border-line pt-[18px]'>
       <p className='min-w-0 flex-1 text-[13.5px] text-subtle'>
@@ -212,18 +328,18 @@ export default function FlagQuiz() {
         />
         <Segmented
           aria-label='Which flags'
+          className='max-w-full overflow-x-auto [scrollbar-width:none]'
           value={set}
           onChange={(s) => {
             setSet(s);
             recent.current = [];
+            const url = new URL(window.location.href);
+            if (s === 'countries') url.searchParams.delete('set');
+            else url.searchParams.set('set', s);
+            window.history.replaceState(window.history.state, '', url);
             next(s);
           }}
-          options={[
-            { value: 'countries', label: 'Countries' },
-            { value: 'us', label: 'US states' },
-            { value: 'more', label: 'More places' },
-            { value: 'all', label: 'All' },
-          ]}
+          options={SET_OPTIONS}
         />
         <div className='flex gap-2 lg:ml-auto'>
           <Stat icon={<Fire weight='fill' />} label='Streak' value={streak} hot={streak > 0} />
@@ -237,6 +353,7 @@ export default function FlagQuiz() {
           <div className='bg-stage relative h-[300px] [container-type:size] sm:h-[380px]'>
             <span className='vx-label absolute left-[18px] top-4'>Question {total + (answered ? 0 : 1)}</span>
             <div className='absolute right-[18px] top-[18px]'>{historyDots}</div>
+            {!question && <div className='absolute inset-0 grid place-items-center'>{waiting}</div>}
             {question && (
               <div className='flag-stage absolute inset-x-8 bottom-8 top-14'>
                 <FlagImage
@@ -263,7 +380,7 @@ export default function FlagQuiz() {
           </div>
           <div className='px-6 pb-6 pt-[22px]'>
             <h1 className='mb-4 text-lg font-semibold tracking-[-0.02em]'>Which flag is this?</h1>
-            <div className='grid gap-2.5 sm:grid-cols-2'>
+            <div className='grid grid-cols-1 gap-2.5 sm:grid-cols-2'>
               {question?.options.map((option, i) => {
                 const isAnswer = option.id === question.answer.id;
                 const isPicked = option.id === selected;
@@ -311,6 +428,7 @@ export default function FlagQuiz() {
             </h1>
             {historyDots}
           </div>
+          {waiting}
           <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
             {question?.options.map((option, i) => {
               const isAnswer = option.id === question.answer.id;

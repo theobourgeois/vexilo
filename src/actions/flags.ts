@@ -864,27 +864,31 @@ export async function getExperimentalRecommendedFlags(flagId: string) {
   return getFlagsByIds(rankedIds);
 }
 
-export async function getRandomFlagsForQuiz() {
-  // Get 4 random flags directly from the database with favorites info
-  const randomFlags = await db
-    .select({
-      id: flags.id,
-      name: flags.name,
-      image: flags.image,
-      link: flags.link,
-      index: flags.index,
-      tags: flags.tags,
-      description: flags.description,
-      sources: flags.sources,
-      createdAt: flags.createdAt,
-      updatedAt: flags.updatedAt,
-      favorites: flags.favorites,
-      isFavorite: await isFavorite(),
-    })
+const getMaxFlagIndex = unstable_cache(
+  async () => {
+    const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${flags.index}), 0)` }).from(flags);
+    return Number(max);
+  },
+  ['flag-max-index-v1'],
+  { revalidate: FLAG_PAGE_CACHE_SECONDS, tags: [FLAGS_TAG] },
+);
+
+/**
+ * A random batch of library flags for the "Every flag" quiz. Picks random `index` values and looks
+ * them up through the unique index, so it never scans or sorts the whole table. Flags drawn in the
+ * flag maker are left out: the quiz is about flags that exist.
+ */
+export async function getRandomFlagsForQuiz(count = 32) {
+  const size = Math.min(Math.max(Math.floor(count), 4), 64);
+  const max = await getMaxFlagIndex();
+  const picks = new Set<number>();
+  // Ask for extra indexes; deleted flags and maker flags leave gaps.
+  while (picks.size < Math.min(size * 2, max + 1)) picks.add(Math.floor(Math.random() * (max + 1)));
+  const rows = await db
+    .select({ id: flags.id, name: flags.name, image: flags.image })
     .from(flags)
-    .orderBy(sql`RANDOM()`)
-    .limit(4);
-  return randomFlags;
+    .where(and(inArray(flags.index, [...picks]), sql`${flags.design} is null`, sql`${flags.remixOf} is null`));
+  return rows.slice(0, size);
 }
 
 async function isFavorite(userId?: string) {
