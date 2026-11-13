@@ -44,7 +44,7 @@ const GAMES = [
   {
     href: '/play/quiz',
     title: 'Flag quiz',
-    blurb: 'Endless rounds of naming flags, or finding them. Countries, US states, territories and more.',
+    blurb: 'Endless rounds of naming flags, or finding them. Countries, US states, territories, or every flag in the library.',
     art: <QuizArt />,
   },
 ];
