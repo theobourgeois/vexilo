@@ -1,14 +1,14 @@
 'use server';
 
 import { db } from '@/db';
-import { redis } from '@/db/redis';
+import { cacheGet, cacheSet } from '@/db/redis';
 import { flagRequests, flags, leaderboard, users } from '@/db/schema';
 import { TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
 import { and, asc, count, desc, eq, gte, inArray, min, sql } from 'drizzle-orm';
 
 const LEADER_BOARD_LIMIT = 5;
 export async function getLeaderboard(limit?: number) {
-  const leaderboardCache = await redis.get('leaderboard');
+  const leaderboardCache = await cacheGet('leaderboard');
   if (leaderboardCache) {
     return leaderboardCache as typeof ldbrd;
   }
@@ -54,7 +54,7 @@ export async function getLeaderboard(limit?: number) {
     }),
   );
 
-  await redis.set('leaderboard', ldbrd);
+  await cacheSet('leaderboard', ldbrd);
 
   return ldbrd;
 }
@@ -122,7 +122,7 @@ export type TopContributor = {
  * Empty when fewer than three people contributed, so a quiet week shows nothing.
  */
 export async function getTopContributorsThisWeek(): Promise<TopContributor[]> {
-  const cached = await redis.get<TopContributor[]>(TOP_CONTRIBUTORS_CACHE_KEY);
+  const cached = await cacheGet<TopContributor[]>(TOP_CONTRIBUTORS_CACHE_KEY);
   if (cached) {
     return cached;
   }
@@ -179,7 +179,7 @@ export async function getTopContributorsThisWeek(): Promise<TopContributor[]> {
   }
 
   // Approvals clear this; the expiry keeps the seven-day window moving.
-  await redis.set(TOP_CONTRIBUTORS_CACHE_KEY, result, { ex: 10 * 60 });
+  await cacheSet(TOP_CONTRIBUTORS_CACHE_KEY, result, { ex: 10 * 60 });
 
   return result;
 }

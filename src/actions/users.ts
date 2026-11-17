@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { redis } from "@/db/redis";
+import { cacheDel } from "@/db/redis";
 import { flags, users } from "@/db/schema";
 import { deleteFileFromUrl, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
@@ -159,7 +159,7 @@ async function replaceProfilePicture(userId: string, image: string | null) {
     .then((res) => res[0]?.image);
 
   await db.update(users).set({ image }).where(eq(users.id, userId));
-  await redis.del("leaderboard");
+  await cacheDel("leaderboard");
 
   if (previous?.startsWith(`${CLOUD_FRONT_URL}/${PROFILE_PICTURE_PREFIX}`)) {
     await deleteFileFromUrl(previous).catch((error) => {

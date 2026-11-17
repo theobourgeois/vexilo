@@ -4,58 +4,52 @@ import { db } from '@/db';
 import { redis } from '@/db/redis';
 import { flagViewDaily, flags } from '@/db/schema';
 import { sql } from 'drizzle-orm';
-import { cookies, headers } from 'next/headers';
+import { headers } from 'next/headers';
 import { after } from 'next/server';
 
-const VISITOR_COOKIE = 'vx_vid';
 const BOT_PATTERN = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|headless|lighthouse/i;
 
+/** Hour this server instance already tried to claim the flush for, to skip asking Redis again. */
+let flushCheckedHour: string | null = null;
+
 /**
- * Counts one view of a flag page. Every call adds a view; a visitor (anonymous cookie)
- * is counted once per flag per UTC day. Counts are buffered in Redis; see flushFlagViews.
+ * Counts one view of a flag page. Every call adds a view; `firstToday` (the browser keeps the list
+ * of flags it viewed today, see FlagViewTracker) also counts a visitor. Counts are buffered in
+ * Redis; see flushFlagViews.
+ *
+ * Upstash bills per command, so a view costs one HINCRBY, two for a visitor's first view.
  */
-export async function recordFlagView(flagId: string) {
+export async function recordFlagView(flagId: string, firstToday: boolean) {
   if (!/^[0-9a-f-]{36}$/i.test(flagId)) return;
   const userAgent = (await headers()).get('user-agent') ?? '';
   if (!userAgent || BOT_PATTERN.test(userAgent)) return;
 
-  const cookieStore = await cookies();
-  let visitorId = cookieStore.get(VISITOR_COOKIE)?.value;
-  if (!visitorId) {
-    visitorId = crypto.randomUUID();
-    cookieStore.set(VISITOR_COOKIE, visitorId, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 365,
-      path: '/',
-    });
-  }
-
   const now = new Date();
-  const day = now.toISOString().slice(0, 10);
-  const bucket = viewBucketKey(hourOf(now));
+  const hour = hourOf(now);
+  const bucket = viewBucketKey(hour);
+
   try {
-    const firstToday = await redis
-      .set(`flag-view:${day}:${flagId}:${visitorId}`, 1, { nx: true, ex: 60 * 60 * 48 })
-      .then((result) => result === 'OK')
-      // If the visitor check fails, still count the view but don't guess at visitors.
-      .catch(() => false);
     await redis.hincrby(bucket, `${flagId}:v`, 1);
-    if (firstToday) await redis.hincrby(bucket, `${flagId}:u`, 1);
-    await redis.expire(bucket, VIEW_BUCKET_TTL_SECONDS);
+    if (firstToday === true) await redis.hincrby(bucket, `${flagId}:u`, 1);
   } catch (error) {
-    console.error('[flag-views] Failed to record view', flagId, error);
+    console.error('[flag-views] Failed to record view', flagId, error instanceof Error ? error.message : error);
     return;
   }
 
   // The first view a few minutes into each hour writes the finished hours to the database.
-  if (now.getUTCMinutes() >= FLUSH_DELAY_MINUTES) {
+  if (now.getUTCMinutes() >= FLUSH_DELAY_MINUTES && flushCheckedHour !== hour) {
+    flushCheckedHour = hour;
     const claimed = await redis
-      .set(`flag-views:flush:${hourOf(now)}`, 1, { nx: true, ex: 60 * 60 * 2 })
+      .set(`flag-views:flush:${hour}`, 1, { nx: true, ex: 60 * 60 * 2 })
       .then((result) => result === 'OK')
       .catch(() => false);
-    if (claimed) after(() => flushFlagViews(now));
+    if (claimed) {
+      after(async () => {
+        // Once an hour rather than on every view: a safety net in case flushes keep failing.
+        await redis.expire(bucket, VIEW_BUCKET_TTL_SECONDS).catch(() => null);
+        await flushFlagViews(now);
+      });
+    }
   }
 }
 

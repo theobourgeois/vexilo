@@ -21,14 +21,22 @@ function seed(key: string) {
   return createHash('sha256').update(`${secret}:${key}`).digest().readUInt32LE(0);
 }
 
-/** The first answer served for a day sticks, even if the pool changes later that day. */
+/**
+ * The first answer served for a day sticks, even if the pool changes later that day. Without
+ * Redis the puzzle is generated fresh, which matches unless the pool changed.
+ */
 async function pinned<T>(key: string, make: () => T, valid: (value: T) => boolean): Promise<T> {
-  const existing = await redis.get<T>(key);
-  if (existing && valid(existing)) return existing;
-  const value = make();
-  await redis.set(key, value, { nx: true, ex: KEEP });
-  const stored = await redis.get<T>(key);
-  return stored && valid(stored) ? stored : value;
+  try {
+    const existing = await redis.get<T>(key);
+    if (existing && valid(existing)) return existing;
+    const value = make();
+    await redis.set(key, value, { nx: true, ex: KEEP });
+    const stored = await redis.get<T>(key);
+    return stored && valid(stored) ? stored : value;
+  } catch (error) {
+    console.warn('[games] Redis unavailable for', key, error instanceof Error ? error.message : error);
+    return make();
+  }
 }
 
 function assertDate(date: string) {
@@ -73,22 +81,28 @@ export async function submitGridGuess(date: string, cell: number, countryId: str
   assertPlayer(player);
   const { grid } = await getGridPuzzle(date);
 
-  if ((await redis.set(`games:grid:${date}:player:${player}`, 1, { nx: true, ex: KEEP })) === 'OK') {
-    const players = await redis.incr(`games:grid:${date}:players`);
-    if (players === 1) await redis.expire(`games:grid:${date}:players`, KEEP);
-  }
+  const correct = fitsCell(grid, cell, country);
+  // The answer stats are extras: without Redis the guess still counts, just without a percentage.
+  try {
+    if ((await redis.set(`games:grid:${date}:player:${player}`, 1, { nx: true, ex: KEEP })) === 'OK') {
+      const players = await redis.incr(`games:grid:${date}:players`);
+      if (players === 1) await redis.expire(`games:grid:${date}:players`, KEEP);
+    }
+    if (!correct) return { correct: false as const };
 
-  if (!fitsCell(grid, cell, country)) return { correct: false as const };
-
-  // Each player counts once per cell, however often the guess is sent.
-  const key = cellKey(date, cell);
-  if ((await redis.set(`games:grid:${date}:player:${player}:${cell}`, 1, { nx: true, ex: KEEP })) === 'OK') {
-    await redis.hincrby(key, countryId, 1);
-    await redis.hincrby(key, '_total', 1);
-    await redis.expire(key, KEEP);
+    // Each player counts once per cell, however often the guess is sent.
+    const key = cellKey(date, cell);
+    if ((await redis.set(`games:grid:${date}:player:${player}:${cell}`, 1, { nx: true, ex: KEEP })) === 'OK') {
+      await redis.hincrby(key, countryId, 1);
+      await redis.hincrby(key, '_total', 1);
+      await redis.expire(key, KEEP);
+    }
+    const counts = (await redis.hgetall<Record<string, number>>(key)) ?? {};
+    return { correct: true as const, percent: percentOf(counts, countryId) as number | null };
+  } catch (error) {
+    console.warn('[games] Could not record grid stats', error instanceof Error ? error.message : error);
+    return correct ? { correct: true as const, percent: null } : { correct: false as const };
   }
-  const counts = (await redis.hgetall<Record<string, number>>(key)) ?? {};
-  return { correct: true as const, percent: percentOf(counts, countryId) };
 }
 
 function percentOf(counts: Record<string, number>, id: string) {
@@ -99,10 +113,16 @@ function percentOf(counts: Record<string, number>, id: string) {
 /** How everyone answered each cell, for the end of the game. */
 export async function getGridResults(date: string) {
   assertDate(date);
-  const [players, ...cells] = await Promise.all([
-    redis.get<number>(`games:grid:${date}:players`),
-    ...Array.from({ length: 9 }, (_, cell) => redis.hgetall<Record<string, number>>(cellKey(date, cell))),
-  ]);
+  let players: number | null = null;
+  let cells: (Record<string, number> | null)[] = Array(9).fill(null);
+  try {
+    [players, cells] = await Promise.all([
+      redis.get<number>(`games:grid:${date}:players`),
+      Promise.all(Array.from({ length: 9 }, (_, cell) => redis.hgetall<Record<string, number>>(cellKey(date, cell)))),
+    ]);
+  } catch (error) {
+    console.warn('[games] Could not read grid results', error instanceof Error ? error.message : error);
+  }
   return {
     players: Number(players ?? 0),
     cells: cells.map((counts) => {

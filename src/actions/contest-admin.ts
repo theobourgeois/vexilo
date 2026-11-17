@@ -3,7 +3,7 @@
 import { and, count, desc, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
-import { redis } from '@/db/redis';
+import { cacheDel } from '@/db/redis';
 import { contestEntries, contests, contestVotes, favorites, flagOfTheDay, flagRequests, users } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { CONTEST_TAG, contestPhase, slugify, type ContestPhase } from '@/lib/contest';
@@ -469,7 +469,7 @@ export async function featureContestWinner(contestId: string) {
   if (!winner) return { success: false as const, message: 'Pick a winner first.' };
   if (!winner.flagId) return { success: false as const, message: 'Publish the winner to Browse first.' };
   await db.insert(flagOfTheDay).values({ flagId: winner.flagId });
-  await redis.del('fotd');
+  await cacheDel('fotd');
   expireCache(CONTESTS_TAG);
   return { success: true as const };
 }
