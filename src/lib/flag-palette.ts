@@ -3,7 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { after } from 'next/server';
 import sharp from 'sharp';
 import { db } from '@/db';
-import { redis } from '@/db/redis';
+import { cacheGet, cacheSet } from '@/db/redis';
 import { flagColors } from '@/db/schema';
 import { type ColorFamily, PALETTE_NAME_FAMILY } from '@/lib/flag-search-terms';
 
@@ -285,12 +285,10 @@ async function readFlagColors(flag: { id: string; image: string }): Promise<Pale
 /** Cached palette for a flag image URL; empty when the image can't be read. */
 export async function getFlagPalette(imageUrl: string): Promise<PaletteColor[]> {
   const key = CACHE_PREFIX + imageUrl;
-  const cached = await redis.get<PaletteColor[]>(key).catch(() => null);
+  const cached = await cacheGet<PaletteColor[]>(key);
   if (cached) return cached;
 
   const palette = await readImagePalette(imageUrl);
-  await redis
-    .set(key, palette, { ex: palette.length > 0 ? CACHE_SECONDS : FAILURE_CACHE_SECONDS })
-    .catch(() => null);
+  await cacheSet(key, palette, { ex: palette.length > 0 ? CACHE_SECONDS : FAILURE_CACHE_SECONDS });
   return palette;
 }

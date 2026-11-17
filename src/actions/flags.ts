@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/db';
-import { redis } from '@/db/redis';
+import { cacheGet, cacheSet, cacheDel } from '@/db/redis';
 import {
   favorites,
   flagAiMetadata,
@@ -515,7 +515,7 @@ async function removeTagsFromCount(tags: string[]) {
 }
 
 export async function getTopFlagTags(limit: number) {
-  const cachedTags = await redis.get('tags');
+  const cachedTags = await cacheGet('tags');
   if (cachedTags) {
     return cachedTags as typeof topTags;
   }
@@ -527,7 +527,7 @@ export async function getTopFlagTags(limit: number) {
     .orderBy(desc(flagTags.count))
     .limit(clampedLimit);
 
-  await redis.set('tags', topTags);
+  await cacheSet('tags', topTags);
 
   return topTags;
 }
@@ -762,7 +762,7 @@ export async function getRelatedFlags(flagId: string) {
 }
 
 async function getRelatedFlagIds(flagId: string) {
-  const cached = await redis.get<string[]>(relatedFlagsCacheKey(flagId)).catch(() => null);
+  const cached = await cacheGet<string[]>(relatedFlagsCacheKey(flagId));
   if (Array.isArray(cached)) return cached;
 
   const [flag] = await db
@@ -787,7 +787,7 @@ async function getRelatedFlagIds(flagId: string) {
   }
   const ids = Array.from(new Set([...linked, ...similar])).slice(0, Math.max(RELATED_LIMIT, linked.length));
 
-  await redis.set(relatedFlagsCacheKey(flagId), ids, { ex: RELATED_CACHE_SECONDS }).catch(() => null);
+  await cacheSet(relatedFlagsCacheKey(flagId), ids, { ex: RELATED_CACHE_SECONDS });
   return ids;
 }
 
@@ -846,7 +846,7 @@ export async function getExperimentalRecommendedFlags(flagId: string) {
   }
 
   const cacheKey = `experimental-recommendations-${EXPERIMENTAL_RECOMMENDATION_CACHE_VERSION}-${flagId}`;
-  const cachedRecommendationIds = await redis.get<string[]>(cacheKey);
+  const cachedRecommendationIds = await cacheGet<string[]>(cacheKey);
 
   if (Array.isArray(cachedRecommendationIds) && cachedRecommendationIds.length > 0) {
     return getFlagsByIds(cachedRecommendationIds);
@@ -857,7 +857,7 @@ export async function getExperimentalRecommendedFlags(flagId: string) {
     return getFlagsByIds(await getRelatedFlagIds(flagId));
   }
 
-  await redis.set(cacheKey, rankedIds, {
+  await cacheSet(cacheKey, rankedIds, {
     ex: EXPERIMENTAL_RECOMMENDATION_CACHE_TTL_SECONDS,
   });
 
@@ -911,7 +911,7 @@ export async function getFlagOfTheDay() {
 
 /** Today's flag, cached in Redis for everyone. */
 async function readFlagOfTheDay() {
-  const cachedFotd = await redis.get('fotd');
+  const cachedFotd = await cacheGet('fotd');
   if (cachedFotd) {
     return cachedFotd as (typeof flag)[0];
   }
@@ -951,7 +951,7 @@ async function readFlagOfTheDay() {
     .where(eq(flags.id, fotdId))
     .limit(1);
 
-  await redis.set('fotd', flag?.[0], {
+  await cacheSet('fotd', flag?.[0], {
     ex: 60 * 60 * 24, // 24 hours
   });
 
@@ -1368,7 +1368,7 @@ export async function toggleFavoriteFlag(
         .where(eq(flags.id, flagId));
 
       if (deleteCache) {
-        await redis.del('flags:home');
+        await cacheDel('flags:home');
       }
 
       return true;
@@ -1387,7 +1387,7 @@ export async function toggleFavoriteFlag(
       .where(eq(flags.id, flagId));
 
     if (deleteCache) {
-      await redis.del('flags:home');
+      await cacheDel('flags:home');
     }
 
     return true;
@@ -1815,7 +1815,7 @@ export async function bulkEditFlagTags(
   }
 
   if (updated) expireCache(FLAGS_TAG);
-  await redis.del('tags');
+  await cacheDel('tags');
   return updated;
 }
 
@@ -1844,7 +1844,7 @@ export async function relateFlags(flagIds: string[]) {
       .update(flags)
       .set({ relatedFlags: nextRelated, updatedAt: new Date() })
       .where(eq(flags.id, row.id));
-    await redis.del(`recommendations-${row.id}`, relatedFlagsCacheKey(row.id));
+    await cacheDel(`recommendations-${row.id}`, relatedFlagsCacheKey(row.id));
   }
 
   expireCache(FLAGS_TAG);
@@ -1880,7 +1880,7 @@ export async function deleteFlags(flagIds: string[]) {
   }
   if (deleted.length) expireCache(FLAGS_TAG);
 
-  await redis.del('tags');
+  await cacheDel('tags');
   return { deleted, failed };
 }
 
@@ -1954,7 +1954,7 @@ export async function updateAdminFlag(
   if (data.image.trim() !== existing.image) saveFlagColorsLater(flagId, data.image.trim());
   expireCache(FLAGS_TAG);
   await updateTagCounts(existing.tags, tags);
-  await redis.del('tags');
+  await cacheDel('tags');
 
   return true;
 }
