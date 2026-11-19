@@ -129,7 +129,7 @@ export function MobileStudio({
   onStartOver,
 }: {
   studio: Studio;
-  emblems: StudioEmblem[];
+  emblems: StudioEmblem[] | null;
   remix: Remix;
   contest: Contest;
   onStartOver?: () => void;

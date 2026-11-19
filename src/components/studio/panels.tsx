@@ -16,6 +16,7 @@ import {
   EyeSlash,
   Folder,
   GroupIcon,
+  Loader2,
   Lock,
   Minus,
   NoClip,
@@ -90,7 +91,8 @@ export function EmblemsPanel({
   onUpload,
   columns = 3,
 }: {
-  emblems: StudioEmblem[];
+  /** Null while the library is still loading. */
+  emblems: StudioEmblem[] | null;
   onAdd: (emblem: StudioEmblem) => void;
   onUpload?: (files: File[]) => void;
   columns?: number;
@@ -102,7 +104,7 @@ export function EmblemsPanel({
   const moreRef = React.useRef<HTMLDivElement>(null);
   const q = query.trim().toLowerCase();
   const matches = React.useMemo(() => {
-    const ranked = emblems
+    const ranked = (emblems ?? [])
       .filter((e) => category === 'all' || e.category === category)
       .map((e) => ({ emblem: e, score: emblemSearchScore(e, q) }))
       .filter((e) => e.score > 0)
@@ -136,7 +138,7 @@ export function EmblemsPanel({
         <input
           value={query}
           onChange={(e) => { setQuery(e.target.value); resetResults(); }}
-          placeholder={`Search ${emblems.length} emblems`}
+          placeholder={emblems ? `Search ${emblems.length} emblems` : 'Search emblems'}
           className='min-w-0 flex-1 bg-transparent text-[13.5px] text-foreground outline-none placeholder:text-muted-foreground'
         />
         {query && (
@@ -204,7 +206,13 @@ export function EmblemsPanel({
         </div>
         {hasMore && <div ref={moreRef} className='h-px' aria-hidden='true' />}
         <span role='status' className='sr-only'>{shown.length} of {matches.length} emblems</span>
-        {matches.length === 0 && <p className='py-10 text-center text-[13px] text-muted-foreground'>No emblems found</p>}
+        {emblems === null ? (
+          <div className='grid place-items-center py-10 text-muted-foreground'>
+            <Loader2 className='size-5 animate-spin' aria-label='Loading emblems' />
+          </div>
+        ) : (
+          matches.length === 0 && <p className='py-10 text-center text-[13px] text-muted-foreground'>No emblems found</p>
+        )}
       </div>
     </div>
   );
