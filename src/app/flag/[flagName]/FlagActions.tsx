@@ -131,7 +131,7 @@ export default function FlagActions({ flag }: FlagActionsProps) {
         Suggest edit
       </Button>
       <Button variant='neutral' asChild>
-        <Link href={`/create?remix=${flag.id}`}>
+        <Link href={`/create?remix=${flag.id}`} rel='nofollow'>
           <Shuffle />
           Remix
         </Link>

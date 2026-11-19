@@ -55,7 +55,7 @@ export function DesktopStudio({
   onStartOver,
 }: {
   studio: Studio;
-  emblems: StudioEmblem[];
+  emblems: StudioEmblem[] | null;
   remix: Remix;
   contest: Contest;
   onStartOver?: () => void;
@@ -119,7 +119,7 @@ export function DesktopStudio({
           onDoubleClickLayer={(id, at) => setColorTarget({ ...at, kind: 'layer', id })}
           onDropFiles={(files, at) => importImages(files, at)}
           onDropEmblem={(id, at) => {
-            const emblem = emblems.find((e) => e.id === id);
+            const emblem = emblems?.find((e) => e.id === id);
             if (emblem) addEmblem(emblem, at);
           }}
         />

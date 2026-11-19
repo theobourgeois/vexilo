@@ -39,17 +39,37 @@ function useIsMobile() {
   return mobile;
 }
 
+/** The emblem library, fetched after the page loads; null until it arrives. */
+function useEmblemLibrary() {
+  const [emblems, setEmblems] = React.useState<StudioEmblem[] | null>(null);
+  React.useEffect(() => {
+    let live = true;
+    fetch('/api/studio-emblems')
+      .then((response) => (response.ok ? (response.json() as Promise<StudioEmblem[]>) : Promise.reject(new Error(String(response.status)))))
+      .then((library) => live && setEmblems(library))
+      .catch(() => {
+        if (!live) return;
+        setEmblems([]);
+        toast.error("Couldn't load the emblem library");
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return emblems;
+}
+
 export default function Studio({
-  emblems,
   remix,
   contest = null,
 }: {
-  emblems: StudioEmblem[];
   remix: RemixSource | null;
   contest?: StudioContest | null;
 }) {
+  const emblems = useEmblemLibrary();
+  // A remix brings the emblems its design uses, so it can be edited before the library arrives.
   const vectorEmblems = React.useMemo(
-    () => new Set([...emblems, ...(remix?.placements.map((p) => p.emblem) ?? [])].filter((e) => e.vector).map((e) => e.id)),
+    () => new Set([...(emblems ?? []), ...(remix?.placements.map((p) => p.emblem) ?? [])].filter((e) => e.vector).map((e) => e.id)),
     [emblems, remix],
   );
   const startName = contest?.entry?.title ?? (remix ? `${remix.name.replace(/^the /, '')} remix` : 'Untitled flag');
