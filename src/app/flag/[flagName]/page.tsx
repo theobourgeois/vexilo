@@ -30,9 +30,9 @@ import { getFlagColors, paletteFamilies, type PaletteColor } from '@/lib/flag-pa
 import { ensureFlagImageSelfHosted } from '@/lib/storage/flag-image-mirror';
 import { getFlagNameById } from '@/lib/studio-data';
 import { MakerBadge } from '@/components/MakerBadge';
-import { MAKER_TAGS } from '@/lib/studio-design';
-import { collectionPath, getColourCollection } from '@/lib/collections';
-import { absoluteUrl, flagHeadline, flagPath, jsonLd } from '@/lib/seo';
+import { MAKER_TAGS } from '@shared/studio-design';
+import { collectionPath, getColourCollection } from '@shared/collections';
+import { absoluteUrl, flagHeadline, flagPath, jsonLd } from '@shared/seo';
 
 export type RelatedFlag = {
   name: string;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { StoredStudioDesign } from '@/lib/studio-design';
+import type { StoredStudioDesign } from './studio-design';
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const unit = z.number().finite();

@@ -7,7 +7,7 @@ import FlagImage from './FlagImage';
 import { RemovablePill } from "./TagInput";
 import { Search, Check, Loader2 } from '@/components/icons';
 import { cn } from "@/lib/utils";
-import { RelatedFlag } from "@/lib/types";
+import { RelatedFlag } from "@shared/types";
 
 type FlagLinkSearchInputProps = {
 	onAdd: (flag: RelatedFlag) => void;

@@ -1,5 +1,5 @@
 import { MAX_FLAG_IMAGE_BYTES } from '@/lib/batch-flags';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { CLOUD_FRONT_URL } from '@shared/constant';
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 

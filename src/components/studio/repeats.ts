@@ -1,4 +1,4 @@
-import type { StudioDesign, StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import type { StudioDesign, StudioLayer, StudioRepeat } from '@shared/studio-design';
 import { membersBox, membersOf } from './groups';
 import { layerWidth } from './model';
 import { apply, flatten, type Pt } from './paths';

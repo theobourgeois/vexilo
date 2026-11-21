@@ -6,7 +6,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { sql } from 'drizzle-orm';
 import { db } from '../../src/db';
-import type { StoredStudioDesign } from '../../src/lib/studio-design';
+import type { StoredStudioDesign } from '../../packages/shared/studio-design';
 import { features, type Features } from './features';
 
 /**

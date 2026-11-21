@@ -6,10 +6,10 @@ import { z } from 'zod';
 import { db } from '@/db';
 import { flags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { CLOUD_FRONT_URL } from '@shared/constant';
 import { extractPalette } from '@/lib/flag-palette';
-import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG, type StoredStudioDesign } from '@/lib/studio-design';
-import { studioDesignSchema } from '@/lib/studio-design-schema';
+import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG, type StoredStudioDesign } from '@shared/studio-design';
+import { studioDesignSchema } from '@shared/studio-design-schema';
 import { createFlagRequest } from './requests';
 import { uploadFile } from '@/lib/storage/s3';
 

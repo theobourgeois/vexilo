@@ -1,4 +1,4 @@
-import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
+import type { StudioDesign, StudioLayer } from '@shared/studio-design';
 import { divisionGeometry, fieldAnchors, fieldPartAt } from './divisions';
 import { placedBounds } from './groups';
 import { flagWidth, unionBox, type Box } from './model';

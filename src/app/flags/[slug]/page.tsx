@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 import { getCollectionFlags, getLiveFavorites } from '@/actions/collections';
 import FlagCard from '@/components/FlagCard';
 import { ChevronRight } from '@/components/icons';
-import { COLLECTIONS, collectionPath, getCollection } from '@/lib/collections';
-import { absoluteUrl, flagHeadline, flagPath, jsonLd } from '@/lib/seo';
+import { COLLECTIONS, collectionPath, getCollection } from '@shared/collections';
+import { absoluteUrl, flagHeadline, flagPath, jsonLd } from '@shared/seo';
 
 type Props = { params: Promise<{ slug: string }> };
 

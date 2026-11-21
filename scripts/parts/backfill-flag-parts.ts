@@ -10,9 +10,9 @@ import { db } from '../../src/db';
 import { flagParts, flags } from '../../src/db/schema';
 import { defaultParams, LAYOUT_VARIANTS, LAYOUTS } from '../../src/components/studio/layouts';
 import { MAX_FLAG_IMAGE_BYTES } from '../../src/lib/batch-flags';
-import { CLOUD_FRONT_URL } from '../../src/lib/constant';
-import type { LayoutId, StudioDesignV1, StudioLayer } from '../../src/lib/studio-design';
-import { studioDesignSchema } from '../../src/lib/studio-design-schema';
+import { CLOUD_FRONT_URL } from '../../packages/shared/constant';
+import type { LayoutId, StudioDesignV1, StudioLayer } from '../../packages/shared/studio-design';
+import { studioDesignSchema } from '../../packages/shared/studio-design-schema';
 
 /**
  * Splits every SVG flag into its field and objects (see extract-parts.js) and stores the result

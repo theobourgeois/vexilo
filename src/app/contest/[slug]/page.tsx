@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getContestArchive, getContestView } from '@/actions/contests';
 import ContestPage from '@/components/contest/ContestPage';
-import { CONTEST_ART } from '@/lib/contest';
-import { absoluteUrl, contestPath } from '@/lib/seo';
+import { CONTEST_ART } from '@shared/contest';
+import { absoluteUrl, contestPath } from '@shared/seo';
 
 export const dynamic = 'force-dynamic';
 

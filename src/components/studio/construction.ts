@@ -1,4 +1,4 @@
-import type { StudioDesign, StudioDivision, StudioLayer } from '@/lib/studio-design';
+import type { StudioDesign, StudioDivision, StudioLayer } from '@shared/studio-design';
 import { divisionFrame, divisionGeometry, divisionParams, sideFrame } from './divisions';
 import { layerPlacements, membersBox, membersOf, place, type Placement } from './groups';
 import { flagWidth, layerCopies, layerWidth } from './model';

@@ -1,6 +1,6 @@
 'use client';
 
-import type { PathContour, StudioGroup, StudioLayer } from '@/lib/studio-design';
+import type { PathContour, StudioGroup, StudioLayer } from '@shared/studio-design';
 import { hexToRgb, normalizeHex, rgbToHex } from './colors';
 import { uid } from './model';
 import { at, compose, contoursBounds, fitContours, flatten, makeNode, mapContours, parsePathD, type Affine, type Bounds, type Pt } from './paths';

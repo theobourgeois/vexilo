@@ -1,6 +1,6 @@
 'use client';
 
-import type { StudioCutout, StudioLayer } from '@/lib/studio-design';
+import type { StudioCutout, StudioLayer } from '@shared/studio-design';
 import { hexToRgb } from './colors';
 import { defaultParams, LAYOUTS } from './layouts';
 

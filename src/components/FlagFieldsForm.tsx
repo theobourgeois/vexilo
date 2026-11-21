@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Upload, Loader2, Check } from '@/components/icons';
-import { Flag, RelatedFlag } from '@/lib/types';
+import { Flag, RelatedFlag } from '@shared/types';
 import { toast } from 'sonner';
 import { createFlagRequest } from '@/actions/requests';
 import { Textarea } from './ui/textarea';

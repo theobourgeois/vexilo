@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { toast } from 'sonner';
-import { localDate, untilTomorrow } from '@/lib/games/daily';
+import { localDate, untilTomorrow } from '@shared/games/daily';
 import { cn } from '@/lib/utils';
 
 export function Stat({ icon, label, value, hot }: { icon: React.ReactNode; label: string; value: React.ReactNode; hot?: boolean }) {

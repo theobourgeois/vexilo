@@ -58,8 +58,8 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@/lib/studio-design';
-import { formatContestDate, STATEMENT_MAX } from '@/lib/contest';
+import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@shared/studio-design';
+import { formatContestDate, STATEMENT_MAX } from '@shared/contest';
 import { autoUnits, construction } from './construction';
 import { ConstructionSheet, type SheetOptions } from './ConstructionSheet';
 import { blobToDataUrl, constructionToPng, constructionToSvg, designToPng, designToSvg, download, encodeDoc, fileName } from './export';

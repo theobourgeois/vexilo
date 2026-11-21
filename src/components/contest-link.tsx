@@ -7,7 +7,7 @@ import { getCurrentContest } from '@/actions/contests';
 import { ArrowRight, Trophy } from '@/components/icons';
 import FlagImage from '@/components/FlagImage';
 import { TODAY_CARD, TODAY_THUMB, TodayCardText } from '@/components/today-card';
-import { CONTEST_ART, formatContestDate, timeLeft } from '@/lib/contest';
+import { CONTEST_ART, formatContestDate, timeLeft } from '@shared/contest';
 import { cn } from '@/lib/utils';
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;

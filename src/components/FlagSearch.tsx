@@ -31,7 +31,7 @@ import {
   getTrait,
   parseFlagQuery,
   removeFromQuery,
-} from '@/lib/flag-search-terms';
+} from '@shared/flag-search-terms';
 import { FOCUS_SEARCH_KEY } from '@/lib/nav';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn } from '@/lib/utils';

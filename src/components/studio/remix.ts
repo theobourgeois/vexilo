@@ -1,6 +1,6 @@
 'use client';
 
-import type { LayoutId, StudioDesign } from '@/lib/studio-design';
+import type { LayoutId, StudioDesign } from '@shared/studio-design';
 import { colorDistance, nearest, rgbToHex } from './colors';
 import { cutoutPalette, loadImage } from './cutout';
 import { layoutToStack, migrateDesign } from './field';

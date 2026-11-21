@@ -6,7 +6,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { inArray, notInArray, sql } from 'drizzle-orm';
 import { db } from '../../src/db';
 import { flagEmblems, flags } from '../../src/db/schema';
-import { CLOUD_FRONT_URL } from '../../src/lib/constant';
+import { CLOUD_FRONT_URL } from '../../packages/shared/constant';
 
 /**
  * Uploads an extracted emblem library to S3 and upserts it into vexilo_flag_emblem.

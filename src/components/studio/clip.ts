@@ -1,4 +1,4 @@
-import type { FieldPartRef, StudioDesign, StudioField, StudioLayer } from '@/lib/studio-design';
+import type { FieldPartRef, StudioDesign, StudioField, StudioLayer } from '@shared/studio-design';
 import { divisionGeometry, divisionLabel, insidePart, resolvePart } from './divisions';
 import { flagWidth, hitsLayer } from './model';
 

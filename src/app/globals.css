@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The Expo app shares the repo but none of the website's CSS. */
+@source not "../../apps";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));

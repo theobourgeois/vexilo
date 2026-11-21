@@ -1,6 +1,6 @@
 import type { ReviewQueueItem } from '@/actions/requests';
 import { checkFileLikeName } from '@/lib/batch-flags';
-import { MAKER_TAGS } from '@/lib/studio-design';
+import { MAKER_TAGS } from '@shared/studio-design';
 import { diffLists } from '@/lib/text-diff';
 
 export type ReviewFilter = 'all' | 'new' | 'edits' | 'attention';

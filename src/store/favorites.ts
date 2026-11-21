@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Flag } from '@/lib/types';
+import { Flag } from '@shared/types';
 
 interface FavoritesStore {
   favorites: Flag[]; // Array of flag objects

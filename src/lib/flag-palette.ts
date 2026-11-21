@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { db } from '@/db';
 import { cacheGet, cacheSet } from '@/db/redis';
 import { flagColors } from '@/db/schema';
-import { type ColorFamily, PALETTE_NAME_FAMILY } from '@/lib/flag-search-terms';
+import { type ColorFamily, PALETTE_NAME_FAMILY } from '@shared/flag-search-terms';
 
 export type PaletteColor = {
   hex: string;

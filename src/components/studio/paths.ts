@@ -1,4 +1,4 @@
-import type { PathContour, PathNode } from '@/lib/studio-design';
+import type { PathContour, PathNode } from '@shared/studio-design';
 
 export type Pt = [number, number];
 /** A cubic Bézier: start, two control points, end. */

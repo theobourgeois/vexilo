@@ -1,6 +1,6 @@
 import { getUnfurlPuzzle } from '@/actions/games';
 import { rasterizeFlag } from '@/lib/flag-texture';
-import { COUNTRY_BY_ID } from '@/lib/games/pool';
+import { COUNTRY_BY_ID } from '@shared/games/pool';
 import { NextResponse } from 'next/server';
 
 // Today's flag by date, so the answer's name isn't sitting in the image URL.

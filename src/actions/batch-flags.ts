@@ -9,7 +9,7 @@ import {
   normalizeFlagNameForComparison,
   parseWikimediaFileTitle,
 } from '@/lib/batch-flags';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { CLOUD_FRONT_URL } from '@shared/constant';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { UnsafeImageError, uploadFile } from '@/lib/storage/s3';
 

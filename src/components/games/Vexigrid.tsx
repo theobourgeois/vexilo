@@ -10,9 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { ArrowUpRight, Flag as FlagIcon, Share, Sparkles, Target, Trophy, Users } from '@/components/icons';
 import { CountryPicker } from '@/components/games/CountryPicker';
 import { Countdown, Stat, playerId, readStore, shareResult, writeStore } from '@/components/games/shared';
-import { localDate } from '@/lib/games/daily';
-import { CRITERIA, cellAnswers, type Criterion, type GridSpec } from '@/lib/games/grid';
-import { COLOR_SWATCHES, COUNTRY_BY_ID, type Country } from '@/lib/games/pool';
+import { localDate } from '@shared/games/daily';
+import { CRITERIA, cellAnswers, type Criterion, type GridSpec } from '@shared/games/grid';
+import { COLOR_SWATCHES, COUNTRY_BY_ID, type Country } from '@shared/games/pool';
 import { cn } from '@/lib/utils';
 
 const GUESSES = 9;

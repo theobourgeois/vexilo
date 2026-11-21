@@ -1,0 +1,5 @@
+{
+  "development": "vexilo-dev",
+  "preview": "vexilo-preview",
+  "production": "vexilo"
+}

@@ -1,4 +1,4 @@
-import type { StoredStudioDesign } from '@/lib/studio-design';
+import type { StoredStudioDesign } from './studio-design';
 
 export type RelatedFlag = {
   name: string;

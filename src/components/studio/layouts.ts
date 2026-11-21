@@ -1,4 +1,4 @@
-import type { LayoutId } from '@/lib/studio-design';
+import type { LayoutId } from '@shared/studio-design';
 
 /** Geometry is in flag units: the flag is W wide and 1 tall. */
 export type Shape = { slot: number; d: string };

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { formatContestDate, PHASE_LABEL, timeLeft, type ContestPhase, type ContestTiming } from '@/lib/contest';
+import { formatContestDate, PHASE_LABEL, timeLeft, type ContestPhase, type ContestTiming } from '@shared/contest';
 import { cn } from '@/lib/utils';
 
 const PHASE_TONE: Record<ContestPhase, string> = {

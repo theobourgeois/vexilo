@@ -1,4 +1,4 @@
-import type { StoredStudioDesign, StudioDesign, StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import type { StoredStudioDesign, StudioDesign, StudioLayer, StudioRepeat } from '@shared/studio-design';
 import { uniqueColors } from './colors';
 import { fieldPartAt } from './divisions';
 import { layoutToStack, stackColors, swapStackColor } from './field';

@@ -3,16 +3,16 @@
 import { db } from '@/db';
 import { flagRequests, flags, leaderboard, users, flagTags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
-import { Flag, RelatedFlag } from '@/lib/types';
+import { Flag, RelatedFlag } from '@shared/types';
 import { and, count, eq, inArray, max, ne, sql } from 'drizzle-orm';
 import { UnsafeImageError, base64ImageToS3URI, deleteFileFromUrl } from '@/lib/storage/s3';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { CLOUD_FRONT_URL } from '@shared/constant';
 import { cacheDel } from '@/db/redis';
 import { relatedFlagsCacheKey, TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
 import { saveFlagColorsLater } from '@/lib/flag-palette';
 import { upsertFlagMetadataMirror } from './flag-ai-metadata';
 import { findExistingFlags } from './batch-flags';
-import { MAKER_TAGS } from '@/lib/studio-design';
+import { MAKER_TAGS } from '@shared/studio-design';
 import { expireCache, FLAGS_TAG } from '@/lib/cache-tags';
 
 // Helper function to update tag counts when tags are added or removed

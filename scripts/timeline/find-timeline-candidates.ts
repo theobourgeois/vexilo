@@ -9,7 +9,7 @@ import {
   timelineKey,
   normalizeName as normalize,
   stripFormalPrefix as stripFormal,
-} from '../../src/lib/timeline/flag-names';
+} from '../../packages/shared/timeline/flag-names';
 
 /**
  * Finds the flags worth giving a history timeline: countries, first-level subdivisions, and any flag

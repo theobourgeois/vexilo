@@ -1,4 +1,4 @@
-import type { PathContour, StrokeAlign, StudioLayer } from '@/lib/studio-design';
+import type { PathContour, StrokeAlign, StudioLayer } from '@shared/studio-design';
 import { layerCopies, layerWidth, uid, type Copy } from './model';
 import { applyVector, compose, fitContours, makeNode, mapContours, rotation, scaling, translate, type Affine } from './paths';
 import { shapeContours, strokeInset } from './shapes';

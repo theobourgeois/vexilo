@@ -4,7 +4,7 @@ import {
   LAYOUT_VARIANTS,
   LAYOUTS,
 } from '../../src/components/studio/layouts';
-import type { LayoutId, StudioDesignV1 } from '../../src/lib/studio-design';
+import type { LayoutId, StudioDesignV1 } from '../../packages/shared/studio-design';
 
 /** Independent from the SVG extractor: changing this never invalidates the SVG backfill. */
 export const RASTER_VERSION = 2;

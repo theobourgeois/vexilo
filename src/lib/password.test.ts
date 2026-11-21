@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { hashPassword, verifyPassword } from './password';
-import { signupSchema } from './auth-validation';
+import { signupSchema } from '@shared/auth-validation';
 import { safeCallbackUrl } from './sign-in';
 
 test('sign-in returns to a local editor URL and rejects external or looping callbacks', () => {

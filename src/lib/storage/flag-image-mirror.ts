@@ -5,7 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { flags } from '@/db/schema';
 import { expireCache, FLAGS_TAG } from '@/lib/cache-tags';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { CLOUD_FRONT_URL } from '@shared/constant';
 import { moveFlagColors } from '@/lib/flag-palette';
 
 type MirrorableFlag = {

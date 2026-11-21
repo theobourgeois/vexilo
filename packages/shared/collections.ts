@@ -1,4 +1,4 @@
-import type { ColorFamily } from '@/lib/flag-search-terms';
+import type { ColorFamily } from './flag-search-terms';
 
 /**
  * Which flags belong to a collection. A flag must have every colour in `colors` (and with

@@ -14,7 +14,7 @@ import {
   parseWikimediaFileTitle,
   checkFileLikeName,
 } from '@/lib/batch-flags';
-import { RelatedFlag } from '@/lib/types';
+import { RelatedFlag } from '@shared/types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 

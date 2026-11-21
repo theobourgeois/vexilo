@@ -10,8 +10,8 @@ import { and, isNull, sql } from 'drizzle-orm';
 import { db } from '../../src/db';
 import { flags, flagParts } from '../../src/db/schema';
 import { MAX_FLAG_IMAGE_BYTES } from '../../src/lib/batch-flags';
-import { CLOUD_FRONT_URL } from '../../src/lib/constant';
-import { studioDesignSchema } from '../../src/lib/studio-design-schema';
+import { CLOUD_FRONT_URL } from '../../packages/shared/constant';
+import { studioDesignSchema } from '../../packages/shared/studio-design-schema';
 import {
   extractRaster,
   rasterDesign,
