@@ -6,8 +6,8 @@ import { db } from '@/db';
 import { cacheDel } from '@/db/redis';
 import { contestEntries, contests, contestVotes, favorites, flagOfTheDay, flagRequests, users } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
-import { CONTEST_TAG, contestPhase, slugify, type ContestPhase } from '@/lib/contest';
-import { CUSTOM_TAG } from '@/lib/studio-design';
+import { CONTEST_TAG, contestPhase, slugify, type ContestPhase } from '@shared/contest';
+import { CUSTOM_TAG } from '@shared/studio-design';
 import { approveFlagRequests } from './requests';
 import { CONTESTS_TAG, expireCache } from '@/lib/cache-tags';
 

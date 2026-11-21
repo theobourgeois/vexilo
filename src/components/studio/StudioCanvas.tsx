@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { PathContour, PathNode, StudioDesign, StudioGroup, StudioLayer } from '@/lib/studio-design';
+import type { PathContour, PathNode, StudioDesign, StudioGroup, StudioLayer } from '@shared/studio-design';
 import { cn } from '@/lib/utils';
 import type { DrawSettings } from './draw';
 import { insideOutline, outlineD } from './outline';

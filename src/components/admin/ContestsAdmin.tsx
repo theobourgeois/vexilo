@@ -55,7 +55,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DEFAULT_RULES, formatContestDate, formatRange, slugify } from '@/lib/contest';
+import { DEFAULT_RULES, formatContestDate, formatRange, slugify } from '@shared/contest';
 import { cn } from '@/lib/utils';
 
 const SIGNALS: Record<VoterSignal, { label: string; hint: string }> = {

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { absoluteUrl } from '@/lib/seo';
+import { absoluteUrl } from '@shared/seo';
 
 /**
  * Keeps crawlers on the pages worth indexing. The flag maker (every `/create?remix=…` is a

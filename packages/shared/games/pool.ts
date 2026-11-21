@@ -1,4 +1,4 @@
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { CLOUD_FRONT_URL } from '../constant';
 import { COUNTRY_ROWS, PLACE_ROWS } from './pool-data';
 
 export type Region = 'AF' | 'AS' | 'EU' | 'NA' | 'SA' | 'OC';

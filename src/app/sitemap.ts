@@ -4,8 +4,8 @@ import { unstable_cache } from 'next/cache';
 import { db } from '@/db';
 import { contests, flags } from '@/db/schema';
 import { CONTESTS_TAG } from '@/lib/cache-tags';
-import { COLLECTIONS, collectionPath } from '@/lib/collections';
-import { absoluteUrl, contestPath, flagPath } from '@/lib/seo';
+import { COLLECTIONS, collectionPath } from '@shared/collections';
+import { absoluteUrl, contestPath, flagPath } from '@shared/seo';
 
 // Rendered on request so the build doesn't need the database; the flag and contest lists are cached for a day.
 export const dynamic = 'force-dynamic';

@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowUpRight, CheckCircle, Fire, Share, Target, Trophy, XCircle } from '@/components/icons';
 import { CountryPicker } from '@/components/games/CountryPicker';
 import { Countdown, Stat, playerId, readStore, shareResult, writeStore } from '@/components/games/shared';
-import { localDate, previousDate, seededRandom } from '@/lib/games/daily';
-import { COLOR_NAMES, COLOR_SWATCHES, COUNTRY_BY_ID, countryColors, type Country } from '@/lib/games/pool';
+import { localDate, previousDate, seededRandom } from '@shared/games/daily';
+import { COLOR_NAMES, COLOR_SWATCHES, COUNTRY_BY_ID, countryColors, type Country } from '@shared/games/pool';
 import { cn } from '@/lib/utils';
 
 const MAX_GUESSES = 6;

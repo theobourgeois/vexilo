@@ -1,4 +1,4 @@
-import type { StudioDesign, StudioGroup, StudioLayer, StudioRepeat } from '@/lib/studio-design';
+import type { StudioDesign, StudioGroup, StudioLayer, StudioRepeat } from '@shared/studio-design';
 import { layerShownAt } from './clip';
 import { hitsLayer, layerBounds, layerCopies, scaleRepeat, unionBox, type Box } from './model';
 

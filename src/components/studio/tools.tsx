@@ -66,7 +66,7 @@ import {
   ChevronDown,
 } from '@/components/icons';
 import { cn } from '@/lib/utils';
-import type { FieldPartRef, StudioClip, StudioDesign, StudioLayer, StudioRepeat, StudioText } from '@/lib/studio-design';
+import type { FieldPartRef, StudioClip, StudioDesign, StudioLayer, StudioRepeat, StudioText } from '@shared/studio-design';
 import { clipTargets } from './clip';
 import { DIVISIONS, divisionParts } from './divisions';
 import { FontPicker, GradientStops, PaintButton, Segmented, WidthSlider } from './draw';

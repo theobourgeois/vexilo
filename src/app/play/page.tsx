@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, CheckCircle } from '@/components/icons';
 import { GridArt, UnfurlArt } from '@/components/games/art';
 import { useDoneToday } from '@/components/games/shared';
-import { localDate, puzzleNumber } from '@/lib/games/daily';
+import { localDate, puzzleNumber } from '@shared/games/daily';
 import { cn } from '@/lib/utils';
 
 function QuizArt() {

@@ -1,5 +1,5 @@
 import type { Font } from 'opentype.js';
-import type { PathContour, StudioLayer, StudioText, TextFont } from '@/lib/studio-design';
+import type { PathContour, StudioLayer, StudioText, TextFont } from '@shared/studio-design';
 import { uid } from './model';
 import { applyVector, fitContours, parsePathD } from './paths';
 import { strokeInset } from './shapes';

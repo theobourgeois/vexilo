@@ -1,0 +1,47 @@
+{
+  "name": "vexilo-mobile",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo start --ios",
+    "android": "expo start --android",
+    "lint": "expo lint",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@expo/ui": "~58.0.0",
+    "expo": "~58.0.0",
+    "expo-constants": "~58.0.0",
+    "expo-device": "~58.0.0",
+    "expo-font": "~58.0.0",
+    "expo-glass-effect": "~58.0.0",
+    "expo-image": "~58.0.0",
+    "expo-linking": "~58.0.0",
+    "expo-router": "~58.0.0",
+    "expo-splash-screen": "~58.0.0",
+    "expo-status-bar": "~58.0.0",
+    "expo-symbols": "~58.0.0",
+    "expo-system-ui": "~58.0.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-gesture-handler": "~3.3.0",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "~5.11.0",
+    "react-native-screens": "~4.30.0",
+    "react-native-worklets": "0.13.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^58.0.4",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.10.1",
+    "typescript": "~6.0.0"
+  }
+}

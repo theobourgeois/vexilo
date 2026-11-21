@@ -1,4 +1,4 @@
-import type { PathContour, ShapeKind, StudioLayer, StudioShape } from '@/lib/studio-design';
+import type { PathContour, ShapeKind, StudioLayer, StudioShape } from '@shared/studio-design';
 import { uid } from './model';
 import { contoursD, fitContours, hitsContours, mapContours, parsePathD, roundCorners, segmentDistance, type Affine } from './paths';
 

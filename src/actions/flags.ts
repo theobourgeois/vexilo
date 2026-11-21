@@ -18,8 +18,8 @@ import { getServerAuthSession } from '@/lib/auth';
 import { relatedFlagsCacheKey } from '@/lib/cache-keys';
 import { expireCache, FLAGS_TAG, toDate } from '@/lib/cache-tags';
 import { saveFlagColorsLater } from '@/lib/flag-palette';
-import { getTrait, isColorFamily, parseFlagQuery } from '@/lib/flag-search-terms';
-import { Flag } from '@/lib/types';
+import { getTrait, isColorFamily, parseFlagQuery } from '@shared/flag-search-terms';
+import { Flag } from '@shared/types';
 import { unstable_cache } from 'next/cache';
 import { getLiveFavorites } from './collections';
 import {

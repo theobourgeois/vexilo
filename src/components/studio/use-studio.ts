@@ -16,7 +16,7 @@ import type {
   StrokeAlign,
   StudioShape,
   StudioText,
-} from '@/lib/studio-design';
+} from '@shared/studio-design';
 import { clipsBelow } from './clip';
 import { emblemShapes } from './emblem-shapes';
 import { contrastRatio, gradientEnd, luminance, matchToPalette, sameColor } from './colors';

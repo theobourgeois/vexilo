@@ -9,7 +9,7 @@ import { TopContributorsLink } from '@/components/top-contributors-link';
 import { UnfurlArt } from '@/components/games/art';
 import { useDoneToday } from '@/components/games/shared';
 import { TODAY_CARD, TODAY_THUMB, TodayCardText } from '@/components/today-card';
-import { localDate, puzzleNumber } from '@/lib/games/daily';
+import { localDate, puzzleNumber } from '@shared/games/daily';
 import { cn } from '@/lib/utils';
 
 const PUZZLES = [

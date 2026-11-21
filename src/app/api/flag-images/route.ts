@@ -1,7 +1,7 @@
 import { UnsafeImageError, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
 import { MAX_FLAG_IMAGE_BYTES } from "@/lib/batch-flags";
-import { CLOUD_FRONT_URL } from "@/lib/constant";
+import { CLOUD_FRONT_URL } from "@shared/constant";
 import { NextResponse } from "next/server";
 
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {

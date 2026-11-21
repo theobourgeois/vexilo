@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { FieldPartRef, ShapeGradient, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@/lib/studio-design';
+import type { FieldPartRef, ShapeGradient, StudioDesign, StudioDivision, StudioField, StudioLayer } from '@shared/studio-design';
 import { clipGroups } from './clip';
 import { layerImage } from './cutout';
 import { divisionGeometry } from './divisions';

@@ -1,6 +1,6 @@
 'use client';
 
-import type { StudioDesign, StudioGroup, StudioLayer } from '@/lib/studio-design';
+import type { StudioDesign, StudioGroup, StudioLayer } from '@shared/studio-design';
 import { getEmblemSvg } from '@/actions/studio-emblems';
 import { colorDistance, nearest, sameColor } from './colors';
 import { MAX_LAYERS, readSvg, SvgImportError, SvgTooDetailedError } from './import-svg';

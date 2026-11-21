@@ -1,5 +1,5 @@
 import { Shuffle, Sparkles } from '@/components/icons';
-import { CUSTOM_TAG, REMIX_TAG } from '@/lib/studio-design';
+import { CUSTOM_TAG, REMIX_TAG } from '@shared/studio-design';
 import { cn } from '@/lib/utils';
 
 /** Marks flags made in the flag maker, so remixes and custom designs never pass as official. */

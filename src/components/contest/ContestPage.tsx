@@ -18,7 +18,7 @@ import FlagImage from '@/components/FlagImage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { CONTEST_ART, DEFAULT_RULES, formatContestDate } from '@/lib/contest';
+import { CONTEST_ART, DEFAULT_RULES, formatContestDate } from '@shared/contest';
 import { openSignIn } from '@/lib/sign-in';
 import { cn } from '@/lib/utils';
 import { ContestDate, ContestTimeline, initials } from './contest-ui';

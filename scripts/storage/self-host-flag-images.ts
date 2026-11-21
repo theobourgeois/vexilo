@@ -5,7 +5,7 @@ import { asc, eq } from 'drizzle-orm';
 
 import { db } from '../../src/db';
 import { flags } from '../../src/db/schema';
-import { CLOUD_FRONT_URL } from '../../src/lib/constant';
+import { CLOUD_FRONT_URL } from '../../packages/shared/constant';
 
 type ParsedArgs = {
   dryRun: boolean;

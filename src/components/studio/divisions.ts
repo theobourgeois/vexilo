@@ -1,4 +1,4 @@
-import type { DivisionKind, EdgeStyle, FieldPartRef, StudioDesign, StudioDivision, StudioField } from '@/lib/studio-design';
+import type { DivisionKind, EdgeStyle, FieldPartRef, StudioDesign, StudioDivision, StudioField } from '@shared/studio-design';
 import type { Anchor } from './layouts';
 
 /**

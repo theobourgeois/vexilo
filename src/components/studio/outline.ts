@@ -1,4 +1,4 @@
-import type { FlagOutline, FlagOutlineKind, PathContour, StudioDesign } from '@/lib/studio-design';
+import type { FlagOutline, FlagOutlineKind, PathContour, StudioDesign } from '@shared/studio-design';
 import { flagWidth } from './model';
 import { contoursD, hitsContours, makeNode, mapContours, scaling, type Pt } from './paths';
 

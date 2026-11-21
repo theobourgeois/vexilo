@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { StudioDesign } from '@/lib/studio-design';
+import type { StudioDesign } from '@shared/studio-design';
 import { FlagArt, type Hrefs } from './FlagArt';
 import { construction, type Pt } from './construction';
 import { documentColors } from './model';

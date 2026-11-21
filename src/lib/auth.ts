@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { AuthOptions, DefaultSession } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { emailSchema } from '@/lib/auth-validation';
+import { emailSchema } from '@shared/auth-validation';
 import { verifyPassword } from '@/lib/password';
 import { allowAuthAttempt } from '@/lib/auth-rate-limit';
 import { users, accounts, sessions, verificationTokens } from '@/db/schema';

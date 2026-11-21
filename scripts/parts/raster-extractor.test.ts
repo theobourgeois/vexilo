@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import sharp from 'sharp';
 import { extractRaster, rasterDesign } from './raster-extractor';
-import { studioDesignSchema } from '../../src/lib/studio-design-schema';
+import { studioDesignSchema } from '../../packages/shared/studio-design-schema';
 
 const image = (content: string, width = 300, height = 200) =>
   sharp(

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getCollectionFlags } from '@/actions/collections';
 import FlagImage from '@/components/FlagImage';
-import { COLLECTION_GROUPS, COLLECTIONS, collectionPath } from '@/lib/collections';
-import { absoluteUrl } from '@/lib/seo';
+import { COLLECTION_GROUPS, COLLECTIONS, collectionPath } from '@shared/collections';
+import { absoluteUrl } from '@shared/seo';
 
 // Collection contents are cached for a day; rendering on request keeps the build off the database.
 export const dynamic = 'force-dynamic';

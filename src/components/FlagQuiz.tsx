@@ -21,7 +21,7 @@ import {
   XCircle,
 } from '@/components/icons';
 import { Stat } from '@/components/games/shared';
-import { COUNTRIES, PLACES, type GameFlag } from '@/lib/games/pool';
+import { COUNTRIES, PLACES, type GameFlag } from '@shared/games/pool';
 import { cn } from '@/lib/utils';
 
 type Mode = 'name' | 'find';

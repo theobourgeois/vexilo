@@ -1,5 +1,5 @@
-import { Flag } from '@/lib/types';
-import type { EmblemPlacement, StoredStudioDesign } from '@/lib/studio-design';
+import { Flag } from '@shared/types';
+import type { EmblemPlacement, StoredStudioDesign } from '@shared/studio-design';
 import { relations, sql } from 'drizzle-orm';
 import {
   date,

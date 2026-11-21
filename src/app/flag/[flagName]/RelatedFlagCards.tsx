@@ -2,7 +2,7 @@
 
 import FlagCard from '@/components/FlagCard';
 import { useLiveFavorites } from '@/hooks/useLiveFavorites';
-import type { Flag } from '@/lib/types';
+import type { Flag } from '@shared/types';
 
 /** The related flags as the page has them (the same for everyone), with the visitor's own favorites added. */
 export default function RelatedFlagCards({ flags }: { flags: Flag[] }) {

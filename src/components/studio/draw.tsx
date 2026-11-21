@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { ChevronDown, Cursor, PaintBrush, PenNib, Shapes, SwapColors, Text } from '@/components/icons';
-import type { TextFont } from '@/lib/studio-design';
+import type { TextFont } from '@shared/studio-design';
 import { cn } from '@/lib/utils';
 import { documentColors, EXPORT_WIDTH } from './model';
 import { isLinear, SHAPE_PRESETS, shapePath, type ShapePreset, type ShapeStyle } from './shapes';

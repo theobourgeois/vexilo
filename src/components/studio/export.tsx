@@ -3,8 +3,8 @@
 import type React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import type { StudioDesign } from '@/lib/studio-design';
-import { studioDesignSchema } from '@/lib/studio-design-schema';
+import type { StudioDesign } from '@shared/studio-design';
+import { studioDesignSchema } from '@shared/studio-design-schema';
 import { ConstructionSheet, sheetLayout, type SheetOptions } from './ConstructionSheet';
 import { FlagArt, type Hrefs } from './FlagArt';
 import { layerImage } from './cutout';

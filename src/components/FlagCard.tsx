@@ -2,7 +2,7 @@
 
 import { Heart, Edit, UserCircle, Check, Shuffle } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { Flag } from '@/lib/types';
+import { Flag } from '@shared/types';
 import { useSession } from 'next-auth/react';
 import React from 'react';
 import Link from 'next/link';

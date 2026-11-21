@@ -5,9 +5,9 @@ import { and, desc, inArray, type SQL, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { flagAiMetadata, flagColors, flagEmblems, flags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
-import { getCollection, type CollectionCriteria } from '@/lib/collections';
-import { getTrait } from '@/lib/flag-search-terms';
-import { MAKER_TAGS } from '@/lib/studio-design';
+import { getCollection, type CollectionCriteria } from '@shared/collections';
+import { getTrait } from '@shared/flag-search-terms';
+import { MAKER_TAGS } from '@shared/studio-design';
 
 const COLLECTION_LIMIT = 120;
 const CACHE_SECONDS = 60 * 60 * 24;

@@ -3,7 +3,7 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Search } from '@/components/icons';
-import { searchCountries, type Country } from '@/lib/games/pool';
+import { searchCountries, type Country } from '@shared/games/pool';
 import { cn } from '@/lib/utils';
 
 /** A search box over the countries in the games, with arrow-key and Enter picking. */

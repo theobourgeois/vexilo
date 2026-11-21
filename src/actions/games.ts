@@ -5,9 +5,9 @@ import { db } from '@/db';
 import { redis } from '@/db/redis';
 import { gameResults } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
-import { dayIndex, isPlayableDate, puzzleNumber, seededRandom, shuffle } from '@/lib/games/daily';
-import { CRITERIA, fitsCell, generateGrid, type GridSpec } from '@/lib/games/grid';
-import { COUNTRIES, COUNTRY_BY_ID } from '@/lib/games/pool';
+import { dayIndex, isPlayableDate, puzzleNumber, seededRandom, shuffle } from '@shared/games/daily';
+import { CRITERIA, fitsCell, generateGrid, type GridSpec } from '@shared/games/grid';
+import { COUNTRIES, COUNTRY_BY_ID } from '@shared/games/pool';
 
 // A day's puzzle is kept for a few days, long enough for every time zone to finish it.
 const KEEP = 60 * 60 * 24 * 4;

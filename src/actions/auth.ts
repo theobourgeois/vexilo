@@ -5,7 +5,7 @@ import { users } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { eq, sql } from 'drizzle-orm';
 import { headers } from 'next/headers';
-import { signupSchema } from '@/lib/auth-validation';
+import { signupSchema } from '@shared/auth-validation';
 import { hashPassword } from '@/lib/password';
 import { verifyPassword } from '@/lib/password';
 import { allowAuthAttempt } from '@/lib/auth-rate-limit';
@@ -14,7 +14,7 @@ import {
   completeEmailVerification,
   resendEmailVerification,
 } from '@/lib/email-verification';
-import { emailSchema } from '@/lib/auth-validation';
+import { emailSchema } from '@shared/auth-validation';
 import { emailDeliveryConfigured } from '@/lib/email';
 import { z } from 'zod';
 

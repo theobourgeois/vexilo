@@ -11,7 +11,7 @@ import {
   saveFlagTimeline,
   type TimelineResult,
 } from '../../src/lib/ai/flag-timeline-pipeline';
-import { isHistoricalVersion, parseYearSpan, timelineKey } from '../../src/lib/timeline/flag-names';
+import { isHistoricalVersion, parseYearSpan, timelineKey } from '../../packages/shared/timeline/flag-names';
 
 /**
  * Researches history timelines for flags and prints them. Pass --write to save them to vexilo_flag_timeline.

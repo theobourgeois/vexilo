@@ -4,7 +4,7 @@ import React from 'react';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Download, Emblems, Layers, Palette, Send, SquaresFour, Trophy, X } from '@/components/icons';
-import type { StudioDesign } from '@/lib/studio-design';
+import type { StudioDesign } from '@shared/studio-design';
 import { cn } from '@/lib/utils';
 import {
   ContestEntryDialog,

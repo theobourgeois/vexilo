@@ -5,7 +5,7 @@ import { cacheDel } from "@/db/redis";
 import { flags, users } from "@/db/schema";
 import { deleteFileFromUrl, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
-import { CLOUD_FRONT_URL } from "@/lib/constant";
+import { CLOUD_FRONT_URL } from "@shared/constant";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 

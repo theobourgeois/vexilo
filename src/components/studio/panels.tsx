@@ -46,7 +46,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { EMBLEM_CATEGORIES, emblemSearchScore, mixEmblemCategories } from '@/lib/emblem-search';
-import type { EdgeStyle, FlagOutline, StudioDesign, StudioDivision, StudioField, StudioGroup, StudioLayer } from '@/lib/studio-design';
+import type { EdgeStyle, FlagOutline, StudioDesign, StudioDivision, StudioField, StudioGroup, StudioLayer } from '@shared/studio-design';
 import { clipBaseIndex, clipsBelow, clipTargets, partLabel } from './clip';
 import { luminance, PALETTE_GROUPS, PALETTES } from './colors';
 import { FlagArt, PartPreview } from './FlagArt';

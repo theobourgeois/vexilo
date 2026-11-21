@@ -1,4 +1,4 @@
-import type { StudioDesign, StudioLayer } from '@/lib/studio-design';
+import type { StudioDesign, StudioLayer } from '@shared/studio-design';
 import { layerPlacements, placedBounds } from './groups';
 import { clamp, layerCopies, layerWidth, scaleRepeat, unionBox, type Box } from './model';
 

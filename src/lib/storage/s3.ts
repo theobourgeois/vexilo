@@ -6,7 +6,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
-import { CLOUD_FRONT_URL } from "@/lib/constant";
+import { CLOUD_FRONT_URL } from "@shared/constant";
 import { IMAGE_EXTENSIONS, UnsafeImageError, safeImageBody } from "@/lib/storage/safe-image";
 
 export { UnsafeImageError };

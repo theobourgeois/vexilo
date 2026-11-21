@@ -3,7 +3,7 @@ import { flagTags } from '@/db/schema';
 import { findExistingFlags, resolveWikimediaFlag, type ExistingFlagMatch } from '@/actions/batch-flags';
 import { uploadFile } from '@/lib/storage/s3';
 import { buildUsageLog } from '@/lib/ai/flag-metadata-pipeline';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { CLOUD_FRONT_URL } from '@shared/constant';
 import { openai } from '@ai-sdk/openai';
 import { Output, generateText } from 'ai';
 import { desc } from 'drizzle-orm';

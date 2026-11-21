@@ -9,10 +9,10 @@ import { db } from '@/db';
 import { bannedUsers, contestEntries, contests, contestVotes, users } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { CONTESTS_TAG, toDate } from '@/lib/cache-tags';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
-import { contestPhase, seededShuffle, STATEMENT_MAX, type ContestPhase } from '@/lib/contest';
-import type { StoredStudioDesign, StudioDesign } from '@/lib/studio-design';
-import { studioDesignSchema } from '@/lib/studio-design-schema';
+import { CLOUD_FRONT_URL } from '@shared/constant';
+import { contestPhase, seededShuffle, STATEMENT_MAX, type ContestPhase } from '@shared/contest';
+import type { StoredStudioDesign, StudioDesign } from '@shared/studio-design';
+import { studioDesignSchema } from '@shared/studio-design-schema';
 import { deleteFileFromUrl, uploadFile } from '@/lib/storage/s3';
 
 type ContestRow = typeof contests.$inferSelect;

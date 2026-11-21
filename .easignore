@@ -1,0 +1,23 @@
+# EAS uploads this whole repo to build apps/mobile, and reads this file
+# instead of every .gitignore. Only the app and the code it shares with the
+# website go up; nothing else (above all .env) may leave this machine.
+# EAS matches directories without a trailing slash, so patterns have none.
+/*
+!/apps
+!/packages
+
+# What apps/mobile/.gitignore keeps out of git
+node_modules
+.expo
+dist
+expo-env.d.ts
+/apps/mobile/ios
+/apps/mobile/android
+.env*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+.DS_Store

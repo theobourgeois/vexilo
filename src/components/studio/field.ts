@@ -1,4 +1,4 @@
-import type { DivisionKind, LayoutId, StoredStudioDesign, StudioDesign, StudioDivision, StudioField } from '@/lib/studio-design';
+import type { DivisionKind, LayoutId, StoredStudioDesign, StudioDesign, StudioDivision, StudioField } from '@shared/studio-design';
 import { colorDistance, sameColor, uniqueColors } from './colors';
 import { DIVISIONS, divisionColors, divisionParams } from './divisions';
 import { defaultParams, LAYOUT_PRESETS, LAYOUTS } from './layouts';
