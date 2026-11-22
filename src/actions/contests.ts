@@ -115,7 +115,7 @@ async function contestBySlug(slug: string) {
  * The contest to promote right now: one that's running, else the next one coming up,
  * else the latest finished one.
  */
-type CurrentContest = ContestSummary & { winnerImage: string | null; announcedAt: Date | null };
+type CurrentContest = ContestSummary & { winnerImage: string | null; announcedAt: Date | null; previews: string[] };
 
 export async function getCurrentContest(): Promise<CurrentContest | null> {
   const contest = await getCachedCurrentContest();
@@ -131,7 +131,7 @@ export async function getCurrentContest(): Promise<CurrentContest | null> {
 }
 
 // Shown on Browse for everyone, so it's cached briefly; contest admin actions expire it.
-const getCachedCurrentContest = unstable_cache(readCurrentContest, ['current-contest-v1'], {
+const getCachedCurrentContest = unstable_cache(readCurrentContest, ['current-contest-v2'], {
   revalidate: 60 * 5,
   tags: [CONTESTS_TAG],
 });
@@ -146,7 +146,7 @@ async function readCurrentContest(): Promise<CurrentContest | null> {
     withPhase.find(({ phase }) => phase === 'results');
   if (!pick) return null;
   const { row } = pick;
-  const [entryCount, winner] = await Promise.all([
+  const [entryCount, winner, previews] = await Promise.all([
     activeEntryCount(row.id),
     pick.phase === 'results' && row.winnerEntryId
       ? db
@@ -155,8 +155,16 @@ async function readCurrentContest(): Promise<CurrentContest | null> {
           .where(eq(contestEntries.id, row.winnerEntryId))
           .then((res) => res[0])
       : undefined,
+    // A few entries for the voting banner on Browse, in an order that favors no one.
+    pick.phase === 'voting'
+      ? db
+          .select({ id: contestEntries.id, image: contestEntries.image })
+          .from(contestEntries)
+          .where(and(eq(contestEntries.contestId, row.id), eq(contestEntries.status, 'active')))
+          .then((res) => seededShuffle(res, `${row.id}:banner`).slice(0, 4).map((entry) => entry.image))
+      : [],
   ]);
-  return { ...summarize(row, entryCount), winnerImage: winner?.image ?? null, announcedAt: row.announcedAt };
+  return { ...summarize(row, entryCount), winnerImage: winner?.image ?? null, announcedAt: row.announcedAt, previews };
 }
 
 export type ArchivedContest = ContestSummary & { winner: { title: string; image: string; designer: string } | null };

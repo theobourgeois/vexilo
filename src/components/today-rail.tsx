@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle } from '@/components/icons';
-import { ContestLink } from '@/components/contest-link';
+import { ContestLink, ContestVoteBanner, useCurrentContest, useVoteBanner } from '@/components/contest-link';
 import { FlagOfTheDayLink } from '@/components/flag-of-the-day-link';
 import { TopContributorsLink } from '@/components/top-contributors-link';
 import { UnfurlArt } from '@/components/games/art';
@@ -39,20 +39,26 @@ export function TodayRail({ className }: { className?: string }) {
   const [number, setNumber] = React.useState<number | null>(null);
   React.useEffect(() => setNumber(puzzleNumber(localDate())), []);
 
+  const contest = useCurrentContest();
+  const banner = useVoteBanner(contest);
+
   return (
-    <div
-      className={cn(
-        // A swipeable strip on phones and tablets; one even row on desktop.
-        '-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1.5 pt-0.5 [scrollbar-width:none] md:-mx-8 md:scroll-px-8 md:px-8 lg:mx-0 lg:grid lg:auto-cols-fr lg:grid-flow-col lg:gap-3 lg:overflow-visible lg:px-0',
-        className,
-      )}
-    >
-      <FlagOfTheDayLink className={CARD} />
-      <ContestLink className={CARD} />
-      {PUZZLES.map((puzzle) => (
-        <PuzzleCard key={puzzle.game} puzzle={puzzle} number={number} />
-      ))}
-      <TopContributorsLink className={CARD} />
+    <div className={className}>
+      {banner.show && contest && <ContestVoteBanner contest={contest} onHide={banner.hide} />}
+      <div
+        className={cn(
+          // A swipeable strip on phones and tablets; one even row on desktop.
+          '-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1.5 pt-0.5 [scrollbar-width:none] md:-mx-8 md:scroll-px-8 md:px-8 lg:mx-0 lg:grid lg:auto-cols-fr lg:grid-flow-col lg:gap-3 lg:overflow-visible lg:px-0',
+          banner.show && 'mt-3',
+        )}
+      >
+        <FlagOfTheDayLink className={CARD} />
+        {!banner.show && <ContestLink contest={contest} className={CARD} />}
+        {PUZZLES.map((puzzle) => (
+          <PuzzleCard key={puzzle.game} puzzle={puzzle} number={number} />
+        ))}
+        <TopContributorsLink className={CARD} />
+      </div>
     </div>
   );
 }
