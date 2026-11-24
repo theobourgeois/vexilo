@@ -13,12 +13,6 @@ type View = 'flat' | 'wave';
 
 const VIEWS: View[] = ['flat', 'wave'];
 
-const WIND_LEVELS = [
-  { value: '0.45', label: 'Light' },
-  { value: '1', label: 'Breeze' },
-  { value: '1.7', label: 'Strong' },
-];
-
 export default function FlagViewer({
   image,
   name,
@@ -31,7 +25,6 @@ export default function FlagViewer({
 }) {
   const extension = image.split('?')[0].split('.').pop()?.toUpperCase();
   const [view, setView] = React.useState<View>('flat');
-  const [wind, setWind] = React.useState('1');
 
   // ?view=wave opens the flag waving, so the mode can be shared.
   React.useEffect(() => {
@@ -52,7 +45,7 @@ export default function FlagViewer({
 
   const stage =
     view === 'wave' ? (
-      <WavingFlag src={image} alt={name} wind={Number(wind)} className='absolute inset-0' />
+      <WavingFlag src={image} alt={name} className='absolute inset-0' />
     ) : (
       <div className={cn('flag-stage absolute inset-0', !band && 'p-10 sm:p-14')}>
         <FlagImage
@@ -78,17 +71,10 @@ export default function FlagViewer({
     />
   );
 
-  const viewControls =
-    view === 'wave' ? (
-      <>
-        <span className='text-[13px] text-muted-foreground'>Wind</span>
-        <Segmented aria-label='Wind' value={wind} onChange={setWind} options={WIND_LEVELS} />
-        <span className='hidden text-[13px] text-muted-foreground sm:inline'>· drag to turn</span>
-      </>
-    ) : band ? null : (
-      extension &&
-      extension.length <= 4 && <span className='tabular-nums text-xs text-muted-foreground'>{extension}</span>
-    );
+  const fileType =
+    !band && extension && extension.length <= 4 ? (
+      <span className='tabular-nums text-xs text-muted-foreground'>{extension}</span>
+    ) : null;
 
   const fileActions = (
     <>
@@ -118,7 +104,6 @@ export default function FlagViewer({
         <div className='relative h-[230px] sm:h-[345px]'>{stage}</div>
         <div className='mt-4 flex flex-wrap items-center gap-2'>
           {viewPicker}
-          {viewControls}
           <span className='flex-1' />
           {fileActions}
         </div>
@@ -133,7 +118,7 @@ export default function FlagViewer({
         {viewPicker}
       </div>
       <div className='flex flex-wrap items-center gap-2 border-t border-line py-3 pl-[18px] pr-3'>
-        {viewControls}
+        {fileType}
         <span className='flex-1' />
         {fileActions}
       </div>
