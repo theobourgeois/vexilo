@@ -4,7 +4,7 @@ export default function FlagLoading() {
   return (
     <div aria-busy='true' aria-label='Loading flag'>
       <div className='flag-band'>
-        <div className='mx-auto max-w-[1312px] px-4 pb-[84px] md:px-8 lg:pb-[92px]'>
+        <div className='mx-auto max-w-[1312px] px-4 pb-10 md:px-8 lg:pb-12'>
           <div className='flex items-center gap-2 pb-4 pt-[22px]'>
             <div className={`h-3.5 w-12 ${bar}`} />
             <div className={`h-3.5 w-16 ${bar}`} />
@@ -48,13 +48,23 @@ export default function FlagLoading() {
       </div>
 
       <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
-        <div className='relative z-10 -mt-11 grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-line shadow-[var(--sh-tile),0_14px_36px_-18px_rgb(0_0_0/0.3)] lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]'>
-          {Array.from({ length: 5 }, (_, i) => (
-            <div key={i} className={`bg-surface px-5 py-4 ${i === 0 ? 'col-span-2 lg:col-span-1' : ''}`}>
-              <div className='h-3 w-16 animate-pulse rounded bg-foreground/[0.06]' />
-              <div className='mt-2.5 h-4 w-20 animate-pulse rounded bg-foreground/[0.06]' />
+        <div className='mt-9 grid gap-x-14 gap-y-9 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]'>
+          <div>
+            <div className='mb-3 h-3.5 w-16 animate-pulse rounded bg-foreground/[0.06]' />
+            <div className='grid grid-cols-4 gap-2.5 sm:grid-cols-3'>
+              {Array.from({ length: 3 }, (_, i) => (
+                <div key={i} className='h-14 animate-pulse rounded-xl bg-foreground/[0.06] sm:h-[72px]' />
+              ))}
             </div>
-          ))}
+          </div>
+          <div>
+            <div className='mb-3 h-3.5 w-12 animate-pulse rounded bg-foreground/[0.06]' />
+            <div className='flex flex-wrap gap-2'>
+              {[120, 110, 96, 104].map((w, i) => (
+                <div key={i} className='h-8 animate-pulse rounded-full bg-foreground/[0.06]' style={{ width: w }} />
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className='mt-14'>

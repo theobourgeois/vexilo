@@ -124,97 +124,105 @@ const formatShare = (share: number) => (share < 0.01 ? '<1%' : `${Math.round(sha
 const humanize = (value: string) =>
   value.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
-/** One cell of the strips under the header: a small label over its value. */
-function Fact({ label, className, children }: { label: React.ReactNode; className?: string; children: React.ReactNode }) {
+/** A small heading over one of the sections under the header, with an optional link on the right. */
+function SectionHeading({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className={cn('min-w-0 bg-surface px-5 py-4', className)}>
-      <h2 className='vx-label'>{label}</h2>
-      <div className='mt-1.5 truncate text-[17px] font-semibold tracking-[-0.01em]'>{children}</div>
+    <div className='mb-3 flex items-baseline justify-between gap-3'>
+      <h2 className='text-[13.5px] font-semibold tracking-normal'>{title}</h2>
+      {children}
     </div>
   );
 }
 
-// The 1px gaps show the strip's background through, which draws the dividers between cells.
-const stripClass = 'vx-strip grid gap-px overflow-hidden rounded-2xl shadow-tile';
+// Four chips a row on phones; one row of however many the flag has from sm up.
+const chipGrid = 'grid grid-cols-4 gap-x-2.5 gap-y-4 sm:auto-cols-[minmax(0,160px)] sm:grid-flow-col sm:grid-cols-none';
 
 // Colours are read from the image itself (cached), so they stream in after the page.
-async function ColoursFact({ colors }: { colors: Promise<PaletteColor[]> }) {
+async function ColoursSection({ colors }: { colors: Promise<PaletteColor[]> }) {
   const palette = await colors.catch(() => [] as PaletteColor[]);
-  const total = palette.reduce((sum, color) => sum + color.share, 0);
   const collection = palette.length > 0 ? getColourCollection(paletteFamilies(palette)) : null;
   return (
-    <div className='col-span-2 min-w-0 bg-surface px-5 py-4 lg:col-span-1'>
-      <div className='flex items-baseline justify-between gap-3'>
-        <h2 className='vx-label'>Colours{palette.length > 0 && ` · ${palette.length}`}</h2>
+    <section className='min-w-0'>
+      <SectionHeading title='Colours'>
         {collection && (
           <Link
             href={collectionPath(collection.slug)}
-            className='inline-flex items-center gap-0.5 truncate text-[12.5px] font-medium text-main hover:underline'
+            className='inline-flex min-w-0 items-center gap-0.5 truncate text-[12.5px] font-medium text-main hover:underline'
           >
             More {collection.title.toLowerCase()}
-            <ChevronRight className='size-3' />
+            <ChevronRight className='size-3 shrink-0' />
           </Link>
         )}
-      </div>
+      </SectionHeading>
       {palette.length === 0 ? (
-        <p className='mt-1.5 text-[13.5px] text-muted-foreground'>Couldn&apos;t read this flag&apos;s colours.</p>
+        <p className='text-[13.5px] text-muted-foreground'>Couldn&apos;t read this flag&apos;s colours.</p>
       ) : (
-        <>
-          <div className='relative mt-2.5 flex h-2.5 overflow-hidden rounded-full after:absolute after:inset-0 after:rounded-full after:shadow-[inset_0_0_0_1px_var(--border)]'>
-            {palette.map((color) => (
-              <span key={color.hex} style={{ flex: color.share / total, minWidth: 4, background: color.hex }} />
-            ))}
-          </div>
-          <ul className='mt-2.5 flex flex-wrap gap-x-3.5 gap-y-1 text-[12.5px]'>
-            {palette.map((color) => (
-              <li key={color.hex} title={color.hex} className='flex items-center gap-1.5'>
-                <span
-                  className='size-[11px] shrink-0 rounded-[3px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.15)]'
-                  style={{ background: color.hex }}
-                />
+        <ul className={chipGrid}>
+          {palette.map((color) => (
+            <li key={color.hex} className='min-w-0'>
+              <div
+                className='h-14 rounded-xl shadow-[inset_0_0_0_1px_rgb(0_0_0/0.1)] sm:h-[72px] dark:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.1)]'
+                style={{ background: color.hex }}
+              />
+              <p className='mt-2 truncate text-[13px] font-medium' title={color.name}>
                 {color.name}
-                <span className='tabular-nums text-muted-foreground'>{formatShare(color.share)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
+              </p>
+              <p className='truncate text-[12px] tabular-nums text-muted-foreground'>
+                <span className='hidden sm:inline'>{color.hex.toUpperCase()} · </span>
+                {formatShare(color.share)}
+              </p>
+            </li>
+          ))}
+        </ul>
       )}
-    </div>
+    </section>
   );
 }
 
-function ColoursFactSkeleton() {
+function ColoursSectionSkeleton() {
   return (
-    <div className='col-span-2 bg-surface px-5 py-4 lg:col-span-1'>
-      <div className='vx-label'>Colours</div>
-      <div className='mt-2.5 h-2.5 animate-pulse rounded-full bg-foreground/[0.06]' />
-      <div className='mt-3 h-3 w-2/3 animate-pulse rounded bg-foreground/[0.06]' />
-    </div>
+    <section className='min-w-0'>
+      <SectionHeading title='Colours' />
+      <div className={chipGrid}>
+        {Array.from({ length: 3 }, (_, i) => (
+          <div key={i}>
+            <div className='h-14 animate-pulse rounded-xl bg-foreground/[0.06] sm:h-[72px]' />
+            <div className='mt-2.5 h-3 w-14 animate-pulse rounded bg-foreground/[0.06]' />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
-function TraitsStrip({ data }: { data: FlagAiStructuredData }) {
+function traitRows(data: FlagAiStructuredData | null | undefined) {
   const rows: [string, string][] = [];
+  if (!data) return rows;
   if (data.layoutType) rows.push(['Layout', humanize(data.layoutType)]);
   if (data.patternType) rows.push(['Pattern', humanize(data.patternType)]);
   if (data.primarySymbols?.length) rows.push(['Symbols', data.primarySymbols.map(humanize).join(', ')]);
   if (data.emblemPlacement && data.emblemPlacement !== 'none') rows.push(['Emblem', humanize(data.emblemPlacement)]);
   if (data.hasText !== undefined) rows.push(['Text', data.hasText ? humanize(data.textType ?? 'yes') : 'None']);
-  if (rows.length === 0) return null;
+  return rows;
+}
+
+function TraitsSection({ rows }: { rows: [string, string][] }) {
   return (
-    <section aria-label='Traits' className={cn(stripClass, 'mt-4 grid-cols-2 md:auto-cols-fr md:grid-flow-col md:grid-cols-none')}>
-      {rows.map(([label, value], i) => (
-        <div
-          key={label}
-          // A lone last cell spans both columns on phones, so no empty gap shows.
-          className={cn('min-w-0 bg-surface px-5 py-3.5', i === rows.length - 1 && rows.length % 2 === 1 && 'col-span-2 md:col-span-1')}
-        >
-          <h3 className='vx-label'>{label}</h3>
-          <p className='mt-1 truncate text-[14.5px] font-medium' title={value}>
-            {value}
-          </p>
-        </div>
-      ))}
+    <section className='min-w-0'>
+      <SectionHeading title='Traits' />
+      <ul className='flex flex-wrap gap-2'>
+        {rows.map(([label, value]) => (
+          <li
+            key={label}
+            className='inline-flex h-8 max-w-full items-center gap-1.5 rounded-full bg-surface px-3 text-[13px] font-medium shadow-tile'
+          >
+            <span className='font-normal text-muted-foreground'>{label}</span>
+            <span className='truncate' title={value}>
+              {value}
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -483,7 +491,7 @@ export default async function FlagPage({
   const colors = getFlagColors(flag);
   const madeInMaker = flag.tags.some((tag) => MAKER_TAGS.includes(tag));
   const original = flag.remixOf ? await getFlagNameById(flag.remixOf) : null;
-  const structured = flag.metadata?.structuredData ?? null;
+  const traits = traitRows(flag.metadata?.structuredData);
   const history = flag.metadata?.historicalContext ?? '';
   const sources = collectSources(flag.sources ?? [], flag.metadata?.researchSources ?? []);
   const firstTag = flag.displayTags.find((t) => t.toLowerCase() !== flag.name.toLowerCase());
@@ -508,7 +516,7 @@ export default async function FlagPage({
         <Suspense fallback={null}>
           <BandBackdrop colors={colors} />
         </Suspense>
-        <div className='mx-auto max-w-[1312px] px-4 pb-[84px] md:px-8 lg:pb-[92px]'>
+        <div className='mx-auto max-w-[1312px] px-4 pb-10 md:px-8 lg:pb-12'>
           <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
             <Link href='/' className='hover:text-foreground'>
               Browse
@@ -575,48 +583,53 @@ export default async function FlagPage({
                   ))}
                 </div>
               )}
+              <p className='mt-6 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground [&_b]:font-medium [&_b]:text-foreground'>
+                <span>
+                  Added <b>{formatDate(flag.createdAt)}</b>
+                </span>
+                <span>
+                  <b>
+                    <FavoriteCount flagId={flag.id} cached={flag.favorites} />
+                  </b>{' '}
+                  favorites
+                </span>
+                {extension && extension.length <= 4 && (
+                  <span>
+                    <b>{extension}</b>
+                  </span>
+                )}
+                {flag.link && sourceHost && (
+                  <span className='min-w-0 truncate'>
+                    Source{' '}
+                    <a
+                      href={flag.link}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      title={flag.link}
+                      className='font-medium text-foreground underline decoration-white/40 underline-offset-2 hover:decoration-white'
+                    >
+                      {sourceHost}
+                    </a>
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
       <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
-        {/* Overlaps the bottom of the band, so the header ends in the page's facts rather than empty colour. */}
-        <section
-          aria-label='Details'
+        <div
           className={cn(
-            stripClass,
-            'relative z-10 -mt-11 grid-cols-2 shadow-[var(--sh-tile),0_14px_36px_-18px_rgb(0_0_0/0.3)] lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]',
+            'mt-9 grid gap-x-14 gap-y-9',
+            traits.length > 0 && 'lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]',
           )}
         >
-          <Suspense fallback={<ColoursFactSkeleton />}>
-            <ColoursFact colors={colors} />
+          <Suspense fallback={<ColoursSectionSkeleton />}>
+            <ColoursSection colors={colors} />
           </Suspense>
-          <Fact label='Catalogue'>
-            <span className='tabular-nums'>{catalogue}</span>
-          </Fact>
-          <Fact label='Added'>{formatDate(flag.createdAt)}</Fact>
-          <Fact label='Favorites'>
-            <FavoriteCount flagId={flag.id} cached={flag.favorites} />
-          </Fact>
-          {flag.link && sourceHost ? (
-            <Fact label='Image source'>
-              <a
-                href={flag.link}
-                target='_blank'
-                rel='noopener noreferrer'
-                title={flag.link}
-                className='border-b border-border hover:border-foreground'
-              >
-                {sourceHost}
-              </a>
-            </Fact>
-          ) : (
-            <Fact label='Format'>{extension && extension.length <= 4 ? extension : 'Image'}</Fact>
-          )}
-        </section>
-
-        {structured && <TraitsStrip data={structured} />}
+          {traits.length > 0 && <TraitsSection rows={traits} />}
+        </div>
 
         <Suspense fallback={<Story {...storyProps} timeline={null} />}>
           <StorySection {...storyProps} flagId={flag.id} />
