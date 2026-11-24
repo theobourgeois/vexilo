@@ -18,7 +18,9 @@ import ExpandableDescription from './ExpandableDescription';
 import FlagViewer from './FlagViewer';
 import FlagViewTracker from './FlagViewTracker';
 import FlagTimeline from './FlagTimeline';
-import { getFlagTimeline } from '@/actions/flag-timeline';
+import HistoryText from './HistoryText';
+import AddHistoryButton from './AddHistoryButton';
+import { getFlagTimeline, type FlagTimelineView } from '@/actions/flag-timeline';
 import type { FlagAiResearchSource, FlagAiStructuredData } from '@/db/schema';
 import { Metadata } from 'next';
 import Tag from '@/components/Tag';
@@ -33,6 +35,8 @@ import { MakerBadge } from '@/components/MakerBadge';
 import { MAKER_TAGS } from '@/lib/studio-design';
 import { collectionPath, getColourCollection } from '@/lib/collections';
 import { absoluteUrl, flagHeadline, flagPath, jsonLd } from '@/lib/seo';
+import { bandGradient, flagBand } from '@/lib/flag-band';
+import { cn } from '@/lib/utils';
 
 export type RelatedFlag = {
   name: string;
@@ -120,87 +124,118 @@ const formatShare = (share: number) => (share < 0.01 ? '<1%' : `${Math.round(sha
 const humanize = (value: string) =>
   value.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
-function Panel({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
+/** A small heading over one of the sections under the header, with an optional link on the right. */
+function SectionHeading({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <section className='vx-tile px-[22px] py-5'>
-      <h2 className='mb-2 flex items-baseline gap-2 text-sm font-semibold'>
-        {title}
-        {aside !== undefined && <span className='tabular-nums text-[13px] font-normal text-muted-foreground'>{aside}</span>}
-      </h2>
+    <div className='mb-3 flex items-baseline justify-between gap-3'>
+      <h2 className='text-[13.5px] font-semibold tracking-normal'>{title}</h2>
       {children}
+    </div>
+  );
+}
+
+// Four chips a row on phones; one row of however many the flag has from sm up.
+const chipGrid = 'grid grid-cols-4 gap-x-2.5 gap-y-4 sm:auto-cols-[minmax(0,160px)] sm:grid-flow-col sm:grid-cols-none';
+
+// Colours are read from the image itself (cached), so they stream in after the page.
+async function ColoursSection({ colors }: { colors: Promise<PaletteColor[]> }) {
+  const palette = await colors.catch(() => [] as PaletteColor[]);
+  const collection = palette.length > 0 ? getColourCollection(paletteFamilies(palette)) : null;
+  return (
+    <section className='min-w-0'>
+      <SectionHeading title='Colours'>
+        {collection && (
+          <Link
+            href={collectionPath(collection.slug)}
+            className='inline-flex min-w-0 items-center gap-0.5 truncate text-[12.5px] font-medium text-main hover:underline'
+          >
+            More {collection.title.toLowerCase()}
+            <ChevronRight className='size-3 shrink-0' />
+          </Link>
+        )}
+      </SectionHeading>
+      {palette.length === 0 ? (
+        <p className='text-[13.5px] text-muted-foreground'>Couldn&apos;t read this flag&apos;s colours.</p>
+      ) : (
+        <ul className={chipGrid}>
+          {palette.map((color) => (
+            <li key={color.hex} className='min-w-0'>
+              <div
+                className='h-14 rounded-xl shadow-[inset_0_0_0_1px_rgb(0_0_0/0.1)] sm:h-[72px] dark:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.1)]'
+                style={{ background: color.hex }}
+              />
+              <p className='mt-2 truncate text-[13px] font-medium' title={color.name}>
+                {color.name}
+              </p>
+              <p className='truncate text-[12px] tabular-nums text-muted-foreground'>
+                <span className='hidden sm:inline'>{color.hex.toUpperCase()} · </span>
+                {formatShare(color.share)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
 
-function SpecRows({ rows }: { rows: [string, React.ReactNode][] }) {
+function ColoursSectionSkeleton() {
   return (
-    <dl className='grid grid-cols-[auto_minmax(0,1fr)] text-[13.5px]'>
-      {rows.map(([k, v]) => (
-        <div key={k} className='contents [&>*]:border-b [&>*]:border-line [&:last-child>*]:border-0'>
-          <dt className='py-2.5 pr-6 text-muted-foreground'>{k}</dt>
-          <dd className='min-w-0 truncate py-2.5 text-right'>{v}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-// Colours are read from the image itself (cached), so they stream in after the page.
-async function ColoursPanel({ colors }: { colors: Promise<PaletteColor[]> }) {
-  const palette = await colors;
-  if (palette.length === 0) return null;
-  const total = palette.reduce((sum, color) => sum + color.share, 0);
-  const collection = getColourCollection(paletteFamilies(palette));
-  return (
-    <Panel title='Colours' aside={palette.length}>
-      <div className='relative mt-1 mb-1.5 flex h-3.5 overflow-hidden rounded-full after:absolute after:inset-0 after:rounded-full after:shadow-[inset_0_0_0_1px_var(--border)]'>
-        {palette.map((color) => (
-          <span key={color.hex} style={{ flex: color.share / total, minWidth: 4, background: color.hex }} />
+    <section className='min-w-0'>
+      <SectionHeading title='Colours' />
+      <div className={chipGrid}>
+        {Array.from({ length: 3 }, (_, i) => (
+          <div key={i}>
+            <div className='h-14 animate-pulse rounded-xl bg-foreground/[0.06] sm:h-[72px]' />
+            <div className='mt-2.5 h-3 w-14 animate-pulse rounded bg-foreground/[0.06]' />
+          </div>
         ))}
       </div>
-      <ul className='text-[13.5px]'>
-        {palette.map((color) => (
-          <li key={color.hex} className='flex items-center gap-2.5 border-b border-line py-2.5 last:border-0'>
-            <span
-              className='size-3.5 shrink-0 rounded-[4px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.15)]'
-              style={{ background: color.hex }}
-            />
-            <span className='flex-1'>{color.name}</span>
-            <span className='tabular-nums text-muted-foreground'>
-              {color.hex} · {formatShare(color.share)}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {collection && (
-        <Link
-          href={collectionPath(collection.slug)}
-          className='mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-main hover:underline'
-        >
-          More {collection.title.toLowerCase()}
-          <ChevronRight className='size-3' />
-        </Link>
-      )}
-    </Panel>
+    </section>
   );
 }
 
-function PanelSkeleton() {
-  return <div className='vx-tile h-[260px] animate-pulse' />;
-}
-
-function TraitsPanel({ data }: { data: FlagAiStructuredData }) {
-  const rows: [string, React.ReactNode][] = [];
+function traitRows(data: FlagAiStructuredData | null | undefined) {
+  const rows: [string, string][] = [];
+  if (!data) return rows;
   if (data.layoutType) rows.push(['Layout', humanize(data.layoutType)]);
   if (data.patternType) rows.push(['Pattern', humanize(data.patternType)]);
   if (data.primarySymbols?.length) rows.push(['Symbols', data.primarySymbols.map(humanize).join(', ')]);
   if (data.emblemPlacement && data.emblemPlacement !== 'none') rows.push(['Emblem', humanize(data.emblemPlacement)]);
   if (data.hasText !== undefined) rows.push(['Text', data.hasText ? humanize(data.textType ?? 'yes') : 'None']);
-  if (rows.length === 0) return null;
+  return rows;
+}
+
+function TraitsSection({ rows }: { rows: [string, string][] }) {
   return (
-    <Panel title='Traits'>
-      <SpecRows rows={rows} />
-    </Panel>
+    <section className='min-w-0'>
+      <SectionHeading title='Traits' />
+      <ul className='flex flex-wrap gap-2'>
+        {rows.map(([label, value]) => (
+          <li
+            key={label}
+            className='inline-flex h-8 max-w-full items-center gap-1.5 rounded-full bg-surface px-3 text-[13px] font-medium shadow-tile'
+          >
+            <span className='font-normal text-muted-foreground'>{label}</span>
+            <span className='truncate' title={value}>
+              {value}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The header's colour, picked from the flag's palette once it has streamed in. */
+async function BandBackdrop({ colors }: { colors: Promise<PaletteColor[]> }) {
+  const palette = await colors.catch(() => [] as PaletteColor[]);
+  return (
+    <div
+      aria-hidden
+      className='absolute inset-0 -z-10 animate-in fade-in duration-300'
+      style={{ backgroundImage: bandGradient(flagBand(palette)) }}
+    />
   );
 }
 
@@ -262,7 +297,7 @@ async function ContributorsSection({ flagId }: { flagId: string }) {
   }));
 
   return (
-    <div className='mt-7 border-t border-line pt-5'>
+    <div>
       <h2 className='mb-2.5 text-sm font-semibold'>Contributors</h2>
       <Contributors contributors={contributors} totalEdits={totalEdits} edits={edits} />
     </div>
@@ -327,44 +362,66 @@ function collectSources(own: string[], researched: FlagAiResearchSource[]) {
   });
 }
 
-// Streams in after the page; most flags have no timeline yet.
-async function TimelineSection({ flagId, beside }: { flagId: string; beside: boolean }) {
-  const timeline = await getFlagTimeline(flagId);
-  if (!timeline) return null;
+function HistoryHeading() {
   return (
-    <div className={beside ? 'lg:col-start-2 lg:row-start-1' : undefined}>
-      <FlagTimeline timeline={timeline} />
+    <h2 className='mb-3.5 flex items-center gap-2 text-[17px] font-semibold tracking-[-0.02em]'>
+      <BookOpen className='size-[18px] text-muted-foreground' />
+      History
+    </h2>
+  );
+}
+
+function AddHistoryPrompt({ flagName }: { flagName: string }) {
+  return (
+    <div className='flex flex-col items-start gap-4 rounded-2xl border border-dashed border-border px-6 py-5 sm:flex-row sm:items-center'>
+      <BookOpen className='hidden size-5 shrink-0 text-muted-foreground sm:block' />
+      <div className='flex-1'>
+        <h2 className='text-[15px] font-semibold'>No history yet</h2>
+        <p className='mt-0.5 text-[13.5px] text-subtle'>
+          Know where this flag comes from or what it stands for? Add its story so others can read it.
+        </p>
+      </div>
+      <AddHistoryButton flagName={flagName} />
     </div>
   );
 }
 
-function HistoryAndSources({ history, sources }: { history: string; sources: string[] }) {
-  if (!history && sources.length === 0) return null;
-  return (
-    <section className='max-w-[780px]'>
-      {history && (
-        <>
-          <h2 className='flex items-center gap-2 text-[17px] font-semibold tracking-[-0.02em]'>
-            <BookOpen className='size-[18px] text-muted-foreground' />
-            History
-          </h2>
-          <div className='mt-3.5'>
-            <ExpandableDescription description={history} lines={8} />
-          </div>
-        </>
-      )}
-      {sources.length > 0 && (
-        <div className={history ? 'mt-7' : ''}>
-          <h2 className='mb-2.5 text-sm font-semibold'>Sources</h2>
-          <div className='flex flex-wrap gap-2'>
-            {sources.map((source) => (
-              <SourceBadge key={source} source={source} />
-            ))}
-          </div>
-        </div>
-      )}
+/**
+ * History, then the timeline, each across the full width: a long history flows into two columns and the
+ * timeline's events do too, so neither leaves an empty half of the page beside a long neighbour.
+ */
+function Story({
+  history,
+  timeline,
+  flagName,
+  promptForHistory,
+}: {
+  history: string;
+  timeline: FlagTimelineView | null;
+  flagName: string;
+  promptForHistory: boolean;
+}) {
+  const historyBlock = history ? (
+    <section>
+      <HistoryHeading />
+      <HistoryText text={history} columns={history.length > 700} />
     </section>
+  ) : promptForHistory ? (
+    <AddHistoryPrompt flagName={flagName} />
+  ) : null;
+  if (!historyBlock && !timeline) return null;
+  return (
+    <div className='mt-12 space-y-12'>
+      {historyBlock}
+      {timeline && <FlagTimeline timeline={timeline} columns />}
+    </div>
   );
+}
+
+// The timeline streams in after the page; most flags have none, so the fallback is the layout without it.
+async function StorySection(props: Omit<React.ComponentProps<typeof Story>, 'timeline'> & { flagId: string }) {
+  const timeline = await getFlagTimeline(props.flagId);
+  return <Story {...props} timeline={timeline} />;
 }
 
 export default async function FlagPage({
@@ -430,136 +487,183 @@ export default async function FlagPage({
     );
   }
 
-  // Shared by the colours panel and the custom colour view, so the image is only read once.
+  // Shared by the header colour and the colours strip, so the image is only read once.
   const colors = getFlagColors(flag);
   const madeInMaker = flag.tags.some((tag) => MAKER_TAGS.includes(tag));
   const original = flag.remixOf ? await getFlagNameById(flag.remixOf) : null;
-  const structured = flag.metadata?.structuredData ?? null;
+  const traits = traitRows(flag.metadata?.structuredData);
   const history = flag.metadata?.historicalContext ?? '';
   const sources = collectSources(flag.sources ?? [], flag.metadata?.researchSources ?? []);
   const firstTag = flag.displayTags.find((t) => t.toLowerCase() !== flag.name.toLowerCase());
-  const details: [string, React.ReactNode][] = [
-    ['Catalogue', <span key='i' className='tabular-nums'>#{String(flag.index).padStart(4, '0')}</span>],
-    ['Favorites', <FavoriteCount key='f' flagId={flag.id} cached={flag.favorites} />],
-    ['Added', formatDate(flag.createdAt)],
-  ];
-  if (flag.link) {
-    details.push([
-      'Image source',
-      <a key='l' href={flag.link} target='_blank' rel='noopener noreferrer' className='border-b border-border hover:border-foreground'>
-        {(() => {
-          try {
-            return new URL(flag.link).hostname.replace(/^www\./, '');
-          } catch {
-            return flag.link;
-          }
-        })()}
-      </a>,
-    ]);
-  }
+  const catalogue = `#${String(flag.index).padStart(4, '0')}`;
+  const extension = flag.image.split('?')[0].split('.').pop()?.toUpperCase();
+  const sourceHost = (() => {
+    if (!flag.link) return null;
+    try {
+      return new URL(flag.link).hostname.replace(/^www\./, '');
+    } catch {
+      return flag.link;
+    }
+  })();
+  const storyProps = { history, flagName: flag.name, promptForHistory: !madeInMaker };
 
   return (
-    <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
+    <>
       <FlagViewTracker flagId={flag.id} />
       <script type='application/ld+json' dangerouslySetInnerHTML={jsonLd(flagStructuredData(flag))} />
-      <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
-        <Link href='/' className='hover:text-foreground'>
-          Browse
-        </Link>
-        {firstTag && (
-          <>
-            <ChevronRight className='size-3' />
-            <Link href={`/?tag=${encodeURIComponent(firstTag)}`} className='hover:text-foreground'>
-              {firstTag}
-            </Link>
-          </>
-        )}
-        <ChevronRight className='size-3' />
-        <span className='truncate font-medium text-foreground'>{flag.name}</span>
-      </nav>
 
-      <div className='grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:gap-10'>
-        <div className='min-w-0'>
-          <FlagViewer image={flag.image} name={flag.name} palette={colors} />
+      <div className='flag-band relative isolate'>
+        <Suspense fallback={null}>
+          <BandBackdrop colors={colors} />
+        </Suspense>
+        <div className='mx-auto max-w-[1312px] px-4 pb-10 md:px-8 lg:pb-12'>
+          <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
+            <Link href='/' className='hover:text-foreground'>
+              Browse
+            </Link>
+            {firstTag && (
+              <>
+                <ChevronRight className='size-3' />
+                <Link href={`/?tag=${encodeURIComponent(firstTag)}`} className='hover:text-foreground'>
+                  {firstTag}
+                </Link>
+              </>
+            )}
+            <ChevronRight className='size-3' />
+            <span className='truncate font-medium text-foreground'>{flag.name}</span>
+          </nav>
+
+          <div className='grid items-center gap-8 pt-2 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)] lg:gap-16 lg:pt-3.5'>
+            <div className='min-w-0'>
+              <FlagViewer image={flag.image} name={flag.name} variant='band' />
+            </div>
+
+            <div className='min-w-0'>
+              <p className='flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground'>
+                <MakerBadge tags={flag.tags} className='bg-white/15 text-white dark:bg-white/15 dark:text-white' />
+                <span>
+                  {catalogue}
+                  {firstTag ? ` · ${firstTag}` : ''}
+                </span>
+              </p>
+              <h1 className='mt-1.5 text-[36px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[46px] lg:text-[54px]'>
+                {flag.name}
+              </h1>
+              {madeInMaker && (
+                <p className='mt-4 max-w-[560px] rounded-[12px] bg-white/10 px-3.5 py-2.5 text-[13px] text-subtle shadow-[inset_0_0_0_1px_rgb(255_255_255/0.18)]'>
+                  <span className='font-semibold text-foreground'>Not an official flag.</span>{' '}
+                  {original ? (
+                    <>
+                      A remix of{' '}
+                      <Link
+                        href={`/flag/${encodeURIComponent(original.name)}`}
+                        className='font-medium text-foreground underline decoration-white/40 underline-offset-2 hover:decoration-white'
+                      >
+                        {original.name}
+                      </Link>
+                      , made in the flag maker.
+                    </>
+                  ) : (
+                    'Made in the flag maker.'
+                  )}
+                </p>
+              )}
+              {flag.displayDescription && (
+                <div className='mt-3.5 max-w-[560px]'>
+                  <ExpandableDescription description={flag.displayDescription} />
+                </div>
+              )}
+              <div className='mt-6'>
+                <FlagActions flag={{ id: flag.id, name: flag.name, favorites: flag.favorites }} />
+              </div>
+              {flag.displayTags.length > 0 && (
+                <div className='mt-5 flex flex-wrap gap-1.5'>
+                  {flag.displayTags.map((tag: string) => (
+                    <Tag key={tag} text={tag} />
+                  ))}
+                </div>
+              )}
+              <p className='mt-6 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground [&_b]:font-medium [&_b]:text-foreground'>
+                <span>
+                  Added <b>{formatDate(flag.createdAt)}</b>
+                </span>
+                <span>
+                  <b>
+                    <FavoriteCount flagId={flag.id} cached={flag.favorites} />
+                  </b>{' '}
+                  favorites
+                </span>
+                {extension && extension.length <= 4 && (
+                  <span>
+                    <b>{extension}</b>
+                  </span>
+                )}
+                {flag.link && sourceHost && (
+                  <span className='min-w-0 truncate'>
+                    Source{' '}
+                    <a
+                      href={flag.link}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      title={flag.link}
+                      className='font-medium text-foreground underline decoration-white/40 underline-offset-2 hover:decoration-white'
+                    >
+                      {sourceHost}
+                    </a>
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className='mx-auto max-w-[1312px] px-4 md:px-8'>
+        <div
+          className={cn(
+            'mt-9 grid gap-x-14 gap-y-9',
+            traits.length > 0 && 'lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]',
+          )}
+        >
+          <Suspense fallback={<ColoursSectionSkeleton />}>
+            <ColoursSection colors={colors} />
+          </Suspense>
+          {traits.length > 0 && <TraitsSection rows={traits} />}
         </div>
 
-        <div className='min-w-0 lg:pt-1'>
-          <p className='flex items-center gap-2 text-[13px] text-muted-foreground'>
-            <MakerBadge tags={flag.tags} />
-            <span>
-              #{String(flag.index).padStart(4, '0')}
-              {firstTag ? ` · ${firstTag}` : ''}
-            </span>
-          </p>
-          <h1 className='mt-1.5 text-[32px] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[38px]'>
-            {flag.name}
-          </h1>
-          {madeInMaker && (
-            <p className='mt-4 rounded-[12px] bg-[rgb(225_120_50/0.08)] px-3.5 py-2.5 text-[13px] text-subtle shadow-[inset_0_0_0_1px_rgb(225_120_50/0.22)]'>
-              <span className='font-semibold text-foreground'>Not an official flag.</span>{' '}
-              {original ? (
-                <>
-                  A remix of{' '}
-                  <Link href={`/flag/${encodeURIComponent(original.name)}`} className='font-medium text-main hover:underline'>
-                    {original.name}
-                  </Link>
-                  , made in the flag maker.
-                </>
-              ) : (
-                'Made in the flag maker.'
-              )}
-            </p>
-          )}
-          {flag.displayDescription && (
-            <div className='mt-4'>
-              <ExpandableDescription description={flag.displayDescription} />
-            </div>
-          )}
-          <div className='mt-5'>
-            <FlagActions flag={{ id: flag.id, name: flag.name, favorites: flag.favorites }} />
-          </div>
-          {flag.displayTags.length > 0 && (
-            <div className='mt-6 flex flex-wrap gap-1.5'>
-              {flag.displayTags.map((tag: string) => (
-                <Tag key={tag} text={tag} />
-              ))}
+        <Suspense fallback={<Story {...storyProps} timeline={null} />}>
+          <StorySection {...storyProps} flagId={flag.id} />
+        </Suspense>
+
+        {/* Empty (and hidden) when the flag has no sources and nobody has edited it. */}
+        <div className='mt-12 flex flex-wrap items-start justify-between gap-x-12 gap-y-6 border-t border-line pt-6 empty:hidden'>
+          {sources.length > 0 && (
+            <div className='min-w-0'>
+              <h2 className='mb-2.5 text-sm font-semibold'>Sources</h2>
+              <div className='flex flex-wrap gap-2'>
+                {sources.map((source) => (
+                  <SourceBadge key={source} source={source} />
+                ))}
+              </div>
             </div>
           )}
           <Suspense fallback={null}>
             <ContributorsSection flagId={flag.id} />
           </Suspense>
         </div>
-      </div>
 
-      <div className={`mt-5 grid gap-4 md:grid-cols-2 ${structured ? 'lg:grid-cols-3' : ''}`}>
-        <Suspense fallback={<PanelSkeleton />}>
-          <ColoursPanel colors={colors} />
-        </Suspense>
-        {structured && <TraitsPanel data={structured} />}
-        <Panel title='Details'>
-          <SpecRows rows={details} />
-        </Panel>
-      </div>
-
-      {/* History on the left, the timeline beside it on wide screens. */}
-      <div className='mt-12 grid gap-x-16 gap-y-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]'>
-        <HistoryAndSources history={history} sources={sources} />
-        <Suspense fallback={null}>
-          <TimelineSection flagId={flag.id} beside={Boolean(history || sources.length)} />
+        <Suspense
+          fallback={
+            <div className='mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className='vx-tile h-[292px] animate-pulse' />
+              ))}
+            </div>
+          }
+        >
+          <RelatedFlagsSection flagId={flag.id} />
         </Suspense>
       </div>
-
-      <Suspense
-        fallback={
-          <div className='mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-            {Array.from({ length: 4 }, (_, i) => (
-              <div key={i} className='vx-tile h-[292px] animate-pulse' />
-            ))}
-          </div>
-        }
-      >
-        <RelatedFlagsSection flagId={flag.id} />
-      </Suspense>
-    </div>
+    </>
   );
 }
