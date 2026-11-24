@@ -479,7 +479,7 @@ export default async function FlagPage({
     );
   }
 
-  // Shared by the header colour, the colours strip and the custom colour view, so the image is only read once.
+  // Shared by the header colour and the colours strip, so the image is only read once.
   const colors = getFlagColors(flag);
   const madeInMaker = flag.tags.some((tag) => MAKER_TAGS.includes(tag));
   const original = flag.remixOf ? await getFlagNameById(flag.remixOf) : null;
@@ -527,7 +527,7 @@ export default async function FlagPage({
 
           <div className='grid items-center gap-8 pt-2 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)] lg:gap-16 lg:pt-3.5'>
             <div className='min-w-0'>
-              <FlagViewer image={flag.image} name={flag.name} palette={colors} variant='band' />
+              <FlagViewer image={flag.image} name={flag.name} variant='band' />
             </div>
 
             <div className='min-w-0'>
