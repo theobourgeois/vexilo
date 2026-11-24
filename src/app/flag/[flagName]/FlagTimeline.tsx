@@ -30,7 +30,14 @@ function sourceLinks(sources: string[]) {
   return [...bySite];
 }
 
-export default function FlagTimeline({ timeline }: { timeline: FlagTimelineView }) {
+export default function FlagTimeline({
+  timeline,
+  columns,
+}: {
+  timeline: FlagTimelineView;
+  /** Flow the events into two columns on wide screens, for a timeline that spans the page. */
+  columns?: boolean;
+}) {
   const { owner, viewingVersionId, events } = timeline;
   const [expanded, setExpanded] = useState(false);
   const collapsible = events.length > COLLAPSED_COUNT + 2;
@@ -57,7 +64,7 @@ export default function FlagTimeline({ timeline }: { timeline: FlagTimelineView 
         </p>
       )}
 
-      <ol className='mt-5'>
+      <ol className={cn('mt-5', columns && 'lg:columns-2 lg:gap-16 [&>li]:break-inside-avoid')}>
         {visible.map((event) => {
           const isViewing = viewingVersionId !== null && event.versionFlagId === viewingVersionId;
           return (

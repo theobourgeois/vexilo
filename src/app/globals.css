@@ -231,6 +231,45 @@
     filter: brightness(0.95) drop-shadow(0 0 0.6px rgb(0 0 0 / 0.7)) drop-shadow(0 10px 14px rgb(0 0 0 / 0.4));
 }
 
+/* ───────────────────────── Flag page band ─────────────────────────
+   The coloured header of a flag page. Its colour comes from the flag (see lib/flag-band.ts) and
+   streams in over this graphite. The tokens are swapped for light-on-dark ones, so buttons, tags and
+   segmented controls inside turn into glass without their own variants. */
+
+.flag-band {
+    color-scheme: dark;
+    background: linear-gradient(160deg, hsl(225 7% 24%) 0%, hsl(225 8% 11%) 100%);
+    color: var(--foreground);
+
+    --foreground: #ffffff;
+    --subtle: rgb(255 255 255 / 0.82);
+    --muted-foreground: rgb(255 255 255 / 0.62);
+    --border: rgb(255 255 255 / 0.25);
+    --line: rgb(255 255 255 / 0.14);
+    --raised: rgb(255 255 255 / 0.12);
+    --sh-key: inset 0 0 0 1px rgb(255 255 255 / 0.2);
+    --sh-key-press: inset 0 0 0 1px rgb(255 255 255 / 0.32);
+    --well: rgb(255 255 255 / 0.1);
+    --sh-well: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+    --main: #ffffff;
+    --main-soft: rgb(255 255 255 / 0.16);
+    --main-foreground: #1b1c1f;
+    --ring: #ffffff;
+    --stage: transparent;
+}
+.flag-band .vx-key:hover {
+    background: rgb(255 255 255 / 0.2);
+}
+.flag-band [role='radio'][aria-checked='true'] {
+    background: #ffffff;
+    color: #1b1c1f;
+    box-shadow: none;
+}
+.flag-band .flag-img,
+.dark .flag-band .flag-img {
+    filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.35)) drop-shadow(0 26px 30px rgb(0 0 0 / 0.45));
+}
+
 /* ───────────────────────── Flag maker ───────────────────────── */
 
 .studio-flag {
@@ -286,4 +325,9 @@
 .contest-slot {
     background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--foreground) 4%, transparent) 6px 7px);
     box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+/* A row of facts whose 1px gaps are its dividers. Opaque, so a strip over the band doesn't show it. */
+@utility vx-strip {
+    background: linear-gradient(var(--line), var(--line)), var(--surface);
 }

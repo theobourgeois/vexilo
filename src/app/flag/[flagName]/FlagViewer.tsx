@@ -9,6 +9,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { Download, ExternalLink, Link, RotateCw } from '@/components/icons';
 import type { PaletteColor } from '@/lib/flag-palette';
+import { cn } from '@/lib/utils';
 
 type View = 'flat' | 'wave' | 'custom';
 
@@ -24,11 +25,14 @@ export default function FlagViewer({
   image,
   name,
   palette: palettePromise,
+  variant = 'tile',
 }: {
   image: string;
   name: string;
   /** The flag's colours, which stream in after the page. */
   palette: Promise<PaletteColor[]>;
+  /** `tile` is a card of its own; `band` sits on the flag page's coloured header. */
+  variant?: 'tile' | 'band';
 }) {
   const extension = image.split('?')[0].split('.').pop()?.toUpperCase();
   const [view, setView] = React.useState<View>('flat');
@@ -82,109 +86,145 @@ export default function FlagViewer({
     }, 'image/png');
   };
 
+  // Band: the flag sits straight on the page header, a little bigger, with its controls underneath.
+  const band = variant === 'band';
+  const flagHeight = band ? 345 : 320;
+  const flagArea = band ? 560 * 330 : 560 * 320;
+  const stagePadding = band ? '' : 'p-10 sm:p-14';
+
+  const stage =
+    view === 'wave' ? (
+      <WavingFlag src={image} alt={name} wind={Number(wind)} className='absolute inset-0' />
+    ) : customView ? (
+      <div className={cn('flag-stage absolute inset-0', stagePadding)}>
+        <CustomFlag
+          src={image}
+          alt={name}
+          palette={palette.map((color) => color.hex)}
+          colors={colors}
+          canvasRef={canvasRef}
+          maxHeight={flagHeight}
+          area={flagArea}
+        />
+      </div>
+    ) : (
+      <div className={cn('flag-stage absolute inset-0', stagePadding)}>
+        <FlagImage src={image} alt={name} maxHeight={flagHeight} area={flagArea} eager />
+      </div>
+    );
+
+  const viewPicker = (
+    <Segmented
+      aria-label='View'
+      value={view === 'custom' && !canCustomize ? 'flat' : view}
+      onChange={changeView}
+      className={band ? undefined : 'absolute right-3.5 top-3.5 z-10'}
+      options={[
+        { value: 'flat', label: 'Flat' },
+        { value: 'wave', label: 'Wave' },
+        ...(canCustomize ? [{ value: 'custom' as const, label: 'Custom' }] : []),
+      ]}
+    />
+  );
+
+  const viewControls =
+    view === 'wave' ? (
+      <>
+        <span className='text-[13px] text-muted-foreground'>Wind</span>
+        <Segmented aria-label='Wind' value={wind} onChange={setWind} options={WIND_LEVELS} />
+        <span className='hidden text-[13px] text-muted-foreground sm:inline'>· drag to turn</span>
+      </>
+    ) : customView ? (
+      <>
+        <span className='mr-1 text-[13px] text-muted-foreground'>Colours</span>
+        {palette.map((color, index) => (
+          <label
+            key={color.hex}
+            title={`${color.name} · ${colors[index].toUpperCase()}`}
+            className='relative size-8 shrink-0 cursor-pointer rounded-[9px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.15)] outline-none transition-transform hover:scale-105 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring'
+            style={{ background: colors[index] }}
+          >
+            <span className='sr-only'>Change {color.name}</span>
+            <input
+              type='color'
+              value={colors[index].toLowerCase()}
+              onChange={(e) => {
+                const value = e.target.value.toUpperCase();
+                setColors((current) => current.map((c, i) => (i === index ? value : c)));
+              }}
+              className='absolute inset-0 size-full cursor-pointer opacity-0'
+            />
+          </label>
+        ))}
+        {edited && (
+          <Button
+            variant='ghost'
+            size='icon-sm'
+            title='Reset colours'
+            onClick={() => setColors(palette.map((color) => color.hex))}
+          >
+            <RotateCw />
+          </Button>
+        )}
+      </>
+    ) : band ? null : (
+      extension &&
+      extension.length <= 4 && <span className='tabular-nums text-xs text-muted-foreground'>{extension}</span>
+    );
+
+  const fileActions = (
+    <>
+      {customView ? (
+        <Button variant='neutral' size={band ? 'sm' : 'default'} onClick={download}>
+          <Download />
+          Download
+        </Button>
+      ) : (
+        <Button variant='neutral' size={band ? 'sm' : 'default'} asChild>
+          <a href={image} target='_blank' rel='noopener noreferrer'>
+            <ExternalLink />
+            Full size
+          </a>
+        </Button>
+      )}
+      <Button
+        variant='neutral'
+        size='icon-sm'
+        title='Copy link'
+        onClick={async () => {
+          await navigator.clipboard.writeText(window.location.href);
+          toast.success('Link copied');
+        }}
+      >
+        <Link />
+      </Button>
+    </>
+  );
+
+  if (band) {
+    return (
+      <div>
+        <div className='relative h-[230px] sm:h-[345px]'>{stage}</div>
+        <div className='mt-4 flex flex-wrap items-center gap-2'>
+          {viewPicker}
+          {viewControls}
+          <span className='flex-1' />
+          {fileActions}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className='vx-tile flex flex-col overflow-hidden'>
       <div className='bg-stage relative h-[340px] sm:h-[440px]'>
-        {view === 'wave' ? (
-          <WavingFlag src={image} alt={name} wind={Number(wind)} className='absolute inset-0' />
-        ) : customView ? (
-          <div className='flag-stage absolute inset-0 p-10 sm:p-14'>
-            <CustomFlag
-              src={image}
-              alt={name}
-              palette={palette.map((color) => color.hex)}
-              colors={colors}
-              canvasRef={canvasRef}
-              maxHeight={320}
-              area={560 * 320}
-            />
-          </div>
-        ) : (
-          <div className='flag-stage absolute inset-0 p-10 sm:p-14'>
-            <FlagImage src={image} alt={name} maxHeight={320} area={560 * 320} eager />
-          </div>
-        )}
-        <Segmented
-          aria-label='View'
-          value={view === 'custom' && !canCustomize ? 'flat' : view}
-          onChange={changeView}
-          className='absolute right-3.5 top-3.5 z-10'
-          options={[
-            { value: 'flat', label: 'Flat' },
-            { value: 'wave', label: 'Wave' },
-            ...(canCustomize ? [{ value: 'custom' as const, label: 'Custom' }] : []),
-          ]}
-        />
+        {stage}
+        {viewPicker}
       </div>
       <div className='flex flex-wrap items-center gap-2 border-t border-line py-3 pl-[18px] pr-3'>
-        {view === 'wave' ? (
-          <>
-            <span className='text-[13px] text-muted-foreground'>Wind</span>
-            <Segmented aria-label='Wind' value={wind} onChange={setWind} options={WIND_LEVELS} />
-            <span className='hidden text-[13px] text-muted-foreground sm:inline'>· drag to turn</span>
-          </>
-        ) : customView ? (
-          <>
-            <span className='mr-1 text-[13px] text-muted-foreground'>Colours</span>
-            {palette.map((color, index) => (
-              <label
-                key={color.hex}
-                title={`${color.name} · ${colors[index].toUpperCase()}`}
-                className='relative size-8 shrink-0 cursor-pointer rounded-[9px] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.15)] outline-none transition-transform hover:scale-105 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring'
-                style={{ background: colors[index] }}
-              >
-                <span className='sr-only'>Change {color.name}</span>
-                <input
-                  type='color'
-                  value={colors[index].toLowerCase()}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase();
-                    setColors((current) => current.map((c, i) => (i === index ? value : c)));
-                  }}
-                  className='absolute inset-0 size-full cursor-pointer opacity-0'
-                />
-              </label>
-            ))}
-            {edited && (
-              <Button
-                variant='ghost'
-                size='icon-sm'
-                title='Reset colours'
-                onClick={() => setColors(palette.map((color) => color.hex))}
-              >
-                <RotateCw />
-              </Button>
-            )}
-          </>
-        ) : (
-          extension &&
-          extension.length <= 4 && <span className='tabular-nums text-xs text-muted-foreground'>{extension}</span>
-        )}
+        {viewControls}
         <span className='flex-1' />
-        {customView ? (
-          <Button variant='neutral' onClick={download}>
-            <Download />
-            Download
-          </Button>
-        ) : (
-          <Button variant='neutral' asChild>
-            <a href={image} target='_blank' rel='noopener noreferrer'>
-              <ExternalLink />
-              Full size
-            </a>
-          </Button>
-        )}
-        <Button
-          variant='neutral'
-          size='icon-sm'
-          title='Copy link'
-          onClick={async () => {
-            await navigator.clipboard.writeText(window.location.href);
-            toast.success('Link copied');
-          }}
-        >
-          <Link />
-        </Button>
+        {fileActions}
       </div>
     </div>
   );
