@@ -198,7 +198,7 @@ export function MobileStudio({
         ) : (
           <WavePreview doc={studio.doc} className='absolute inset-0' />
         )}
-        {(remix || contest || onStartOver || gallery.status === 'posted' || gallery.status === 'review') && (
+        {(remix || contest || onStartOver || gallery.status === 'posted') && (
           <div className='absolute left-3 top-3 flex items-center gap-1.5'>
             <GalleryPill gallery={gallery} />
             <RemixPill remix={remix} />

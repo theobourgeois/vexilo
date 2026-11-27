@@ -30,8 +30,12 @@ export type StudioDoc = { name: string; design: StudioDesign };
 export type RemixSource = {
   /** Cached segmentation was held for review; retain the original image field. */
   partsNeedReview?: boolean;
+  /** A real flag from the encyclopedia, or someone's post; `id` is the flag's or the post's. */
+  kind: 'flag' | 'post';
   id: string;
   name: string;
+  /** Its page: /flag/… or /@user/slug. */
+  href: string;
   image: string;
   palette: string[];
   design: StoredStudioDesign | null;

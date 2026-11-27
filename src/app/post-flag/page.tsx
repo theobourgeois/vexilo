@@ -52,5 +52,18 @@ export default function PostFlagPage() {
     );
   }
 
-  return <BatchCreateFlags />;
+  return (
+    <>
+      <div className='mx-auto max-w-[920px] px-4 pt-6 md:px-8'>
+        <p className='rounded-[12px] bg-foreground/[0.04] px-4 py-3 text-[13px] text-subtle shadow-[inset_0_0_0_1px_hsl(var(--border))]'>
+          <b className='font-semibold text-foreground'>This is for real flags.</b> Designed one yourself?{' '}
+          <Link href='/create' className='font-medium text-foreground underline underline-offset-2'>
+            Post it from the flag maker
+          </Link>{' '}
+          and it goes on your profile and in the community.
+        </p>
+      </div>
+      <BatchCreateFlags />
+    </>
+  );
 }

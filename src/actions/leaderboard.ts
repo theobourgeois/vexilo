@@ -2,13 +2,14 @@
 
 import { db } from '@/db';
 import { cacheGet, cacheSet } from '@/db/redis';
-import { flagRequests, flags, leaderboard, users } from '@/db/schema';
-import { TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
+import { flagRequests, leaderboard, users } from '@/db/schema';
+import { LEADERBOARD_CACHE_KEY, TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
+import { getProfileFlags } from '@/lib/profile-flag';
 import { and, asc, count, desc, eq, gte, inArray, min, sql } from 'drizzle-orm';
 
 const LEADER_BOARD_LIMIT = 5;
 export async function getLeaderboard(limit?: number) {
-  const leaderboardCache = await cacheGet('leaderboard');
+  const leaderboardCache = await cacheGet(LEADERBOARD_CACHE_KEY);
   if (leaderboardCache) {
     return leaderboardCache as typeof ldbrd;
   }
@@ -20,23 +21,10 @@ export async function getLeaderboard(limit?: number) {
     .orderBy(desc(leaderboard.contributions))
     .limit(limit || LEADER_BOARD_LIMIT);
 
+  const profileFlags = await getProfileFlags(entries.flatMap((entry) => (entry.user ? [entry.user] : [])));
   const ldbrd = await Promise.all(
     entries.map(async (entry) => {
-      // Fetch favorite flag if user has one
-      let favoriteFlag = null;
-      if (entry.user?.favoriteFlagId) {
-        const flag = await db
-          .select({
-            id: flags.id,
-            name: flags.name,
-            image: flags.image,
-          })
-          .from(flags)
-          .where(eq(flags.id, entry.user.favoriteFlagId))
-          .limit(1)
-          .then((res) => res[0]);
-        favoriteFlag = flag || null;
-      }
+      const favoriteFlag = entry.user ? profileFlags.get(entry.user.id) ?? null : null;
 
       return {
         leaderboard: entry.leaderboard,
@@ -54,7 +42,7 @@ export async function getLeaderboard(limit?: number) {
     }),
   );
 
-  await cacheSet('leaderboard', ldbrd);
+  await cacheSet(LEADERBOARD_CACHE_KEY, ldbrd);
 
   return ldbrd;
 }
@@ -67,23 +55,10 @@ export async function getFullLeaderboard() {
     .orderBy(desc(leaderboard.contributions))
     .limit(100);
 
+  const profileFlags = await getProfileFlags(entries.flatMap((entry) => (entry.user ? [entry.user] : [])));
   const ldbrd = await Promise.all(
     entries.map(async (entry) => {
-      // Fetch favorite flag if user has one
-      let favoriteFlag = null;
-      if (entry.user?.favoriteFlagId) {
-        const flag = await db
-          .select({
-            id: flags.id,
-            name: flags.name,
-            image: flags.image,
-          })
-          .from(flags)
-          .where(eq(flags.id, entry.user.favoriteFlagId))
-          .limit(1)
-          .then((res) => res[0]);
-        favoriteFlag = flag || null;
-      }
+      const favoriteFlag = entry.user ? profileFlags.get(entry.user.id) ?? null : null;
 
       return {
         leaderboard: entry.leaderboard,

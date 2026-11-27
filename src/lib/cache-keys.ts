@@ -3,3 +3,6 @@ export const relatedFlagsCacheKey = (flagId: string) => `related-v2-${flagId}`;
 
 /** Redis key holding the homepage's top contributors of the past week; delete it when a request is approved. */
 export const TOP_CONTRIBUTORS_CACHE_KEY = 'top-contributors-week';
+
+/** Redis key holding the contributions leaderboard (with each person's profile flag). */
+export const LEADERBOARD_CACHE_KEY = 'leaderboard-v2';

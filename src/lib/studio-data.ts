@@ -2,8 +2,9 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
 import { db } from '@/db';
-import { flagEmblems, flagParts, flags } from '@/db/schema';
-import { getFlagColors } from '@/lib/flag-palette';
+import { flagEmblems, flagParts, flags, savedFlags, users } from '@/db/schema';
+import { getFlagColors, getStoredPalette } from '@/lib/flag-palette';
+import { postPath } from '@/lib/post-slug';
 import type { RemixSource, StudioEmblem } from '@/components/studio/model';
 
 /** The flag maker's emblem library. Changes only when the library is re-imported. */
@@ -63,6 +64,19 @@ export const getStudioEmblems = unstable_cache(
 export async function getRemixSource(flagId: string): Promise<RemixSource | null> {
   if (!z.string().uuid().safeParse(flagId).success) return null;
   const [flag] = await db
+    .select({ id: flags.id, name: flags.name, image: flags.image, design: flags.design, movedToPostId: flags.movedToPostId })
+    .from(flags)
+    .where(eq(flags.id, flagId))
+    .limit(1);
+  if (!flag) return null;
+  // Someone's design that used to be in the encyclopedia: remix the post it became.
+  if (flag.movedToPostId) return getPostRemixSource(flag.movedToPostId);
+  return getRemixSourceRow(flagId);
+}
+
+/** getRemixSource, without sending moved flags to their posts. */
+async function getRemixSourceRow(flagId: string): Promise<RemixSource | null> {
+  const [flag] = await db
     .select({ id: flags.id, name: flags.name, image: flags.image, design: flags.design })
     .from(flags)
     .where(eq(flags.id, flagId))
@@ -97,8 +111,10 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
   ]);
 
   return {
+    kind: 'flag',
     id: flag.id,
     name: flag.name,
+    href: `/flag/${encodeURIComponent(flag.name)}`,
     image: flag.image,
     palette: palette.map((color) => color.hex),
     design: flag.design ?? (parts?.status === 'ok' ? parts.design : null) ?? null,
@@ -127,6 +143,50 @@ export async function getRemixSource(flagId: string): Promise<RemixSource | null
         },
       ];
     }),
+  };
+}
+
+/**
+ * What the flag maker needs to remix someone's post: its design if it was made in the flag maker,
+ * else what the flag it came from had (moved encyclopedia flags), else just its picture.
+ */
+export async function getPostRemixSource(postId: string): Promise<RemixSource | null> {
+  if (!z.string().uuid().safeParse(postId).success) return null;
+  const [post] = await db
+    .select({
+      id: savedFlags.id,
+      name: savedFlags.name,
+      image: savedFlags.image,
+      design: savedFlags.design,
+      slug: savedFlags.slug,
+      flagId: savedFlags.flagId,
+      username: users.name,
+    })
+    .from(savedFlags)
+    .innerJoin(users, eq(users.id, savedFlags.userId))
+    .where(and(eq(savedFlags.id, postId), sql`${savedFlags.publishedAt} IS NOT NULL`))
+    .limit(1);
+  if (!post?.slug) return null;
+  const href = postPath(post.username, post.slug);
+
+  if (!post.design && post.flagId) {
+    // Its old flag row still has the parts and emblem placements.
+    const [old] = await db.select({ image: flags.image }).from(flags).where(eq(flags.id, post.flagId)).limit(1);
+    if (old?.image === post.image) {
+      const source = await getRemixSourceRow(post.flagId);
+      if (source) return { ...source, kind: 'post', id: post.id, name: post.name, href };
+    }
+  }
+  const palette = (await getStoredPalette({ kind: 'post', id: post.id, image: post.image })) ?? [];
+  return {
+    kind: 'post',
+    id: post.id,
+    name: post.name,
+    href,
+    image: post.image,
+    palette: palette.map((color) => color.hex),
+    design: post.design ?? null,
+    placements: [],
   };
 }
 

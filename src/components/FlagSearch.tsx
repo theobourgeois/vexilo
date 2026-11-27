@@ -16,6 +16,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FlagCard from './FlagCard';
 import { TodayRail } from './today-rail';
+import CommunityMatches from './community/CommunityMatches';
 import Tag from './Tag';
 import {
   getFavoriteFlagsCount,
@@ -537,6 +538,8 @@ export default function FlagSearch() {
       <div className='mt-7'>
         <SimplePagination currentPage={currentPage} totalPages={totalPages} onPageChange={updatePage} />
       </div>
+
+      {!isFavorites && query && currentPage === 1 && !flagsLoading && <CommunityMatches query={query} className='mt-12' />}
     </div>
   );
 }

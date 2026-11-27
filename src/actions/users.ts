@@ -6,7 +6,10 @@ import { flags, users } from "@/db/schema";
 import { deleteFileFromUrl, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { inEncyclopedia } from "@/lib/encyclopedia";
+import { getProfileFlag } from "@/lib/profile-flag";
+import { LEADERBOARD_CACHE_KEY } from "@/lib/cache-keys";
 import { usernameSchema } from "@/lib/username";
 import { isUsernameConflict, isUsernameTaken } from "@/lib/username-db";
 import sharp from "sharp";
@@ -83,7 +86,7 @@ export async function changeFavoriteFlag(flagId: string | null) {
     const flag = await db
       .select({ id: flags.id })
       .from(flags)
-      .where(eq(flags.id, flagId))
+      .where(and(eq(flags.id, flagId), inEncyclopedia))
       .limit(1)
       .then((res) => res[0]);
 
@@ -97,7 +100,7 @@ export async function changeFavoriteFlag(flagId: string | null) {
 
   await db
     .update(users)
-    .set({ favoriteFlagId: flagId })
+    .set({ favoriteFlagId: flagId, profilePostId: null })
     .where(eq(users.id, session.user.id));
 
   return {
@@ -177,7 +180,7 @@ async function replaceProfilePicture(userId: string, image: string | null) {
     .then((res) => res[0]?.image);
 
   await db.update(users).set({ image }).where(eq(users.id, userId));
-  await cacheDel("leaderboard");
+  await cacheDel(LEADERBOARD_CACHE_KEY);
 
   if (previous?.startsWith(`${CLOUD_FRONT_URL}/${PROFILE_PICTURE_PREFIX}`)) {
     await deleteFileFromUrl(previous).catch((error) => {
@@ -198,6 +201,7 @@ export async function getUserData() {
 
   const user = await db
     .select({
+      id: users.id,
       name: users.name,
       email: users.email,
       image: users.image,
@@ -205,28 +209,18 @@ export async function getUserData() {
       isAnonymous: users.isAnonymous,
       userNumber: users.userNumber,
       favoriteFlagId: users.favoriteFlagId,
+      profilePostId: users.profilePostId,
+      bio: users.bio,
+      link: users.link,
+      location: users.location,
+      pinnedPostIds: users.pinnedPostIds,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1)
     .then((res) => res[0]);
 
-  // If user has a favorite flag, fetch its details
-  let favoriteFlag = null;
-  if (user?.favoriteFlagId) {
-    const flag = await db
-      .select({
-        id: flags.id,
-        name: flags.name,
-        image: flags.image,
-      })
-      .from(flags)
-      .where(eq(flags.id, user.favoriteFlagId))
-      .limit(1)
-      .then((res) => res[0]);
-    
-    favoriteFlag = flag || null;
-  }
+  const favoriteFlag = user ? await getProfileFlag(user) : null;
 
   return {
     success: true,
@@ -246,6 +240,7 @@ export async function getUserByUserNumber(userNumber: string) {
       isAnonymous: users.isAnonymous,
       createdAt: users.createdAt,
       favoriteFlagId: users.favoriteFlagId,
+      profilePostId: users.profilePostId,
     })
     .from(users)
     .where(eq(users.userNumber, userNumber))
@@ -257,22 +252,7 @@ export async function getUserByUserNumber(userNumber: string) {
     user.image = "/logo.svg";
   }
 
-  // If user has a favorite flag, fetch its details
-  let favoriteFlag = null;
-  if (user?.favoriteFlagId) {
-    const flag = await db
-      .select({
-        id: flags.id,
-        name: flags.name,
-        image: flags.image,
-      })
-      .from(flags)
-      .where(eq(flags.id, user.favoriteFlagId))
-      .limit(1)
-      .then((res) => res[0]);
-    
-    favoriteFlag = flag || null;
-  }
+  const favoriteFlag = user ? await getProfileFlag(user) : null;
 
   return {
     success: true,

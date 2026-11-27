@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { openSignIn } from '@/lib/sign-in';
 import { toast } from 'sonner';
-import type { SavedFlagStatus } from '@/actions/my-flags';
-import { postFlagDesign } from '@/actions/studio';
+import type { RemixLink, SavedFlagStatus } from '@/actions/my-flags';
+import { publishPost, unpublishPost } from '@/actions/community';
 import { submitContestEntry, type StudioContest } from '@/actions/contests';
 import WavingFlag from '@/components/WavingFlag';
 import { Button } from '@/components/ui/button';
@@ -56,13 +56,11 @@ import {
   Ruler,
   Save,
   Check,
-  Clock,
 } from '@/components/icons';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Segmented } from '@/components/ui/segmented';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { CUSTOM_TAG, MAKER_TAGS, REMIX_TAG } from '@/lib/studio-design';
 import { formatContestDate, STATEMENT_MAX } from '@/lib/contest';
 import { autoUnits, construction } from './construction';
 import { ConstructionSheet, type SheetOptions } from './ConstructionSheet';
@@ -78,49 +76,49 @@ import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
 import { canEditPoints } from './vector';
 
-export type Remix = { id: string; name: string } | null;
+/** What the design is a remix of: a real flag or someone's post. */
+export type Remix = RemixLink | null;
 export type Contest = StudioContest | null;
 
 /** What posting returns, to keep the flag maker in step with the post. */
-export type PostResult = { savedId: string; published: boolean; update: boolean; flagName: string | null };
+export type PostResult = { savedId: string; path: string; update: boolean };
 
 /** The flag as kept in My flags: whether it's saved, posted, and how to save it. */
 export type Gallery = {
   savedId: string | null;
   /** Null until it's first saved. */
   status: SavedFlagStatus | null;
-  updatePending: boolean;
-  /** Its page on Browse, once posted. */
-  flagName: string | null;
+  /** Its post, once posted. */
+  path: string | null;
   post: { description: string; tags: string[] };
   /** Changed since it was last saved (or never saved). */
   dirty: boolean;
   saving: boolean;
   save: () => void;
   onPosted: (result: PostResult & { description: string; tags: string[] }) => void;
+  onUnpublished: () => void;
 };
 
-/** Live on Browse: posting again sends an update. */
+/** On the maker's profile: saving updates the post. */
 const isPosted = (gallery: Gallery) => gallery.status === 'posted';
-const inReview = (gallery: Gallery) => gallery.status === 'review';
 
 /** What the post button says. */
 export function postLabel(gallery: Gallery, short = false) {
-  if (isPosted(gallery)) return short ? 'Update' : 'Post update';
-  if (inReview(gallery)) return short ? 'Update' : 'Update post';
+  if (isPosted(gallery)) return short ? 'Post' : 'Edit post';
   return 'Post';
 }
 
 export function SaveButton({ gallery, className }: { gallery: Gallery; className?: string }) {
   const saved = gallery.savedId !== null && !gallery.dirty;
+  const label = isPosted(gallery) ? (saved ? 'Saved · post is up to date' : 'Save · updates your post') : saved ? 'Saved to My flags' : 'Save to My flags';
   return (
     <Button
       variant='neutral'
       size='sm'
       onClick={gallery.save}
       disabled={gallery.saving}
-      aria-label={saved ? 'Saved to My flags' : 'Save to My flags'}
-      title={saved ? 'Saved to My flags' : 'Save to My flags (⌘S)'}
+      aria-label={label}
+      title={saved ? label : `${label} (⌘S)`}
       className={cn(saved && 'text-subtle', className)}
     >
       {gallery.saving ? <Loader2 className='animate-spin' /> : saved ? <Check /> : <Save />}
@@ -129,30 +127,19 @@ export function SaveButton({ gallery, className }: { gallery: Gallery; className
   );
 }
 
-/** Where a saved flag stands: on Browse, or waiting for a moderator. */
+/** Links to the post, once it's up. */
 export function GalleryPill({ gallery }: { gallery: Gallery }) {
-  const pill = 'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold';
-  if (isPosted(gallery) && gallery.flagName) {
-    return (
-      <Link
-        href={`/flag/${encodeURIComponent(gallery.flagName)}`}
-        title={gallery.updatePending ? 'Posted · your update is waiting for review' : 'Posted on Browse'}
-        className={cn(pill, 'bg-[rgb(34_160_90/0.13)] text-[#17794a] hover:brightness-110 dark:bg-[rgb(80_200_130/0.14)] dark:text-[#6fd39b]')}
-      >
-        <Check className='size-3' />
-        {gallery.updatePending ? 'Update in review' : 'Posted'}
-      </Link>
-    );
-  }
-  if (inReview(gallery)) {
-    return (
-      <span title='Waiting for a moderator' className={cn(pill, 'bg-[rgb(217_154_11/0.14)] text-[#9a6a00] dark:text-[#f2c14e]')}>
-        <Clock className='size-3' />
-        In review
-      </span>
-    );
-  }
-  return null;
+  if (!isPosted(gallery) || !gallery.path) return null;
+  return (
+    <Link
+      href={gallery.path}
+      title='Posted on your profile'
+      className='inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-[rgb(34_160_90/0.13)] px-2.5 text-[12px] font-semibold text-[#17794a] hover:brightness-110 dark:bg-[rgb(80_200_130/0.14)] dark:text-[#6fd39b]'
+    >
+      <Check className='size-3' />
+      Posted
+    </Link>
+  );
 }
 
 // ───────────────────────── Title ─────────────────────────
@@ -193,7 +180,7 @@ export function RemixPill({ remix }: { remix: Remix }) {
   if (!remix) return null;
   return (
     <Link
-      href={`/flag/${encodeURIComponent(remix.name)}`}
+      href={remix.href}
       title={`Remix of ${remix.name.replace(/^the /, '')}`}
       className='inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-[rgb(225_120_50/0.13)] px-2.5 text-[12px] font-semibold text-[#b4541d] hover:brightness-110 dark:bg-[rgb(240_163_107/0.14)] dark:text-[#f0a36b]'
     >
@@ -404,29 +391,34 @@ export function PostDialog({
   const session = useSession();
   const [title, setTitle] = React.useState(studio.doc.name);
   const [description, setDescription] = React.useState(gallery.post.description);
-  const [tags, setTags] = React.useState<string[]>(() => gallery.post.tags.filter((tag) => !MAKER_TAGS.includes(tag.toLowerCase())));
-  const [busy, setBusy] = React.useState(false);
+  const [tags, setTags] = React.useState<string[]>(() => gallery.post.tags);
+  const [busy, setBusy] = React.useState<null | 'post' | 'unpublish'>(null);
   const [done, setDone] = React.useState<null | PostResult>(null);
-  const makerTag = gallery.post.tags.find((tag) => MAKER_TAGS.includes(tag.toLowerCase())) ?? (remix ? REMIX_TAG : CUSTOM_TAG);
-  const updating = isPosted(gallery) || inReview(gallery);
+  const posted = isPosted(gallery);
 
-  React.useEffect(() => { if (open) setTitle(studio.doc.name); }, [open, studio.doc.name]);
+  React.useEffect(() => {
+    if (open) setTitle(studio.doc.name);
+  }, [open, studio.doc.name]);
 
   async function submit() {
     const name = title.trim();
-    if (!name) { toast.error('Give your flag a title.'); return; }
+    if (!name) {
+      toast.error('Give your flag a title.');
+      return;
+    }
     studio.actions.setName(name);
-    setBusy(true);
+    setBusy('post');
     try {
       const image = await blobToDataUrl(await designToPng(studio.design, 1800));
-      const result = await postFlagDesign({
+      const result = await publishPost({
+        savedId: gallery.savedId,
         name,
         description,
         tags,
         image,
         design: studio.design,
-        remixOf: remix?.id ?? null,
-        savedId: gallery.savedId,
+        remixOf: remix?.flagId ?? null,
+        remixOfPostId: remix?.postId ?? null,
       });
       if (result.success) {
         setDone(result);
@@ -435,41 +427,58 @@ export function PostDialog({
     } catch {
       toast.error('Could not post the flag. Try again.');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
+  async function unpublish() {
+    if (!gallery.savedId) return;
+    setBusy('unpublish');
+    try {
+      const result = await unpublishPost(gallery.savedId);
+      if (result.success) {
+        gallery.onUnpublished();
+        toast.success('Taken down. It’s a draft in My flags again.');
+        onOpenChange(false);
+      } else toast.error(result.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const username = session.data?.user?.name;
   return (
     <Dialog open={open} onOpenChange={(next) => (onOpenChange(next), !next && setDone(null))}>
       <DialogContent className='w-[calc(100%-2rem)] max-w-[460px] sm:max-w-[460px] max-h-[calc(100dvh-2rem)] overflow-y-auto gap-5'>
         {done ? (
           <div className='flex flex-col items-center gap-3 py-4 text-center'>
             <FlagArt design={studio.design} className='studio-flag h-24 w-auto' style={{ aspectRatio: `${studio.design.ratio[1]} / ${studio.design.ratio[0]}` }} />
-            <DialogTitle className='mt-2 text-[19px]'>
-              {done.published ? (done.update ? 'Updated' : 'Posted') : done.update ? 'Update sent for review' : 'Sent for review'}
-            </DialogTitle>
+            <DialogTitle className='mt-2 text-[19px]'>{done.update ? 'Post updated' : 'Posted'}</DialogTitle>
             <DialogDescription className='text-[13.5px] text-subtle'>
-              {done.published
-                ? done.update
-                  ? `${studio.doc.name} is updated on Browse.`
-                  : `${studio.doc.name} is live.`
-                : done.update
-                  ? 'Your flag stays as it is on Browse until a moderator approves the update.'
-                  : `${studio.doc.name} will appear once a moderator approves it. It’s in My flags meanwhile.`}
+              {done.update
+                ? `${studio.doc.name} is updated on your profile.`
+                : `${studio.doc.name} is live on your profile. Share it, and see who remixes it.`}
             </DialogDescription>
+            <p className='rounded-full bg-foreground/[0.05] px-3 py-1 font-mono text-[12px] text-subtle'>vexilo.org{done.path}</p>
             <div className='mt-2 flex flex-wrap justify-center gap-2'>
               <Button variant='neutral' onClick={() => onOpenChange(false)}>
                 Back to editing
               </Button>
-              {done.published && done.flagName ? (
-                <Button asChild>
-                  <Link href={`/flag/${encodeURIComponent(done.flagName)}`}>View flag</Link>
-                </Button>
-              ) : (
-                <Button asChild>
-                  <Link href='/my-flags'>My flags</Link>
-                </Button>
-              )}
+              <Button
+                variant='neutral'
+                onClick={() => {
+                  navigator.clipboard
+                    .writeText(`${window.location.origin}${done.path}`)
+                    .then(() => toast.success('Link copied'))
+                    .catch(() => toast.error('Couldn’t copy the link'));
+                }}
+              >
+                <LinkIcon />
+                Copy link
+              </Button>
+              <Button asChild>
+                <Link href={done.path}>View post</Link>
+              </Button>
             </div>
           </div>
         ) : (
@@ -477,39 +486,57 @@ export function PostDialog({
             <div className='flex items-center gap-4'>
               <FlagArt design={studio.design} className='studio-flag h-14 w-auto shrink-0' style={{ aspectRatio: `${studio.design.ratio[1]} / ${studio.design.ratio[0]}` }} />
               <div className='min-w-0 flex-1'>
-                <DialogTitle className='sr-only'>Post your flag</DialogTitle>
+                <DialogTitle className='sr-only'>{posted ? 'Edit your post' : 'Post your flag'}</DialogTitle>
                 <label htmlFor='post-flag-title' className='mb-1 block text-xs font-medium text-muted-foreground'>Title</label>
-                <Input id='post-flag-title' value={title} maxLength={120} required disabled={busy} onChange={(event) => setTitle(event.target.value)} onBlur={() => { if (title.trim()) studio.actions.setName(title.trim()); }} className='text-[17px] font-semibold' />
-                <DialogDescription className='sr-only'>Post this flag to Vexilo</DialogDescription>
+                <Input
+                  id='post-flag-title'
+                  value={title}
+                  maxLength={120}
+                  required
+                  disabled={busy !== null}
+                  onChange={(event) => setTitle(event.target.value)}
+                  onBlur={() => {
+                    if (title.trim()) studio.actions.setName(title.trim());
+                  }}
+                  className='text-[17px] font-semibold'
+                />
+                <DialogDescription className='sr-only'>Post this flag to your Vexilo profile</DialogDescription>
                 {remix && <p className='mt-0.5 truncate text-[13px] text-muted-foreground'>Remix of {remix.name}</p>}
-                {updating && (
-                  <p className='mt-0.5 text-[13px] text-muted-foreground'>
-                    {isPosted(gallery)
-                      ? 'This updates your flag on Browse.'
-                      : 'This replaces the version waiting for review.'}
-                  </p>
-                )}
+                {posted && gallery.path && <p className='mt-0.5 truncate text-[13px] text-muted-foreground'>Updates vexilo.org{gallery.path}</p>}
               </div>
             </div>
             {session.status === 'authenticated' ? (
               <>
                 <div className='space-y-1.5'>
-                <label htmlFor='post-flag-description' className='text-[13px] font-medium'>Description</label>
-                <textarea
-                  id='post-flag-description'
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder='Describe your flag…'
-                  rows={3}
-                  maxLength={2000}
-                  className='vx-well w-full resize-none rounded-[12px] px-3.5 py-3 text-[14px] outline-none focus:ring-2 focus:ring-ring'
-                />
+                  <label htmlFor='post-flag-description' className='text-[13px] font-medium'>Description</label>
+                  <textarea
+                    id='post-flag-description'
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder='What does it stand for? What inspired it?'
+                    rows={3}
+                    maxLength={2000}
+                    className='vx-well w-full resize-none rounded-[12px] px-3.5 py-3 text-[14px] outline-none focus:ring-2 focus:ring-ring'
+                  />
                 </div>
-                <TagInput tags={tags} onTagsChange={(next) => setTags(next.filter((tag) => !MAKER_TAGS.includes(tag.toLowerCase())))} lockedTags={[makerTag]} maxTags={8} placeholder='Search or add tags…' />
-                <Button onClick={submit} disabled={busy || !title.trim()} className='h-11'>
-                  {busy ? <Loader2 className='animate-spin' /> : <Send />}
-                  {isPosted(gallery) ? 'Post update' : inReview(gallery) ? 'Update post' : `Post ${remix ? 'remix' : 'flag'}`}
-                </Button>
+                <TagInput tags={tags} onTagsChange={(next) => setTags(next.filter((tag) => !['custom', 'remix'].includes(tag.toLowerCase())))} maxTags={8} placeholder='Add tags: fictional, alt-history, redesign…' />
+                {!posted && username && (
+                  <p className='-mt-1 text-[12.5px] text-muted-foreground'>
+                    Goes up on your profile at <span className='font-medium text-foreground'>vexilo.org/@{username}</span>. Anyone can see, like and remix it.
+                  </p>
+                )}
+                <div className='flex flex-col gap-2'>
+                  <Button onClick={submit} disabled={busy !== null || !title.trim()} className='h-11'>
+                    {busy === 'post' ? <Loader2 className='animate-spin' /> : <Send />}
+                    {posted ? 'Update post' : `Post ${remix ? 'remix' : 'flag'}`}
+                  </Button>
+                  {posted && (
+                    <Button variant='ghost' onClick={unpublish} disabled={busy !== null} className='h-9 text-[13px] text-muted-foreground'>
+                      {busy === 'unpublish' && <Loader2 className='animate-spin' />}
+                      Take down (keep as a draft)
+                    </Button>
+                  )}
+                </div>
               </>
             ) : (
               <Button variant='neutral' className='h-11' onClick={() => openSignIn()}>

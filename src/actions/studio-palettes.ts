@@ -1,10 +1,11 @@
 'use server';
 
-import { asc, desc, eq, ilike, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db';
 import { flags } from '@/db/schema';
 import { getFlagColors } from '@/lib/flag-palette';
+import { inEncyclopedia } from '@/lib/encyclopedia';
 
 export async function searchPaletteFlags(input: string) {
   const query = input.trim().slice(0, 100);
@@ -13,7 +14,7 @@ export async function searchPaletteFlags(input: string) {
   return db
     .select({ id: flags.id, name: flags.name, image: flags.image })
     .from(flags)
-    .where(ilike(flags.name, pattern))
+    .where(and(ilike(flags.name, pattern), inEncyclopedia))
     .orderBy(
       sql`case when lower(${flags.name}) in (${query.toLowerCase()}, ${`the ${query.toLowerCase()}`}) then 0 else 1 end`,
       desc(flags.favorites),

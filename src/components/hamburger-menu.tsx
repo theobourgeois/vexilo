@@ -81,11 +81,16 @@ export function HamburgerMenu() {
             </a>
           </nav>
 
-          <div className='mt-auto border-t border-line pt-4'>
+          <div className='mt-auto grid gap-2 border-t border-line pt-4'>
             <Button asChild size='lg' className='w-full'>
-              <Link href='/post-flag' onClick={() => setOpen(false)}>
+              <Link href='/create' onClick={() => setOpen(false)}>
                 <Plus />
-                Post flag
+                Post your design
+              </Link>
+            </Button>
+            <Button asChild size='lg' variant='neutral' className='w-full'>
+              <Link href='/post-flag' onClick={() => setOpen(false)}>
+                Add a real flag
               </Link>
             </Button>
           </div>

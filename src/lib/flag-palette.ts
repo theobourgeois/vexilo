@@ -4,7 +4,7 @@ import { after } from 'next/server';
 import sharp from 'sharp';
 import { db } from '@/db';
 import { cacheGet, cacheSet } from '@/db/redis';
-import { flagColors } from '@/db/schema';
+import { flagColors, savedFlags } from '@/db/schema';
 import { type ColorFamily, PALETTE_NAME_FAMILY } from '@/lib/flag-search-terms';
 
 export type PaletteColor = {
@@ -291,4 +291,49 @@ export async function getFlagPalette(imageUrl: string): Promise<PaletteColor[]> 
   const palette = await readImagePalette(imageUrl);
   await cacheSet(key, palette, { ex: palette.length > 0 ? CACHE_SECONDS : FAILURE_CACHE_SECONDS });
   return palette;
+}
+
+/** Reads a post's colours from its image and stores them with it. */
+export async function storePostPalette(postId: string, imageUrl: string): Promise<PaletteColor[]> {
+  const palette = await readImagePalette(imageUrl);
+  await db.update(savedFlags).set({ palette, paletteImage: imageUrl }).where(eq(savedFlags.id, postId));
+  return palette;
+}
+
+/** Saves a post's colours once the current request has responded. Outside a request (scripts) it runs now. */
+export function savePostPaletteLater(postId: string, imageUrl: string) {
+  const task = () =>
+    storePostPalette(postId, imageUrl).then(
+      () => undefined,
+      (error) => console.error(`[flag-palette] Could not save colours for post ${postId}:`, error),
+    );
+  try {
+    after(task);
+  } catch {
+    void task();
+  }
+}
+
+/**
+ * Colours already stored for a post or a real flag, or null when they still need reading. Pages
+ * use this rather than reading the image while they render: the reading is queued for after the
+ * response, so the next visit has the colours. (Downloading an image mid-render is slow, and in
+ * development React records the bytes in the page's payload, which Next can't send.)
+ */
+export async function getStoredPalette(target: { kind: 'post' | 'flag'; id: string; image: string }): Promise<PaletteColor[] | null> {
+  try {
+    if (target.kind === 'flag') {
+      const [row] = await db.select({ colors: flagColors.colors, image: flagColors.image }).from(flagColors).where(eq(flagColors.flagId, target.id)).limit(1);
+      if (row && row.image === target.image) return row.colors;
+      saveFlagColorsLater(target.id, target.image);
+      return null;
+    }
+    const [row] = await db.select({ palette: savedFlags.palette, image: savedFlags.paletteImage }).from(savedFlags).where(eq(savedFlags.id, target.id)).limit(1);
+    if (row?.palette && row.image === target.image) return row.palette;
+    savePostPaletteLater(target.id, target.image);
+    return null;
+  } catch (error) {
+    console.error('[flag-palette] Could not read stored colours:', error);
+    return null;
+  }
 }

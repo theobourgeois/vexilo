@@ -24,6 +24,13 @@ const FLAG_PAGE_CDN_CACHE = {
 };
 
 const nextConfig: NextConfig = {
+  // Profiles and posts live at /@username and /@username/slug; "@" can't start a route folder, so they're served from /u.
+  async rewrites() {
+    return [
+      { source: '/@:username', destination: '/u/:username' },
+      { source: '/@:username/:rest*', destination: '/u/:username/:rest*' },
+    ];
+  },
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }, FLAG_PAGE_CDN_CACHE];
   },

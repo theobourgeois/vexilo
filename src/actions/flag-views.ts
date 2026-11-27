@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { redis } from '@/db/redis';
-import { flagViewDaily, flags } from '@/db/schema';
+import { flagViewDaily, flags, savedFlags } from '@/db/schema';
 import { sql } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { after } from 'next/server';
@@ -53,6 +53,21 @@ export async function recordFlagView(flagId: string, firstToday: boolean) {
   }
 }
 
+/**
+ * Counts a visitor's first view today of a post (the browser remembers which, like flags). One
+ * HINCRBY into the same hourly bucket as flag views, written out with them.
+ */
+export async function recordPostView(postId: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(postId)) return;
+  const userAgent = (await headers()).get('user-agent') ?? '';
+  if (!userAgent || BOT_PATTERN.test(userAgent)) return;
+  try {
+    await redis.hincrby(viewBucketKey(hourOf(new Date())), `${postId}:p`, 1);
+  } catch (error) {
+    console.error('[flag-views] Failed to record post view', postId, error instanceof Error ? error.message : error);
+  }
+}
+
 /*
  * Views pile up in an hourly Redis hash (`<flagId>:v` views, `<flagId>:u` new visitors) and reach
  * Postgres once an hour in one statement, so readers don't keep the database awake. Counts lag
@@ -98,8 +113,13 @@ async function flushFlagViews(now: Date) {
 
 async function writeHourlyViews(day: string, counts: Record<string, number | string>) {
   const byFlag = new Map<string, { views: number; visitors: number }>();
+  const byPost = new Map<string, number>();
   for (const [field, value] of Object.entries(counts)) {
     const [flagId, kind] = field.split(':');
+    if (kind === 'p') {
+      byPost.set(flagId, (byPost.get(flagId) ?? 0) + (Number(value) || 0));
+      continue;
+    }
     const entry = byFlag.get(flagId) ?? { views: 0, visitors: 0 };
     if (kind === 'v') entry.views += Number(value) || 0;
     if (kind === 'u') entry.visitors += Number(value) || 0;
@@ -128,6 +148,19 @@ async function writeHourlyViews(day: string, counts: Record<string, number | str
       )
       update ${flags} set views = ${flags.views} + counted.views
       from counted where ${flags.id} = counted.flag_id
+    `);
+  }
+
+  const posts = [...byPost].filter(([id, views]) => views > 0 && /^[0-9a-f-]{36}$/i.test(id));
+  for (let i = 0; i < posts.length; i += 1000) {
+    const values = sql.join(
+      posts.slice(i, i + 1000).map(([postId, views]) => sql`(${postId}::uuid, ${views}::int)`),
+      sql`, `,
+    );
+    await db.execute(sql`
+      with counted (post_id, views) as (values ${values})
+      update ${savedFlags} set views = ${savedFlags.views} + counted.views
+      from counted where ${savedFlags.id} = counted.post_id
     `);
   }
 }

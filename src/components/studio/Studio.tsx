@@ -8,7 +8,7 @@ import type { StudioContest } from '@/actions/contests';
 import { saveMyFlag, type SavedFlagSource, type SavedFlagStatus } from '@/actions/my-flags';
 import { Loader2 } from '@/components/icons';
 import { openSignIn } from '@/lib/sign-in';
-import type { Gallery } from './chrome';
+import type { Gallery, Remix } from './chrome';
 import { DesktopStudio } from './DesktopStudio';
 import { blobToDataUrl, decodeDoc, designToPng } from './export';
 import { migrateDesign } from './field';
@@ -32,7 +32,7 @@ const stableJson = (value: unknown) =>
 const snapshot = (doc: StudioDoc) => stableJson({ name: doc.name, design: doc.design });
 
 /** The picture kept in My flags; the gallery shows it small. */
-const THUMBNAIL_WIDTH = 800;
+const THUMBNAIL_WIDTH = 1200;
 
 function loadDraft(key: string): StudioDoc | null {
   try {
@@ -106,13 +106,11 @@ export default function Studio({
   const [savedId, setSavedId] = React.useState(saved?.id ?? null);
   const [standing, setStanding] = React.useState<{
     status: SavedFlagStatus | null;
-    updatePending: boolean;
-    flagName: string | null;
+    path: string | null;
     post: { description: string; tags: string[] };
   }>({
     status: saved?.status ?? null,
-    updatePending: saved?.updatePending ?? false,
-    flagName: saved?.flagName ?? null,
+    path: saved?.path ?? null,
     post: saved?.post ?? { description: '', tags: [] },
   });
   const [lastSaved, setLastSaved] = React.useState<string | null>(null);
@@ -202,7 +200,9 @@ export default function Studio({
     };
   }, [studio.doc, ready, key]);
 
-  const remixLink = remix ? { id: remix.id, name: remix.name } : (saved?.remix ?? null);
+  const remixLink: Remix = remix
+    ? { flagId: remix.kind === 'flag' ? remix.id : null, postId: remix.kind === 'post' ? remix.id : null, name: remix.name, href: remix.href }
+    : (saved?.remix ?? null);
 
   // The latest design, for saves that finish after it changes again.
   const docRef = React.useRef(studio.doc);
@@ -243,7 +243,14 @@ export default function Studio({
     setSaving(true);
     try {
       const image = await blobToDataUrl(await designToPng(doc.design, THUMBNAIL_WIDTH));
-      const result = await saveMyFlag({ id: savedId, name: doc.name, design: doc.design, image, remixOf: remixLink?.id ?? null });
+      const result = await saveMyFlag({
+        id: savedId,
+        name: doc.name,
+        design: doc.design,
+        image,
+        remixOf: remixLink?.flagId ?? null,
+        remixOfPostId: remixLink?.postId ?? null,
+      });
       if (!result.success) {
         toast.error(result.message);
         return;
@@ -254,7 +261,7 @@ export default function Studio({
         setStanding((s) => ({ ...s, status: 'draft' }));
         toast.success('Saved to My flags', { action: { label: 'View', onClick: () => router.push('/my-flags') } });
       } else {
-        toast.success(standing.status === 'posted' ? 'Saved. Post an update to change it on Browse.' : 'Saved');
+        toast.success(standing.status === 'posted' ? 'Saved. Your post is updated too.' : 'Saved');
       }
     } catch {
       toast.error('Couldn’t save your flag. Try again.');
@@ -262,7 +269,7 @@ export default function Studio({
       savingRef.current = false;
       setSaving(false);
     }
-  }, [contest, session.status, savedId, lastSaved, remixLink?.id, adopt, router, standing.status]);
+  }, [contest, session.status, savedId, lastSaved, remixLink?.flagId, remixLink?.postId, adopt, router, standing.status]);
 
   const gallery: Gallery = {
     savedId,
@@ -272,13 +279,10 @@ export default function Studio({
     save,
     onPosted: (result) => {
       adopt(result.savedId, docRef.current);
-      setStanding((s) => ({
-        // A live flag stays live while its update waits.
-        status: result.published || result.update || s.status === 'posted' ? 'posted' : 'review',
-        updatePending: !result.published && (result.update || s.status === 'posted'),
-        flagName: result.flagName ?? s.flagName,
-        post: { description: result.description, tags: result.tags },
-      }));
+      setStanding({ status: 'posted', path: result.path, post: { description: result.description, tags: result.tags } });
+    },
+    onUnpublished: () => {
+      setStanding((s) => ({ ...s, status: 'draft', path: null }));
     },
   };
 

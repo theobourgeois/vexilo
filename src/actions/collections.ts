@@ -8,6 +8,7 @@ import { getServerAuthSession } from '@/lib/auth';
 import { getCollection, type CollectionCriteria } from '@/lib/collections';
 import { getTrait } from '@/lib/flag-search-terms';
 import { MAKER_TAGS } from '@/lib/studio-design';
+import { inEncyclopedia } from '@/lib/encyclopedia';
 
 const COLLECTION_LIMIT = 120;
 const CACHE_SECONDS = 60 * 60 * 24;
@@ -44,7 +45,7 @@ function collectionWhere({ colors, onlyColors, symbols }: CollectionCriteria) {
     if (symbols.tags?.length) shows.push(hasAnyTag(symbols.tags));
     conditions.push(shows.length ? sql`(${sql.join(shows, sql` OR `)})` : sql`false`);
   }
-  return conditions.length ? and(...conditions)! : sql`true`;
+  return and(inEncyclopedia, ...conditions)!;
 }
 
 /** The most popular flags in a collection and how many there are, cached for a day. */
@@ -75,7 +76,7 @@ const getCachedCollectionFlags = unstable_cache(
     ]);
     return { flags: rows, total };
   },
-  ['flag-collection-v1'],
+  ['flag-collection-v2'],
   { revalidate: CACHE_SECONDS },
 );
 

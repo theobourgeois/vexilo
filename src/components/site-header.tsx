@@ -8,6 +8,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { PostFlagButton } from '@/components/post-flag-button';
 import { AuthHeader } from '@/components/auth-header';
 import { HamburgerMenu } from '@/components/hamburger-menu';
+import NotificationsBell from '@/components/community/NotificationsBell';
 import { cn } from '@/lib/utils';
 import { PendingDot, useDailyPending } from '@/components/games/shared';
 import { FOCUS_SEARCH_KEY, NAV_LINKS } from '@/lib/nav';
@@ -65,8 +66,10 @@ export function SiteHeader() {
         <div className='hidden items-center gap-2 md:flex'>
           <ThemeToggle />
           <PostFlagButton />
+          <NotificationsBell />
           <AuthHeader />
         </div>
+        <NotificationsBell className='md:hidden' />
         <HamburgerMenu />
       </div>
     </header>

@@ -7,6 +7,7 @@ import {
   type FlagAiStructuredData,
 } from '@/db/schema';
 import { asc, desc, eq, sql } from 'drizzle-orm';
+import { inEncyclopedia } from '@/lib/encyclopedia';
 
 const MAX_PAGE_SIZE = 48;
 const MIN_RESULT_SCORE = 18;
@@ -953,6 +954,7 @@ export async function getExperimentalFlagSearchResults(
     })
     .from(flags)
     .leftJoin(flagAiMetadata, eq(flagAiMetadata.flagId, flags.id))
+    .where(inEncyclopedia)
     .orderBy(desc(flags.favorites), asc(flags.name));
 
   const rankedResults = rows
