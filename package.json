@@ -20,6 +20,7 @@
     "usernames:backfill": "tsx scripts/users/backfill-usernames.ts",
     "emblems:import": "tsx scripts/emblems/import-emblems.ts",
     "emblems:import-reviewed": "tsx scripts/emblems/import-reviewed-emblems.ts",
+    "emblems:import-clipart": "tsx scripts/emblems/import-clipart.ts",
     "emblems:harvest": "tsx scripts/emblems/harvest-candidates.ts",
     "emblems:cluster": "tsx scripts/emblems/cluster-candidates.ts",
     "emblems:tag-sheets": "tsx scripts/emblems/tag-sheets.ts",

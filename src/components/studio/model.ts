@@ -22,6 +22,8 @@ export type StudioEmblem = {
   copies: number;
   /** Drawn from an SVG, so it can be turned into shapes. */
   vector?: boolean;
+  /** Artist credit for clip art from other libraries. */
+  credit?: string;
 };
 
 export type StudioDoc = { name: string; design: StudioDesign };

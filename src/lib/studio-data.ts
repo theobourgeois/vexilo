@@ -24,10 +24,11 @@ export const getStudioEmblems = unstable_cache(
         tags: flagEmblems.tags,
         category: flagEmblems.category,
         rank: flagEmblems.rank,
+        credit: flagEmblems.credit,
         flagName: flags.name,
       })
       .from(flagEmblems)
-      .innerJoin(flags, eq(flags.id, flagEmblems.flagId))
+      .leftJoin(flags, eq(flags.id, flagEmblems.flagId))
       .where(eq(flagEmblems.isActive, true));
     const ids = [...new Set(rows.flatMap((row) => row.appearsOn))];
     const names = new Map(
@@ -38,8 +39,8 @@ export const getStudioEmblems = unstable_cache(
     return rows
       .map((row) => ({
         id: row.id,
-        name: row.name || row.flagName,
-        names: [...new Set([row.flagName, ...row.appearsOn.map((id) => names.get(id) ?? '').filter(Boolean)])],
+        name: row.name || row.flagName || '',
+        names: [...new Set([row.flagName ?? '', ...row.appearsOn.map((id) => names.get(id) ?? '')].filter(Boolean))],
         tags: row.tags,
         category: row.category,
         rank: row.rank,
@@ -49,10 +50,11 @@ export const getStudioEmblems = unstable_cache(
         colors: row.colors,
         copies: row.copies,
         ...(row.svg && { vector: true }),
+        ...(row.credit && { credit: row.credit }),
       }))
       .sort((a, b) => b.rank - a.rank || b.copies - a.copies || a.name.localeCompare(b.name));
   },
-  ['studio-emblems-v3'],
+  ['studio-emblems-v4'],
   { revalidate: 60 * 60, tags: ['studio-emblems'] },
 );
 
