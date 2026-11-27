@@ -82,11 +82,16 @@ export default function PostOwnerMenu({
             <PushPin weight={pinned ? 'fill' : 'bold'} />
             {pinned ? 'Unpin from profile' : 'Pin to profile'}
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setTakingDown(true)} className='text-bad focus:bg-bad-soft focus:text-bad'>
-            <EyeClosed />
-            Take down
-          </DropdownMenuItem>
+          {/* Uploaded flags have no design, so they couldn't be posted again; they can only be deleted. */}
+          {hasDesign && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setTakingDown(true)} className='text-bad focus:bg-bad-soft focus:text-bad'>
+                <EyeClosed />
+                Take down
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

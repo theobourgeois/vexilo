@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { recordPostView } from '@/actions/community';
+import { recordPostView } from '@/actions/flag-views';
 
 const counted = new Set<string>();
 const SEEN_KEY = 'vx:post-views-seen';
@@ -27,7 +27,7 @@ export default function PostViewTracker({ postId }: { postId: string }) {
     if (counted.has(postId)) return;
     counted.add(postId);
     const unique = markSeenToday(postId);
-    if (unique) recordPostView(postId, true).catch(() => counted.delete(postId));
+    if (unique) recordPostView(postId).catch(() => counted.delete(postId));
   }, [postId]);
   return null;
 }

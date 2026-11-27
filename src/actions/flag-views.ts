@@ -160,7 +160,7 @@ async function writeHourlyViews(day: string, counts: Record<string, number | str
     await db.execute(sql`
       with counted (post_id, views) as (values ${values})
       update ${savedFlags} set views = ${savedFlags.views} + counted.views
-      from counted where ${savedFlags.id} = counted.post_id
+      from counted where ${savedFlags.id} = counted.post_id and ${savedFlags.publishedAt} is not null
     `);
   }
 }

@@ -197,7 +197,20 @@ export async function publishPost(input: {
   savePostPaletteLater(id, image);
 
   const firstTime = !existing?.publishedAt;
-  if (firstTime && parentPost) await notify(parentPost.userId, who.userId, 'remix', id);
+  if (firstTime) {
+    // The parent can come from this call or from the draft (saved as a remix before it was posted).
+    const parentId = parentPost?.id ?? existing?.remixOfPostId ?? null;
+    const [parent] = parentPost
+      ? [parentPost]
+      : parentId
+        ? await db
+            .select({ userId: savedFlags.userId })
+            .from(savedFlags)
+            .where(and(eq(savedFlags.id, parentId), isNotNull(savedFlags.publishedAt)))
+            .limit(1)
+        : [];
+    if (parent) await notify(parent.userId, who.userId, 'remix', id);
+  }
   revalidatePath(`/u/${who.username}`, 'layout');
   return { success: true, savedId: id, path: postPath(who.username, slug), slug, update: !firstTime };
 }
@@ -207,10 +220,18 @@ export async function unpublishPost(id: string) {
   if (!uuid.safeParse(id).success) return fail('That post doesn’t exist.');
   const who = await member();
   if (!who.ok) return fail(who.message);
+  // Posting needs a design from the flag maker. Uploaded flags have none, so they couldn't go back up.
   const [row] = await db
     .update(savedFlags)
     .set({ publishedAt: null, updatedAt: new Date() })
-    .where(and(eq(savedFlags.id, id), eq(savedFlags.userId, who.userId), isNotNull(savedFlags.publishedAt)))
+    .where(
+      and(
+        eq(savedFlags.id, id),
+        eq(savedFlags.userId, who.userId),
+        isNotNull(savedFlags.publishedAt),
+        isNotNull(savedFlags.design),
+      ),
+    )
     .returning({ id: savedFlags.id });
   if (!row) return fail('That post isn’t up any more.');
   // It can't be their profile flag or pinned while it's down.
@@ -245,6 +266,7 @@ export async function updatePostDetails(input: { id: string; name: string; descr
     .where(and(eq(savedFlags.id, parsed.data.id), eq(savedFlags.userId, who.userId)))
     .returning({ slug: savedFlags.slug, publishedAt: savedFlags.publishedAt });
   if (!row) return fail('That flag isn’t in your flags any more.');
+  if (row.publishedAt) revalidatePath(`/u/${who.username}`, 'layout');
   return { success: true as const, path: row.slug && row.publishedAt ? postPath(who.username, row.slug) : null };
 }
 
@@ -457,13 +479,14 @@ export async function getNotifications(): Promise<{ groups: NotificationGroup[];
   const groups = new Map<string, NotificationGroup>();
   let unread = 0;
   for (const row of rows) {
-    if (!row.readAt) unread++;
     const key = row.type === 'remix' ? `remix:${row.id}` : row.type === 'follow' ? 'follow' : `like:${row.postId}`;
     const post =
       row.postName && row.postImage && row.postSlug && row.postAuthor
         ? { name: row.postName, image: row.postImage, path: postPath(row.postAuthor, row.postSlug) }
         : null;
+    // Likes and remixes of posts that have since come down aren't shown, or counted.
     if (row.type !== 'follow' && !post) continue;
+    if (!row.readAt) unread++;
     const group = groups.get(key);
     if (group) {
       group.total++;
@@ -490,7 +513,11 @@ export async function getUnreadNotificationCount(): Promise<number> {
   if (!session?.user) return 0;
   const [row] = rowsOf<{ n: number }>(
     await db.execute<{ n: number }>(
-      sql`select count(*)::int as n from ${notifications} where user_id = ${session.user.id} and read_at is null`,
+      // Like getNotifications: only follows, and posts that are still up.
+      sql`select count(*)::int as n from ${notifications} n
+           where n.user_id = ${session.user.id} and n.read_at is null
+             and (n.type = 'follow' or exists (
+               select 1 from ${savedFlags} p where p.id = n.post_id and p.published_at is not null))`,
     ),
   );
   return Number(row?.n ?? 0);
@@ -503,26 +530,6 @@ export async function markNotificationsRead() {
     .update(notifications)
     .set({ readAt: new Date() })
     .where(and(eq(notifications.userId, session.user.id), isNull(notifications.readAt)));
-}
-
-/**
- * Counts a view of a post: once per browser per day (`unique`, which the page works out from
- * local storage), so refreshing doesn't inflate it. Not counted for the post's own author.
- */
-export async function recordPostView(postId: string, unique: boolean) {
-  if (!unique || !uuid.safeParse(postId).success) return;
-  const session = await getServerAuthSession();
-  const viewerId = session?.user?.id ?? null;
-  await db
-    .update(savedFlags)
-    .set({ views: sql`${savedFlags.views} + 1` })
-    .where(
-      and(
-        eq(savedFlags.id, postId),
-        isNotNull(savedFlags.publishedAt),
-        viewerId ? sql`${savedFlags.userId} <> ${viewerId}` : undefined,
-      ),
-    );
 }
 
 // ───────────────────────── Feeds ─────────────────────────

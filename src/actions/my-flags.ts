@@ -1,12 +1,14 @@
 'use server';
 
 import { and, count, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { db } from '@/db';
 import { flags, savedFlags, users } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { inEncyclopedia } from '@/lib/encyclopedia';
+import { savePostPaletteLater } from '@/lib/flag-palette';
 import { postPath } from '@/lib/post-slug';
 import { SAVED_PREFIX, uploadSavedFlagImage } from '@/lib/saved-flag-image';
 import type { StoredStudioDesign } from '@/lib/studio-design';
@@ -184,7 +186,7 @@ export async function saveMyFlag(input: {
 
   const [existing] = id
     ? await db
-        .select({ id: savedFlags.id, image: savedFlags.image })
+        .select({ id: savedFlags.id, image: savedFlags.image, publishedAt: savedFlags.publishedAt })
         .from(savedFlags)
         .where(and(eq(savedFlags.id, id), eq(savedFlags.userId, userId)))
         .limit(1)
@@ -209,6 +211,11 @@ export async function saveMyFlag(input: {
     await db.update(savedFlags).set({ name, design, image, updatedAt: now }).where(eq(savedFlags.id, existing.id));
     // Pictures from before posts (flags that were in the encyclopedia) are under images/ and stay.
     await deleteImageIfUnused(existing.image, { prefix: SAVED_PREFIX }).catch(() => {});
+    if (existing.publishedAt) {
+      // The post shows the new picture: refresh its pages and the header colours taken from it.
+      savePostPaletteLater(existing.id, image);
+      revalidatePath(`/u/${user.name}`, 'layout');
+    }
     return { success: true as const, id: existing.id, savedAt: now };
   }
 
@@ -239,8 +246,9 @@ export async function deleteMyFlag(id: string) {
   const [row] = await db
     .delete(savedFlags)
     .where(and(eq(savedFlags.id, id), eq(savedFlags.userId, user.id)))
-    .returning({ image: savedFlags.image });
+    .returning({ image: savedFlags.image, publishedAt: savedFlags.publishedAt });
   if (!row) return { success: false as const, message: 'That flag isn’t in your flags any more.' };
+  if (row.publishedAt) revalidatePath(`/u/${user.name}`, 'layout');
   await db
     .update(users)
     .set({ pinnedPostIds: sql`array_remove(${users.pinnedPostIds}, ${id}::uuid)` })

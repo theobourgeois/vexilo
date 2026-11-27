@@ -88,11 +88,13 @@ async function main() {
       profiles += result.rowCount ?? 0;
     }
 
-    // The likes it copied: one per favorite of the old flag.
+    // The likes it copied: one per favorite of the old flag, with the favorite's time. A like made
+    // after the move (even by someone who'd favorited it) has a later time and stays.
     const likes = await client.query(
       `DELETE FROM vexilo_post_like l
         USING vexilo_post_move m, vexilo_favorite fa
-        WHERE m.batch_id = $1 AND l.post_id = m.post_id AND fa.flag_id = m.flag_id AND fa.user_id = l.user_id`,
+        WHERE m.batch_id = $1 AND l.post_id = m.post_id AND fa.flag_id = m.flag_id AND fa.user_id = l.user_id
+          AND l.created_at = fa.created_at`,
       [batchId],
     );
 
@@ -119,10 +121,11 @@ async function main() {
         const p = move.previous;
         const result = await client.query(
           `UPDATE vexilo_saved_flag
-              SET slug = $2, description = $3, tags = $4, published_at = $5, likes = $6, views = $7,
-                  remix_of_post_id = $8
+              SET slug = $2, description = $3, tags = $4, published_at = $5, views = $6, remix_of_post_id = $7,
+                  -- What's left once the copied likes are gone, so the count matches the rows.
+                  likes = (SELECT count(*) FROM vexilo_post_like l WHERE l.post_id = $1)
             WHERE id = $1`,
-          [move.post_id, p.slug, p.description, p.tags, p.published_at, p.likes, p.views, p.remix_of_post_id],
+          [move.post_id, p.slug, p.description, p.tags, p.published_at, p.views, p.remix_of_post_id],
         );
         restored += result.rowCount ?? 0;
       }

@@ -76,7 +76,8 @@ export default async function PostPage({ params }: { params: Params }) {
 
   return (
     <>
-      <PostViewTracker postId={post.id} />
+      {/* The author's own visits don't count. */}
+      {viewerId !== post.author.id && <PostViewTracker postId={post.id} />}
       <div className='flag-band relative isolate'>
         <Suspense fallback={null}>
           <Band palette={palette} />
