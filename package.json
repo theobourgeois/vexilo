@@ -17,6 +17,7 @@
     "views:backfill": "tsx scripts/views/backfill-flag-views.ts",
     "colors:backfill": "tsx scripts/colors/backfill-flag-colors.ts",
     "my-flags:backfill": "tsx scripts/my-flags/backfill-saved-flags.ts",
+    "usernames:backfill": "tsx scripts/users/backfill-usernames.ts",
     "emblems:import": "tsx scripts/emblems/import-emblems.ts",
     "emblems:import-reviewed": "tsx scripts/emblems/import-reviewed-emblems.ts",
     "emblems:harvest": "tsx scripts/emblems/harvest-candidates.ts",

@@ -31,7 +31,7 @@ let hashedPassword: string;
 const fresh = () => {
   const email = `verification-${randomUUID()}@example.test`;
   emails.push(email);
-  return { email, name: 'New member', hashedPassword, userId: null };
+  return { email, name: 'New_member', hashedPassword, userId: null };
 };
 const codeFor = (email: string) => sent.get(email)!.at(-1)!;
 
@@ -286,7 +286,7 @@ test('verification cannot replace an account that became verified in the meantim
   const [existing] = await db
     .insert(users)
     .values({
-      name: 'Existing Google user',
+      name: 'Existing_Google_user',
       email: details.email,
       emailVerified: new Date(),
     })
@@ -304,7 +304,7 @@ test('verification cannot replace an account that became verified in the meantim
   );
   const [user] = await db.select().from(users).where(eq(users.id, existing.id));
   assert.equal(user.hashedPassword, null);
-  assert.equal(user.name, 'Existing Google user');
+  assert.equal(user.name, 'Existing_Google_user');
 });
 
 test('legacy unverified password accounts activate without creating another user', async () => {

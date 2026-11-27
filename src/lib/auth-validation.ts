@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { usernameSchema } from '@/lib/username';
 
 export const emailSchema = z
   .string()
@@ -11,7 +12,7 @@ export const passwordSchema = z
   .min(12, 'Use at least 12 characters for your password.')
   .max(128, 'Use at most 128 characters for your password.');
 export const signupSchema = z.object({
-  name: z.string().trim().min(1, 'Enter your name.').max(100),
+  name: usernameSchema,
   email: emailSchema,
   password: passwordSchema,
 });

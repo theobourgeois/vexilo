@@ -15,6 +15,7 @@ import {
   jsonb,
   real,
   uniqueIndex,
+  check,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { type AdapterAccount } from 'next-auth/adapters';
@@ -137,7 +138,8 @@ export const users = createTable('user', {
   isAdmin: boolean('is_admin').notNull().default(false),
   // Trusted creators' flag requests and edits are approved automatically.
   isTrusted: boolean('is_trusted').notNull().default(false),
-  name: varchar('name', { length: 255 }),
+  // The public, unique username (see src/lib/username.ts). Not a real name.
+  name: varchar('name', { length: 255 }).notNull(),
   userNumber: uuid('user_number').defaultRandom().notNull().unique(),
   email: varchar('email', { length: 255 }).notNull(),
   emailVerified: timestamp('email_verified', {
@@ -151,7 +153,11 @@ export const users = createTable('user', {
   favoriteFlagId: uuid('favorite_flag_id').references(() => flags.id, {
     onDelete: 'set null',
   }),
-}, (table) => [uniqueIndex('user_email_unique').on(sql`lower(${table.email})`)]);
+}, (table) => [
+  uniqueIndex('user_email_unique').on(sql`lower(${table.email})`),
+  uniqueIndex('user_name_unique').on(sql`lower(${table.name})`),
+  check('user_name_format', sql`${table.name} ~ '^[A-Za-z0-9_]{3,24}$'`),
+]);
 
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),

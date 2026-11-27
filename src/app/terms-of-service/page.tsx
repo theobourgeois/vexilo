@@ -58,7 +58,7 @@ export default function TermsOfServicePage() {
                     </Sub>
                     <Sub title="Privacy controls">
                         <p>
-                            You can manage your privacy settings in your account settings page, including options to update your display name
+                            You can manage your privacy settings in your account settings page, including options to update your username
                             and control your visibility in public features.
                         </p>
                     </Sub>

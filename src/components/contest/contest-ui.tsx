@@ -106,7 +106,7 @@ export function ContestTimeline({ contest }: { contest: TimelineContest }) {
 
 export function initials(name: string) {
   return name
-    .split(/\s+/)
+    .split(/[\s_]+/)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');

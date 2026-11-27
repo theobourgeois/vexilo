@@ -17,6 +17,7 @@ import {
 import { emailSchema } from '@/lib/auth-validation';
 import { emailDeliveryConfigured } from '@/lib/email';
 import { z } from 'zod';
+import { isUsernameTaken } from '@/lib/username-db';
 
 async function requestIp() {
   const requestHeaders = await headers();
@@ -57,6 +58,8 @@ export async function signUpWithEmail(input: {
       message:
         'An account already uses this email. Sign in with your password or Google.',
     };
+  if (await isUsernameTaken(name, existing?.id))
+    return { success: false, message: 'That username is taken. Try another.' };
   try {
     if (!emailDeliveryConfigured())
       return {
@@ -182,7 +185,7 @@ export async function requestVerificationCode(input: {
     return await beginEmailVerification(
       {
         email: parsed.data.email,
-        name: user.name ?? 'Vexilo member',
+        name: user.name,
         hashedPassword: user.hashedPassword!,
         userId: user.id,
       },

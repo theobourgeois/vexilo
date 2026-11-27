@@ -49,7 +49,7 @@ export function Leaderboard() {
 
     const getInitials = (name: string) => {
         return name
-            .split(" ")
+            .split(/[\s_]+/)
             .map((word) => word.charAt(0))
             .join("")
             .toUpperCase()

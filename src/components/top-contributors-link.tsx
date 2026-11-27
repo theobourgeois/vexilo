@@ -16,7 +16,7 @@ const CLOSE_DELAY_MS = 150;
 
 function initials(name: string, count: number) {
   return name
-    .split(/\s+/)
+    .split(/[\s_]+/)
     .slice(0, count)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');

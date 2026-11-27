@@ -305,7 +305,7 @@ export function ReviewQueue() {
                     }
                   >
                     <ShieldCheck />
-                    Trust {group.user.name?.split(' ')[0] || 'creator'}
+                    Trust {group.user.name?.split(/[\s_]/)[0] || 'creator'}
                   </Button>
                 )}
                 <Button size='sm' onClick={() => runBulk('approve', approvable.map((item) => item.id))} disabled={approvable.length === 0}>

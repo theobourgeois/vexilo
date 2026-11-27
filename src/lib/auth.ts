@@ -11,6 +11,7 @@ import { db } from '@/db';
 import { Adapter } from 'next-auth/adapters';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import { eq, sql } from 'drizzle-orm';
+import { availableUsername, isUsernameConflict } from '@/lib/username-db';
 
 declare module 'next-auth' {
   interface Session extends DefaultSession {
@@ -21,6 +22,27 @@ declare module 'next-auth' {
       // role: UserRole;
     } & DefaultSession['user'];
   }
+}
+
+/**
+ * New Google accounts get a unique username built from their Google name
+ * ("Théo Bourgeois" -> "Theo_Bourgeois"), which they can change in settings.
+ */
+function withUsernames(adapter: Adapter): Adapter {
+  const createUser = adapter.createUser!;
+  return {
+    ...adapter,
+    async createUser(user: Parameters<NonNullable<Adapter['createUser']>>[0]) {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await createUser({ ...user, name: await availableUsername(user.name) });
+        } catch (error) {
+          // Two people with the same name signing up at the same moment.
+          if (attempt >= 2 || !isUsernameConflict(error)) throw error;
+        }
+      }
+    },
+  };
 }
 
 export const authOptions: AuthOptions = {
@@ -138,12 +160,14 @@ export const authOptions: AuthOptions = {
   session: {
     strategy: 'jwt',
   },
-  adapter: DrizzleAdapter(db, {
-    usersTable: users,
-    accountsTable: accounts,
-    sessionsTable: sessions,
-    verificationTokensTable: verificationTokens,
-  }) as Adapter,
+  adapter: withUsernames(
+    DrizzleAdapter(db, {
+      usersTable: users,
+      accountsTable: accounts,
+      sessionsTable: sessions,
+      verificationTokensTable: verificationTokens,
+    }) as Adapter,
+  ),
   secret: process.env.NEXTAUTH_SECRET!,
 };
 

@@ -19,7 +19,7 @@ const MEDALS = [
 
 const initials = (name?: string | null) =>
   (name || 'U')
-    .split(' ')
+    .split(/[\s_]+/)
     .map((w) => w.charAt(0))
     .join('')
     .toUpperCase()

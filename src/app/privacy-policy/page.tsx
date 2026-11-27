@@ -42,7 +42,7 @@ export default function PrivacyPolicyPage() {
                     <Sub title="Account information">
                         <ul>
                             <li>Email address (for authentication and communication)</li>
-                            <li>Display name and profile picture</li>
+                            <li>Username and profile picture</li>
                             <li>Authentication provider information (Google, etc.)</li>
                             <li>Account preferences and settings</li>
                         </ul>
@@ -123,7 +123,7 @@ export default function PrivacyPolicyPage() {
                 <Section title="Your rights and choices">
                     <Sub title="Account control">
                         <ul>
-                            <li>Update your profile information and display name</li>
+                            <li>Update your profile information and username</li>
                             <li>Control your privacy settings</li>
                             <li>Delete your account and associated data</li>
                             <li>Export your data upon request</li>
