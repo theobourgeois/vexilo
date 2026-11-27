@@ -21,7 +21,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Check,
   ClipboardIcon,
   Copy,
   SelectAll,
