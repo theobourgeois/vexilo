@@ -482,6 +482,36 @@ export const flagRequests = createTable('flag_request', {
   index('flag_request_user_idx').on(table.userId),
 ]);
 
+/**
+ * A flag someone made in the flag maker and kept, posted or not: their My Flags gallery.
+ * `image` is a picture of the design as last saved (or as posted). Posting links the row to its
+ * request (`requestId`), and to the flag once it's published (`flagId`); an update to a posted
+ * flag goes through a new edit request, which `requestId` then points at.
+ */
+export const savedFlags = createTable(
+  'saved_flag',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 120 }).notNull(),
+    design: jsonb('design').$type<StoredStudioDesign>().notNull(),
+    image: varchar('image', { length: 1000 }).notNull(),
+    remixOf: uuid('remix_of').references(() => flags.id, { onDelete: 'set null' }),
+    flagId: uuid('flag_id').references(() => flags.id, { onDelete: 'set null' }),
+    requestId: uuid('request_id').references(() => flagRequests.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('saved_flag_user_idx').on(table.userId, table.updatedAt.desc()),
+    uniqueIndex('saved_flag_flag_idx').on(table.flagId),
+    uniqueIndex('saved_flag_request_idx').on(table.requestId),
+    index('saved_flag_image_idx').on(table.image),
+  ],
+);
+
 export const bannedUsers = createTable('banned_user', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')

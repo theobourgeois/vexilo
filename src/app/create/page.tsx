@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getStudioContest } from '@/actions/contests';
-import Studio from '@/components/studio/Studio';
+import { getSavedFlagSource } from '@/actions/my-flags';
+import StudioRoute from '@/components/studio/StudioRoute';
 import { getRemixSource } from '@/lib/studio-data';
 
 export const metadata: Metadata = {
@@ -9,10 +10,23 @@ export const metadata: Metadata = {
 };
 
 // The emblem library isn't sent with the page; Studio fetches it from /api/studio-emblems.
-export default async function CreatePage({ searchParams }: { searchParams: Promise<{ remix?: string; contest?: string }> }) {
-  const { remix, contest: contestSlug } = await searchParams;
+export default async function CreatePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ remix?: string; contest?: string; flag?: string }>;
+}) {
+  const { remix, contest: contestSlug, flag } = await searchParams;
   const contest = contestSlug ? await getStudioContest(contestSlug) : null;
+  // One of your saved flags, from My Flags. Someone else's (or a deleted one) opens a blank flag.
+  const saved = flag && !contest ? await getSavedFlagSource(flag) : null;
   // Contest entries start from scratch (or the entry so far), never from a remix of a real flag.
-  const source = remix && !contest ? await getRemixSource(remix) : null;
-  return <Studio key={contest ? `contest-${contest.slug}` : (source?.id ?? 'new')} remix={source} contest={contest} />;
+  const source = remix && !contest && !saved ? await getRemixSource(remix) : null;
+  return (
+    <StudioRoute
+      identity={contest ? `contest-${contest.slug}` : saved ? `saved-${saved.id}` : (source?.id ?? 'new')}
+      remix={source}
+      contest={contest}
+      saved={saved}
+    />
+  );
 }

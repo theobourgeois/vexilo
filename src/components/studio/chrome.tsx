@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { openSignIn } from '@/lib/sign-in';
 import { toast } from 'sonner';
+import type { SavedFlagStatus } from '@/actions/my-flags';
 import { postFlagDesign } from '@/actions/studio';
 import { submitContestEntry, type StudioContest } from '@/actions/contests';
 import WavingFlag from '@/components/WavingFlag';
@@ -53,6 +54,9 @@ import {
   FlagTriangleRight,
   Shapes,
   Ruler,
+  Save,
+  Check,
+  Clock,
 } from '@/components/icons';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Segmented } from '@/components/ui/segmented';
@@ -75,6 +79,80 @@ import { canEditPoints } from './vector';
 
 export type Remix = { id: string; name: string } | null;
 export type Contest = StudioContest | null;
+
+/** What posting returns, to keep the flag maker in step with the post. */
+export type PostResult = { savedId: string; published: boolean; update: boolean; flagName: string | null };
+
+/** The flag as kept in My flags: whether it's saved, posted, and how to save it. */
+export type Gallery = {
+  savedId: string | null;
+  /** Null until it's first saved. */
+  status: SavedFlagStatus | null;
+  updatePending: boolean;
+  /** Its page on Browse, once posted. */
+  flagName: string | null;
+  post: { description: string; tags: string[] };
+  /** Changed since it was last saved (or never saved). */
+  dirty: boolean;
+  saving: boolean;
+  save: () => void;
+  onPosted: (result: PostResult & { description: string; tags: string[] }) => void;
+};
+
+/** Live on Browse: posting again sends an update. */
+const isPosted = (gallery: Gallery) => gallery.status === 'posted';
+const inReview = (gallery: Gallery) => gallery.status === 'review';
+
+/** What the post button says. */
+export function postLabel(gallery: Gallery, short = false) {
+  if (isPosted(gallery)) return short ? 'Update' : 'Post update';
+  if (inReview(gallery)) return short ? 'Update' : 'Update post';
+  return 'Post';
+}
+
+export function SaveButton({ gallery, className }: { gallery: Gallery; className?: string }) {
+  const saved = gallery.savedId !== null && !gallery.dirty;
+  return (
+    <Button
+      variant='neutral'
+      size='sm'
+      onClick={gallery.save}
+      disabled={gallery.saving}
+      aria-label={saved ? 'Saved to My flags' : 'Save to My flags'}
+      title={saved ? 'Saved to My flags' : 'Save to My flags (⌘S)'}
+      className={cn(saved && 'text-subtle', className)}
+    >
+      {gallery.saving ? <Loader2 className='animate-spin' /> : saved ? <Check /> : <Save />}
+      <span className='hidden min-[900px]:inline'>{gallery.saving ? 'Saving' : saved ? 'Saved' : 'Save'}</span>
+    </Button>
+  );
+}
+
+/** Where a saved flag stands: on Browse, or waiting for a moderator. */
+export function GalleryPill({ gallery }: { gallery: Gallery }) {
+  const pill = 'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold';
+  if (isPosted(gallery) && gallery.flagName) {
+    return (
+      <Link
+        href={`/flag/${encodeURIComponent(gallery.flagName)}`}
+        title={gallery.updatePending ? 'Posted · your update is waiting for review' : 'Posted on Browse'}
+        className={cn(pill, 'bg-[rgb(34_160_90/0.13)] text-[#17794a] hover:brightness-110 dark:bg-[rgb(80_200_130/0.14)] dark:text-[#6fd39b]')}
+      >
+        <Check className='size-3' />
+        {gallery.updatePending ? 'Update in review' : 'Posted'}
+      </Link>
+    );
+  }
+  if (inReview(gallery)) {
+    return (
+      <span title='Waiting for a moderator' className={cn(pill, 'bg-[rgb(217_154_11/0.14)] text-[#9a6a00] dark:text-[#f2c14e]')}>
+        <Clock className='size-3' />
+        In review
+      </span>
+    );
+  }
+  return null;
+}
 
 // ───────────────────────── Title ─────────────────────────
 
@@ -142,7 +220,7 @@ export function ContestPill({ contest }: { contest: Contest }) {
 }
 
 /** Back to the remixed flag (or a blank one). Only shown once something has changed. */
-export function StartOver({ remix, onStartOver, className }: { remix: Remix; onStartOver?: () => void; className?: string }) {
+export function StartOver({ remix, onStartOver, label, className }: { remix: Remix; onStartOver?: () => void; label?: string; className?: string }) {
   if (!onStartOver) return null;
   return (
     <button
@@ -154,7 +232,7 @@ export function StartOver({ remix, onStartOver, className }: { remix: Remix; onS
       )}
     >
       <History className='size-3' />
-      {remix ? 'Reset' : 'Start over'}
+      {label ?? (remix ? 'Reset' : 'Start over')}
     </button>
   );
 }
@@ -309,14 +387,27 @@ function ConstructionSheetPanel({ studio }: { studio: Studio }) {
 
 // ───────────────────────── Post ─────────────────────────
 
-export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Studio; remix: Remix; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function PostDialog({
+  studio,
+  remix,
+  gallery,
+  open,
+  onOpenChange,
+}: {
+  studio: Studio;
+  remix: Remix;
+  gallery: Gallery;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const session = useSession();
   const [title, setTitle] = React.useState(studio.doc.name);
-  const [description, setDescription] = React.useState('');
-  const [tags, setTags] = React.useState<string[]>([]);
+  const [description, setDescription] = React.useState(gallery.post.description);
+  const [tags, setTags] = React.useState<string[]>(() => gallery.post.tags.filter((tag) => !MAKER_TAGS.includes(tag.toLowerCase())));
   const [busy, setBusy] = React.useState(false);
-  const [done, setDone] = React.useState<null | { published: boolean }>(null);
-  const makerTag = remix ? REMIX_TAG : CUSTOM_TAG;
+  const [done, setDone] = React.useState<null | PostResult>(null);
+  const makerTag = gallery.post.tags.find((tag) => MAKER_TAGS.includes(tag.toLowerCase())) ?? (remix ? REMIX_TAG : CUSTOM_TAG);
+  const updating = isPosted(gallery) || inReview(gallery);
 
   React.useEffect(() => { if (open) setTitle(studio.doc.name); }, [open, studio.doc.name]);
 
@@ -334,9 +425,12 @@ export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Stud
         image,
         design: studio.design,
         remixOf: remix?.id ?? null,
+        savedId: gallery.savedId,
       });
-      if (result.success) setDone({ published: result.published });
-      else toast.error(result.message);
+      if (result.success) {
+        setDone(result);
+        gallery.onPosted({ ...result, description, tags });
+      } else toast.error(result.message);
     } catch {
       toast.error('Could not post the flag. Try again.');
     } finally {
@@ -350,13 +444,32 @@ export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Stud
         {done ? (
           <div className='flex flex-col items-center gap-3 py-4 text-center'>
             <FlagArt design={studio.design} className='studio-flag h-24 w-auto' style={{ aspectRatio: `${studio.design.ratio[1]} / ${studio.design.ratio[0]}` }} />
-            <DialogTitle className='mt-2 text-[19px]'>{done.published ? 'Posted' : 'Sent for review'}</DialogTitle>
+            <DialogTitle className='mt-2 text-[19px]'>
+              {done.published ? (done.update ? 'Updated' : 'Posted') : done.update ? 'Update sent for review' : 'Sent for review'}
+            </DialogTitle>
             <DialogDescription className='text-[13.5px] text-subtle'>
-              {done.published ? `${studio.doc.name} is live.` : `${studio.doc.name} will appear once a moderator approves it.`}
+              {done.published
+                ? done.update
+                  ? `${studio.doc.name} is updated on Browse.`
+                  : `${studio.doc.name} is live.`
+                : done.update
+                  ? 'Your flag stays as it is on Browse until a moderator approves the update.'
+                  : `${studio.doc.name} will appear once a moderator approves it. It’s in My flags meanwhile.`}
             </DialogDescription>
-            <Button variant='neutral' className='mt-2' onClick={() => onOpenChange(false)}>
-              Back to editing
-            </Button>
+            <div className='mt-2 flex flex-wrap justify-center gap-2'>
+              <Button variant='neutral' onClick={() => onOpenChange(false)}>
+                Back to editing
+              </Button>
+              {done.published && done.flagName ? (
+                <Button asChild>
+                  <Link href={`/flag/${encodeURIComponent(done.flagName)}`}>View flag</Link>
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href='/my-flags'>My flags</Link>
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <>
@@ -368,6 +481,13 @@ export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Stud
                 <Input id='post-flag-title' value={title} maxLength={120} required disabled={busy} onChange={(event) => setTitle(event.target.value)} onBlur={() => { if (title.trim()) studio.actions.setName(title.trim()); }} className='text-[17px] font-semibold' />
                 <DialogDescription className='sr-only'>Post this flag to Vexilo</DialogDescription>
                 {remix && <p className='mt-0.5 truncate text-[13px] text-muted-foreground'>Remix of {remix.name}</p>}
+                {updating && (
+                  <p className='mt-0.5 text-[13px] text-muted-foreground'>
+                    {isPosted(gallery)
+                      ? 'This updates your flag on Browse.'
+                      : 'This replaces the version waiting for review.'}
+                  </p>
+                )}
               </div>
             </div>
             {session.status === 'authenticated' ? (
@@ -387,7 +507,7 @@ export function PostDialog({ studio, remix, open, onOpenChange }: { studio: Stud
                 <TagInput tags={tags} onTagsChange={(next) => setTags(next.filter((tag) => !MAKER_TAGS.includes(tag.toLowerCase())))} lockedTags={[makerTag]} maxTags={8} placeholder='Search or add tags…' />
                 <Button onClick={submit} disabled={busy || !title.trim()} className='h-11'>
                   {busy ? <Loader2 className='animate-spin' /> : <Send />}
-                  Post {remix ? 'remix' : 'flag'}
+                  {isPosted(gallery) ? 'Post update' : inReview(gallery) ? 'Update post' : `Post ${remix ? 'remix' : 'flag'}`}
                 </Button>
               </>
             ) : (
