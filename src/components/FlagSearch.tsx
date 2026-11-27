@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FlagCard from './FlagCard';
-import { TodayRail } from './today-rail';
+import BrowseTabs from './browse-tabs';
 import CommunityMatches from './community/CommunityMatches';
 import Tag from './Tag';
 import {
@@ -167,7 +167,7 @@ export default function FlagSearch() {
       update(params);
       params.delete('page');
       const qs = params.toString();
-      router.replace(qs ? `/?${qs}` : '/', { scroll: false });
+      router.replace(qs ? `/browse?${qs}` : '/browse', { scroll: false });
     },
     [router, searchParams],
   );
@@ -276,7 +276,7 @@ export default function FlagSearch() {
     const params = new URLSearchParams(searchParams);
     if (page > 1) params.set('page', String(page));
     else params.delete('page');
-    router.replace(`/?${params.toString()}`, { scroll: false });
+    router.replace(`/browse?${params.toString()}`, { scroll: false });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -295,20 +295,27 @@ export default function FlagSearch() {
 
   return (
     <div>
-      <div className='flex flex-wrap items-end gap-x-4 gap-y-1 pt-8'>
-        <h1 className='text-[28px] font-semibold tracking-[-0.03em] sm:text-[30px]'>
-          {isFavorites ? 'Favorites' : 'Browse'}
-        </h1>
-        <p className='pb-1.5 tabular-nums text-[13px] text-muted-foreground'>
-          {flagsCount !== undefined
-            ? isSearching
-              ? `${flagsCount.toLocaleString()} ${flagsCount === 1 ? 'flag matches' : 'flags match'}`
-              : `${flagsCount.toLocaleString()} flags`
-            : ''}
-        </p>
+      <div className='flex flex-wrap items-end gap-x-5 gap-y-3 pt-8'>
+        <div className='min-w-[260px] flex-1'>
+          <h1 className='text-[34px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[40px]'>
+            {isFavorites ? 'Favorites' : 'Browse flags'}
+          </h1>
+          <p className='mt-2 min-h-[22px] text-[15px] text-subtle'>
+            {flagsCount === undefined ? null : isSearching ? (
+              <span className='tabular-nums'>
+                {flagsCount.toLocaleString()} {flagsCount === 1 ? 'flag matches' : 'flags match'}
+              </span>
+            ) : isFavorites ? (
+              <span className='tabular-nums'>
+                {flagsCount.toLocaleString()} {flagsCount === 1 ? 'flag' : 'flags'} you favorited
+              </span>
+            ) : (
+              <span className='tabular-nums'>{flagsCount.toLocaleString()} real flags</span>
+            )}
+          </p>
+        </div>
+        {!isFavorites && <BrowseTabs active='all' />}
       </div>
-
-      {!isFavorites && !isSearching && currentPage === 1 && <TodayRail className='mt-4' />}
 
       <div className='mt-4 flex gap-2'>
         <form

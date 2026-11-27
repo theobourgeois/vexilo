@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 // No /contest: it redirects to the current contest, and each contest page is listed below.
 // No /create: robots.txt keeps crawlers out of the flag maker.
-const STATIC_PATHS = ['/', '/flags', '/play', '/play/quiz', '/play/grid', '/play/unfurl', '/flag-of-the-day', '/leaderboard', '/tags', '/community'];
+const STATIC_PATHS = ['/', '/browse', '/flags', '/play', '/play/quiz', '/play/grid', '/play/unfurl', '/flag-of-the-day', '/leaderboard', '/tags', '/community'];
 
 const getFlagEntries = unstable_cache(
   () => db.select({ name: flags.name, updatedAt: flags.updatedAt }).from(flags).where(inEncyclopedia),

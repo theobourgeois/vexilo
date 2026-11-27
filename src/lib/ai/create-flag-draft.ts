@@ -3,7 +3,7 @@ import { flagTags } from '@/db/schema';
 import { findExistingFlags, resolveWikimediaFlag, type ExistingFlagMatch } from '@/actions/batch-flags';
 import { uploadFile } from '@/lib/storage/s3';
 import { buildUsageLog } from '@/lib/ai/flag-metadata-pipeline';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { storedFileUrl } from '@/lib/storage/local-storage';
 import { openai } from '@ai-sdk/openai';
 import { Output, generateText } from 'ai';
 import { desc } from 'drizzle-orm';
@@ -233,7 +233,7 @@ export async function drawFlagSvg(research: Research, input: string, model: stri
 async function uploadSvg(svg: string) {
   const key = `images/${crypto.randomUUID()}.svg`;
   await uploadFile(Buffer.from(svg), process.env.S3_BUCKET_NAME!, key, 'image/svg+xml');
-  return `${CLOUD_FRONT_URL}/${key}`;
+  return storedFileUrl(key);
 }
 
 function cleanTags(tags: string[], fictional: boolean) {

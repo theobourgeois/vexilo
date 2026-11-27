@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { flags } from '@/db/schema';
 import { expireCache, FLAGS_TAG } from '@/lib/cache-tags';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { isLocalStorage, isStoredFileUrl, storedFileUrl, writeLocalFile } from '@/lib/storage/local-storage';
 import { moveFlagColors } from '@/lib/flag-palette';
 
 type MirrorableFlag = {
@@ -77,7 +78,7 @@ export function isSelfHostedFlagImage(url: string): boolean {
   try {
     const parsedUrl = new URL(url);
     const hostname = parsedUrl.hostname.toLowerCase();
-    if (hostname === cloudFrontHost) {
+    if (hostname === cloudFrontHost || isStoredFileUrl(url)) {
       return true;
     }
 
@@ -233,17 +234,21 @@ async function mirrorFlagImage(flag: MirrorableFlag): Promise<string> {
     throw new Error('Downloaded SVG is not valid');
   }
   const key = getTargetKey(flag, download.extension);
-  const targetUrl = `${CLOUD_FRONT_URL}/${key}`;
+  const targetUrl = storedFileUrl(key);
 
-  await getS3Client().send(
-    new PutObjectCommand({
-      Bucket: getBucketName(),
-      Key: key,
-      Body: body,
-      ContentType: download.contentType,
-      CacheControl: 'public, max-age=31536000, immutable',
-    }),
-  );
+  if (isLocalStorage()) {
+    await writeLocalFile(key, body);
+  } else {
+    await getS3Client().send(
+      new PutObjectCommand({
+        Bucket: getBucketName(),
+        Key: key,
+        Body: body,
+        ContentType: download.contentType,
+        CacheControl: 'public, max-age=31536000, immutable',
+      }),
+    );
+  }
 
   await db
     .update(flags)

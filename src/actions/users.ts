@@ -5,7 +5,7 @@ import { cacheDel } from "@/db/redis";
 import { flags, users } from "@/db/schema";
 import { deleteFileFromUrl, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
-import { CLOUD_FRONT_URL } from "@/lib/constant";
+import { isStoredFileUrl, storedFileUrl } from "@/lib/storage/local-storage";
 import { and, eq } from "drizzle-orm";
 import { inEncyclopedia } from "@/lib/encyclopedia";
 import { getProfileFlag } from "@/lib/profile-flag";
@@ -141,7 +141,7 @@ export async function changeProfilePicture(formData: FormData) {
 
   const key = `${PROFILE_PICTURE_PREFIX}${session.user.id}-${Date.now()}.webp`;
   await uploadFile(image, process.env.S3_BUCKET_NAME!, key, "image/webp");
-  const url = `${CLOUD_FRONT_URL}/${key}`;
+  const url = storedFileUrl(key);
 
   await replaceProfilePicture(session.user.id, url);
 
@@ -182,7 +182,7 @@ async function replaceProfilePicture(userId: string, image: string | null) {
   await db.update(users).set({ image }).where(eq(users.id, userId));
   await cacheDel(LEADERBOARD_CACHE_KEY);
 
-  if (previous?.startsWith(`${CLOUD_FRONT_URL}/${PROFILE_PICTURE_PREFIX}`)) {
+  if (previous && isStoredFileUrl(previous, PROFILE_PICTURE_PREFIX)) {
     await deleteFileFromUrl(previous).catch((error) => {
       console.error("Failed to delete old profile picture", error);
     });

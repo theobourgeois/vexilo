@@ -7,7 +7,7 @@ import { Flag, RelatedFlag } from '@/lib/types';
 import { and, count, eq, inArray, max, sql } from 'drizzle-orm';
 import { UnsafeImageError, base64ImageToS3URI } from '@/lib/storage/s3';
 import { deleteImageIfUnused } from '@/lib/storage/unused-image';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { isStoredFileUrl } from '@/lib/storage/local-storage';
 import { cacheDel } from '@/db/redis';
 import { LEADERBOARD_CACHE_KEY, relatedFlagsCacheKey, TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
 import { saveFlagColorsLater } from '@/lib/flag-palette';
@@ -1002,7 +1002,7 @@ export async function submitAiFlagDrafts(drafts: AiFlagDraftSubmission[]) {
   const invalid = drafts.find(
     (draft) =>
       !draft.flagName.trim() ||
-      !draft.flagImage.startsWith(`${CLOUD_FRONT_URL}/`) ||
+      !isStoredFileUrl(draft.flagImage) ||
       (draft.imageOrigin === 'commons' && draft.sources.length === 0),
   );
   if (invalid) {

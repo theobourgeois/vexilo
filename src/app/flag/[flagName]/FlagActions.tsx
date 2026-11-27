@@ -104,7 +104,7 @@ export default function FlagActions({ flag }: FlagActionsProps) {
     if (isSuccess) {
       toast.success('Flag deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['flags'] });
-      router.push('/');
+      router.push('/browse');
     } else {
       toast.error('Failed to delete flag');
     }

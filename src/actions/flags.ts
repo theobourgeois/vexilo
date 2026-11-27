@@ -10,6 +10,7 @@ import {
   flagRequests,
   flags,
   flagTags,
+  flagViewDaily,
   reports,
   type FlagAiStructuredData,
   users,
@@ -30,6 +31,7 @@ import {
   desc,
   eq,
   gt,
+  gte,
   ilike,
   inArray,
   ne,
@@ -400,6 +402,30 @@ async function getSharedFlagsByIds(flagIds: string[]) {
 async function getFlagsByIds(flagIds: string[]) {
   const [rows, overlay] = await Promise.all([getSharedFlagsByIds(flagIds), getLiveFavorites(flagIds)]);
   return withFavorites(rows, overlay);
+}
+
+/** The real flags with the most views over the last 7 days, most first. The id list is shared and cached for an hour. */
+const getCachedMostViewedIds = unstable_cache(
+  async (limit: number) => {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const total = sql<number>`sum(${flagViewDaily.views})`.mapWith(Number);
+    const rows = await db
+      .select({ id: flagViewDaily.flagId, total })
+      .from(flagViewDaily)
+      .innerJoin(flags, eq(flags.id, flagViewDaily.flagId))
+      .where(and(gte(flagViewDaily.day, since), inEncyclopedia))
+      .groupBy(flagViewDaily.flagId)
+      .orderBy(desc(total))
+      .limit(limit);
+    return rows.map((row) => row.id);
+  },
+  ['most-viewed-week-v1'],
+  { revalidate: 60 * 60, tags: [FLAGS_TAG] },
+);
+
+export async function getMostViewedFlagsThisWeek(limit = 4) {
+  const ids = await getCachedMostViewedIds(Math.min(Math.max(limit, 1), 12));
+  return getFlagsByIds(ids);
 }
 
 // Helper function to update tag counts when tags are added or removed

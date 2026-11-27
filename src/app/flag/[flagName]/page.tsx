@@ -573,13 +573,13 @@ export default async function FlagPage({
         </Suspense>
         <div className='mx-auto max-w-[1312px] px-4 pb-10 md:px-8 lg:pb-12'>
           <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
-            <Link href='/' className='hover:text-foreground'>
+            <Link href='/browse' className='hover:text-foreground'>
               Browse
             </Link>
             {firstTag && (
               <>
                 <ChevronRight className='size-3' />
-                <Link href={`/?tag=${encodeURIComponent(firstTag)}`} className='hover:text-foreground'>
+                <Link href={`/browse?tag=${encodeURIComponent(firstTag)}`} className='hover:text-foreground'>
                   {firstTag}
                 </Link>
               </>

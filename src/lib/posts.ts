@@ -343,7 +343,8 @@ export async function getProfile(username: string, viewerId: string | null): Pro
       .select({ title: contests.title, slug: contests.slug })
       .from(contests)
       .innerJoin(contestEntries, eq(contestEntries.id, contests.winnerEntryId))
-      .where(eq(contestEntries.userId, user.id)),
+      // A winner can be picked before it's announced; only announced wins show.
+      .where(and(eq(contestEntries.userId, user.id), isNotNull(contests.announcedAt))),
     viewerId && viewerId !== user.id
       ? db
           .select({ followerId: follows.followerId })
@@ -514,45 +515,6 @@ export async function getPopularPostTags(limit = 8) {
 function rowsOfResult<T>(result: unknown): T[] {
   if (Array.isArray(result)) return result as T[];
   return ((result as { rows?: T[] }).rows ?? []) as T[];
-}
-
-/**
- * What a post was remixed from, from the start: the real flag it began as (if any), then each post
- * in between, oldest first. Stops at 6 steps, and at a post that's been taken down.
- */
-export async function getLineage(postId: string): Promise<PostLineage[]> {
-  const rows = rowsOfResult<{ depth: number; name: string; image: string; slug: string | null; username: string; remix_of: string | null; published: boolean }>(
-    await db.execute(sql`
-      with recursive chain as (
-        select p.remix_of_post_id as id, p.remix_of as flag_id, 1 as depth
-          from ${savedFlags} p where p.id = ${postId}
-        union all
-        select p.remix_of_post_id, p.remix_of, chain.depth + 1
-          from chain join ${savedFlags} p on p.id = chain.id
-         where chain.depth < 6 and p.published_at is not null
-      )
-      select chain.depth, p.name, p.image, p.slug, u.name as username, p.remix_of, (p.published_at is not null) as published
-        from chain join ${savedFlags} p on p.id = chain.id join ${users} u on u.id = p.user_id
-       order by chain.depth
-    `),
-  );
-  const posts: PostLineage[] = [];
-  let originFlagId: string | null = null;
-  for (const row of rows) {
-    if (!row.published || !row.slug) break;
-    posts.push({ kind: 'post', name: row.name, href: postPath(row.username, row.slug), image: row.image, author: row.username });
-    originFlagId = row.remix_of;
-  }
-  if (rows.length === 0 || posts.length === rows.length) {
-    // The chain ended at a design from scratch, or at a real flag.
-    const [self] = rows.length ? [] : await db.select({ remixOf: savedFlags.remixOf }).from(savedFlags).where(eq(savedFlags.id, postId));
-    const flagId = rows.length ? originFlagId : (self?.remixOf ?? null);
-    if (flagId) {
-      const [flag] = await db.select({ name: flags.name, image: flags.image }).from(flags).where(and(eq(flags.id, flagId), inEncyclopedia));
-      if (flag) posts.push({ kind: 'flag', name: flag.name, href: `/flag/${encodeURIComponent(flag.name)}`, image: flag.image, author: null });
-    }
-  }
-  return posts.reverse();
 }
 
 export const ENCYCLOPEDIA_PAGE_SIZE = 48;

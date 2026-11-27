@@ -9,7 +9,7 @@ import { db } from '@/db';
 import { bannedUsers, contestEntries, contests, contestVotes, users } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { CONTESTS_TAG, toDate } from '@/lib/cache-tags';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { storedFileUrl } from '@/lib/storage/local-storage';
 import { contestPhase, seededShuffle, STATEMENT_MAX, type ContestPhase } from '@/lib/contest';
 import type { StoredStudioDesign, StudioDesign } from '@/lib/studio-design';
 import { studioDesignSchema } from '@/lib/studio-design-schema';
@@ -115,7 +115,14 @@ async function contestBySlug(slug: string) {
  * The contest to promote right now: one that's running, else the next one coming up,
  * else the latest finished one.
  */
-type CurrentContest = ContestSummary & { winnerImage: string | null; announcedAt: Date | null; previews: string[] };
+type CurrentContest = ContestSummary & {
+  winnerImage: string | null;
+  /** Results only: the winning entry's title and its designer's username. */
+  winnerTitle: string | null;
+  winnerDesigner: string | null;
+  announcedAt: Date | null;
+  previews: string[];
+};
 
 export async function getCurrentContest(): Promise<CurrentContest | null> {
   const contest = await getCachedCurrentContest();
@@ -131,7 +138,7 @@ export async function getCurrentContest(): Promise<CurrentContest | null> {
 }
 
 // Shown on Browse for everyone, so it's cached briefly; contest admin actions expire it.
-const getCachedCurrentContest = unstable_cache(readCurrentContest, ['current-contest-v2'], {
+const getCachedCurrentContest = unstable_cache(readCurrentContest, ['current-contest-v3'], {
   revalidate: 60 * 5,
   tags: [CONTESTS_TAG],
 });
@@ -150,8 +157,9 @@ async function readCurrentContest(): Promise<CurrentContest | null> {
     activeEntryCount(row.id),
     pick.phase === 'results' && row.winnerEntryId
       ? db
-          .select({ image: contestEntries.image })
+          .select({ image: contestEntries.image, title: contestEntries.title, designer: users.name })
           .from(contestEntries)
+          .innerJoin(users, eq(users.id, contestEntries.userId))
           .where(eq(contestEntries.id, row.winnerEntryId))
           .then((res) => res[0])
       : undefined,
@@ -164,7 +172,26 @@ async function readCurrentContest(): Promise<CurrentContest | null> {
           .then((res) => seededShuffle(res, `${row.id}:banner`).slice(0, 4).map((entry) => entry.image))
       : [],
   ]);
-  return { ...summarize(row, entryCount), winnerImage: winner?.image ?? null, announcedAt: row.announcedAt, previews };
+  return {
+    ...summarize(row, entryCount),
+    winnerImage: winner?.image ?? null,
+    winnerTitle: winner?.title ?? null,
+    winnerDesigner: winner?.designer ?? null,
+    announcedAt: row.announcedAt,
+    previews,
+  };
+}
+
+/** How many of their votes the signed-in viewer has used in a contest (voided votes don't count). */
+export async function getMyVoteCount(contestId: string): Promise<number> {
+  const session = await getServerAuthSession();
+  const userId = session?.user?.id;
+  if (!userId) return 0;
+  const [row] = await db
+    .select({ count: count() })
+    .from(contestVotes)
+    .where(and(eq(contestVotes.contestId, contestId), eq(contestVotes.userId, userId), isNull(contestVotes.voidedAt)));
+  return row?.count ?? 0;
 }
 
 export type ArchivedContest = ContestSummary & { winner: { title: string; image: string; designer: string } | null };
@@ -332,7 +359,7 @@ export async function submitContestEntry(input: {
   } catch {
     return { success: false as const, message: 'Couldn’t upload your flag. Try again.' };
   }
-  const image = `${CLOUD_FRONT_URL}/${key}`;
+  const image = storedFileUrl(key);
   const values = {
     title: parsed.data.title,
     statement: parsed.data.statement,

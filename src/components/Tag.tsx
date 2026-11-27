@@ -35,13 +35,14 @@ export default function Tag({
       return;
     }
     e.preventDefault();
-    const params = new URLSearchParams(window.location.pathname === '/' ? searchParams : undefined);
+    const onBrowse = window.location.pathname === '/browse';
+    const params = new URLSearchParams(onBrowse ? searchParams : undefined);
     params.set('tag', text);
     params.delete('page');
-    if (window.location.pathname !== '/') {
-      router.push(`/?${params.toString()}`);
+    if (onBrowse) {
+      router.replace(`/browse?${params.toString()}`, { scroll: false });
     } else {
-      router.replace(`/?${params.toString()}`, { scroll: false });
+      router.push(`/browse?${params.toString()}`);
     }
   };
 

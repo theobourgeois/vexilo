@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { storedFileUrl } from '@/lib/storage/local-storage';
 import { uploadFile } from '@/lib/storage/s3';
 
 /** Saved flags' (and so posts') pictures. Big enough for a post page, small enough for a grid. */
@@ -19,5 +19,5 @@ export async function uploadSavedFlagImage(userId: string, dataUrl: string) {
     .toBuffer();
   const key = `${SAVED_PREFIX}${userId}/${crypto.randomUUID()}.png`;
   await uploadFile(png, process.env.S3_BUCKET_NAME!, key, 'image/png');
-  return `${CLOUD_FRONT_URL}/${key}`;
+  return storedFileUrl(key);
 }

@@ -124,7 +124,7 @@ export default function AnonymousProfile() {
         <h2 className='text-lg font-semibold'>{title}</h2>
         {body && <p className='text-sm text-muted-foreground'>{body}</p>}
         <Button variant='neutral' asChild className='mt-2'>
-          <Link href='/'>Back to browse</Link>
+          <Link href='/browse'>Back to browse</Link>
         </Button>
       </div>
     </div>

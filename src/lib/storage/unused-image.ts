@@ -1,7 +1,7 @@
 import { and, ne, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { flags, savedFlags } from '@/db/schema';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { isStoredFileUrl } from '@/lib/storage/local-storage';
 import { deleteFileFromUrl } from './s3';
 
 /**
@@ -13,8 +13,7 @@ export async function deleteImageIfUnused(
   imageUrl: string,
   options: { prefix?: string; ignoreFlagId?: string; ignoreSavedId?: string } = {},
 ) {
-  if (!imageUrl.startsWith(`${CLOUD_FRONT_URL}/`)) return;
-  if (options.prefix && !imageUrl.startsWith(`${CLOUD_FRONT_URL}/${options.prefix}`)) return;
+  if (!isStoredFileUrl(imageUrl, options.prefix)) return;
 
   const [[flag], [saved]] = await Promise.all([
     db

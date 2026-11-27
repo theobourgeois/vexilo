@@ -6,7 +6,14 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
-import { CLOUD_FRONT_URL } from "@/lib/constant";
+import {
+  deleteLocalFile,
+  isLocalStorage,
+  isStoredFileUrl,
+  storedFileUrl,
+  uploadBaseUrl,
+  writeLocalFile,
+} from "@/lib/storage/local-storage";
 import { IMAGE_EXTENSIONS, UnsafeImageError, safeImageBody } from "@/lib/storage/safe-image";
 
 export { UnsafeImageError };
@@ -31,10 +38,15 @@ export const uploadFile = async (
   if (!session) {
     throw new Error("Unauthorized");
   }
+  const body = safeImageBody(file, contentType);
+  if (isLocalStorage()) {
+    await writeLocalFile(key, body);
+    return null;
+  }
   const uploadParams = {
     Bucket: bucketName,
     Key: key,
-    Body: safeImageBody(file, contentType),
+    Body: body,
     ContentType: contentType,
   };
 
@@ -45,7 +57,9 @@ export const uploadFile = async (
 };
 
 export async function deleteFileFromUrl(url: string) {
-  const key = url.replace(`${CLOUD_FRONT_URL}/`, "");
+  // Locally, seeded rows still point at prod CDN files: leave anything we didn't store alone.
+  if (isLocalStorage() && !isStoredFileUrl(url)) return;
+  const key = url.replace(`${uploadBaseUrl()}/`, "");
   if (!key) {
     throw new Error("Invalid URL");
   }
@@ -56,6 +70,10 @@ export async function deleteFile(key: string) {
   const session = await getServerAuthSession();
   if (!session) {
     throw new Error("Unauthorized");
+  }
+  if (isLocalStorage()) {
+    await deleteLocalFile(key);
+    return;
   }
   const command = new DeleteObjectCommand({
     Bucket: bucketName,
@@ -81,5 +99,5 @@ export async function base64ImageToS3URI(base64Image: string): Promise<string> {
 
   await uploadFile(imageBuffer, bucketName, fileName, contentType);
 
-  return `${CLOUD_FRONT_URL}/${fileName}`;
+  return storedFileUrl(fileName);
 }

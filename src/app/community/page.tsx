@@ -1,15 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { getCurrentContest } from '@/actions/contests';
 import CreatorRow from '@/components/community/CreatorRow';
 import PostGrid from '@/components/community/PostGrid';
 import { PostGridSkeleton } from '@/components/community/PostCard';
 import FlagImage from '@/components/FlagImage';
-import { ArrowRight, PaintBrush, Trophy, Users } from '@/components/icons';
+import { PaintBrush, Users } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { getServerAuthSession } from '@/lib/auth';
-import { timeLeft } from '@/lib/contest';
 import {
   getCommunityTotals,
   getMostRemixedFlags,
@@ -43,12 +41,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Se
   const session = await getServerAuthSession();
   const viewerId = session?.user?.id ?? null;
 
-  const [totals, tags, contest] = await Promise.all([
-    getCommunityTotals(),
-    getPopularPostTags(6),
-    getCurrentContest().catch(() => null),
-  ]);
-  const showContest = contest && (contest.phase === 'open' || contest.phase === 'voting');
+  const [totals, tags] = await Promise.all([getCommunityTotals(), getPopularPostTags(6)]);
 
   return (
     <div className='mx-auto max-w-[1312px] px-4 pb-16 md:px-8'>
@@ -68,29 +61,6 @@ export default async function CommunityPage({ searchParams }: { searchParams: Se
           </Link>
         </Button>
       </div>
-
-      {showContest && (
-        <Link
-          href={`/contest/${contest.slug}`}
-          className='vx-tile mt-6 flex items-center gap-3.5 py-3 pl-3 pr-4 transition-shadow hover:shadow-tile-hover'
-        >
-          <span className='grid size-[38px] shrink-0 place-items-center rounded-[10px] bg-[rgb(217_154_11/0.14)] text-[#9a6a00] dark:text-[#f2c14e]'>
-            <Trophy className='size-[18px]' />
-          </span>
-          <div className='min-w-0 flex-1 text-[14px]'>
-            <b className='font-semibold'>{contest.title}</b>{' '}
-            <span className='text-subtle'>
-              ·{' '}
-              {contest.phase === 'voting'
-                ? `Voting is open. ${contest.entryCount} entries, ends in ${timeLeft(contest.endsAt)}.`
-                : `Taking entries for ${timeLeft(contest.votingStartsAt)} more.`}
-            </span>
-          </div>
-          <span className='hidden items-center gap-1.5 text-[13px] font-medium sm:inline-flex'>
-            {contest.phase === 'voting' ? 'Vote' : 'Enter'} <ArrowRight className='size-3.5' />
-          </span>
-        </Link>
-      )}
 
       <div className='mt-7 grid gap-7 lg:grid-cols-[minmax(0,1fr)_300px]'>
         <div className='min-w-0'>

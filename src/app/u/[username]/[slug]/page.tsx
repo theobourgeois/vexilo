@@ -15,17 +15,21 @@ import PostViewTracker from '@/components/community/PostViewTracker';
 import ShareButton from '@/components/community/ShareButton';
 import UserAvatar from '@/components/community/UserAvatar';
 import FlagImage from '@/components/FlagImage';
-import { ArrowRight, ChevronRight, Shuffle, TreeStructure } from '@/components/icons';
+import { ArrowRight, ChevronLeft, Shuffle } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { getServerAuthSession } from '@/lib/auth';
 import { bandGradient, flagBand } from '@/lib/flag-band';
 import { getStoredPalette, type PaletteColor } from '@/lib/flag-palette';
 import { profilePath } from '@/lib/post-slug';
-import { getLineage, getPost, INDEXABLE_LIKES, listPosts, type PostDetail } from '@/lib/posts';
+import { getPost, INDEXABLE_LIKES, listPosts, type PostDetail } from '@/lib/posts';
 import { absoluteUrl } from '@/lib/seo';
 import PostOwnerMenu from './PostOwnerMenu';
 
 type Params = Promise<{ username: string; slug: string }>;
+
+/** The old flag maker filled descriptions in itself ("A remix of X, made with the Vexilo flag maker."); those say nothing, so they're hidden. */
+const FILLER_DESCRIPTION = /^(A remix of .+, made|Made) with the Vexilo flag maker\.?$/;
+const ownDescription = (text: string) => (FILLER_DESCRIPTION.test(text.trim()) ? '' : text);
 
 const formatDate = (date: Date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -43,7 +47,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const url = absoluteUrl(post.path);
   const title = `${post.name} by @${post.author.username} | Vexilo`;
   const description =
-    post.description.slice(0, 200) || `A flag designed by @${post.author.username} on Vexilo. Remix it or make your own in the flag maker.`;
+    ownDescription(post.description).slice(0, 200) || `A flag designed by @${post.author.username} on Vexilo. Remix it or make your own in the flag maker.`;
   return {
     title,
     description,
@@ -60,6 +64,7 @@ export default async function PostPage({ params }: { params: Params }) {
   if (!post) notFound();
   if (post.author.username !== username) permanentRedirect(post.path);
 
+  const description = ownDescription(post.description);
   const palette = getStoredPalette({ kind: 'post', id: post.id, image: post.image }).then((colors) => colors ?? []);
   const pinned = post.isMine
     ? await db
@@ -77,16 +82,11 @@ export default async function PostPage({ params }: { params: Params }) {
           <Band palette={palette} />
         </Suspense>
         <div className='mx-auto max-w-[1312px] px-4 pb-10 md:px-8 lg:pb-12'>
-          <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
-            <Link href='/community' className='hover:text-foreground'>
+          <nav className='pb-4 pt-[22px] text-[13px] text-muted-foreground'>
+            <Link href='/community' className='inline-flex items-center gap-1 hover:text-foreground'>
+              <ChevronLeft className='size-3' />
               Community
             </Link>
-            <ChevronRight className='size-3' />
-            <Link href={profilePath(post.author.username)} className='hover:text-foreground'>
-              @{post.author.username}
-            </Link>
-            <ChevronRight className='size-3' />
-            <span className='truncate font-medium text-foreground'>{post.name}</span>
           </nav>
 
           <div className='grid items-center gap-8 pt-2 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)] lg:gap-16 lg:pt-3.5'>
@@ -94,42 +94,33 @@ export default async function PostPage({ params }: { params: Params }) {
               <FlagViewer image={post.image} name={post.name} variant='band' />
             </div>
             <div className='min-w-0'>
-              <div className='flex flex-wrap items-center gap-3'>
-                <Link href={profilePath(post.author.username)} className='flex min-w-0 items-center gap-2.5'>
-                  <UserAvatar username={post.author.username} image={post.author.image} className='size-10 text-sm' />
-                  <span className='min-w-0'>
-                    <b className='block truncate text-[14px] font-semibold'>{post.author.username}</b>
-                    <span className='block text-[12px] text-muted-foreground'>
-                      {post.authorFollowers.toLocaleString()} {post.authorFollowers === 1 ? 'follower' : 'followers'}
-                    </span>
-                  </span>
+              <h1 className='text-[32px] font-semibold leading-[1.08] tracking-[-0.035em] sm:text-[40px] lg:text-[44px]'>{post.name}</h1>
+
+              <div className='mt-4 flex flex-wrap items-center gap-3'>
+                <Link href={profilePath(post.author.username)} className='flex min-w-0 items-center gap-2 hover:underline'>
+                  <UserAvatar username={post.author.username} image={post.author.image} className='size-7 text-xs' />
+                  <b className='truncate text-[14px] font-semibold'>{post.author.username}</b>
                 </Link>
                 {!post.isMine && <FollowButton userId={post.author.id} following={post.following} size='sm' />}
               </div>
 
-              <h1 className='mt-5 text-[36px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[46px] lg:text-[52px]'>{post.name}</h1>
-              <p className='mt-3 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground'>
-                {post.remixOf && (
-                  <span className='inline-flex h-6 items-center gap-1 rounded-full bg-white/15 px-2.5 text-[12px] font-semibold text-white'>
-                    <Shuffle className='size-3' /> Remix
-                  </span>
-                )}
-                <span>
-                  Community design · not an official flag
-                  {post.remixOf && (
-                    <>
-                      {' · based on '}
-                      <Link href={post.remixOf.href} className='font-medium text-foreground underline decoration-white/40 underline-offset-2 hover:decoration-white'>
-                        {post.remixOf.name}
-                      </Link>
-                      {post.remixOf.author && ` by @${post.remixOf.author}`}
-                    </>
+              {post.remixOf && (
+                <p className='mt-4 flex min-w-0 items-center gap-2 text-[13.5px] text-muted-foreground'>
+                  <Shuffle className='size-3.5 shrink-0' />
+                  <span className='shrink-0'>Remix of</span>
+                  <Link href={post.remixOf.href} className='flex min-w-0 items-center gap-2 font-medium text-foreground hover:underline'>
+                    <FlagImage src={post.remixOf.image} alt='' maxHeight={18} fixed />
+                    <span className='truncate'>{post.remixOf.name}</span>
+                  </Link>
+                  {post.remixOf.author && post.remixOf.author !== post.author.username && (
+                    <span className='shrink-0'>by @{post.remixOf.author}</span>
                   )}
-                </span>
-              </p>
-              {post.description && (
-                <div className='mt-3.5 max-w-[560px]'>
-                  <DescriptionBox text={post.description} long={post.description.length > 620} />
+                </p>
+              )}
+
+              {description && (
+                <div className='mt-4 max-w-[560px]'>
+                  <DescriptionBox text={description} long={description.length > 620} />
                 </div>
               )}
 
@@ -152,43 +143,31 @@ export default async function PostPage({ params }: { params: Params }) {
                 )}
               </div>
 
-              {post.tags.length > 0 && (
-                <div className='mt-5 flex flex-wrap gap-1.5'>
-                  {post.tags.map((tag) => (
-                    <Link
-                      key={tag}
-                      href={`/community?tag=${encodeURIComponent(tag)}&range=all`}
-                      className='inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-[12.5px] font-medium capitalize text-subtle shadow-[inset_0_0_0_1px_rgb(255_255_255/0.16)] hover:text-foreground'
-                    >
-                      {tag}
-                    </Link>
-                  ))}
-                </div>
-              )}
-
-              <p className='mt-6 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground [&_b]:font-medium [&_b]:text-foreground'>
-                <span>
-                  Posted <b>{formatDate(post.publishedAt)}</b>
+              <div className='mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-muted-foreground'>
+                {post.tags.map((tag) => (
+                  <Link
+                    key={tag}
+                    href={`/community?tag=${encodeURIComponent(tag)}&range=all`}
+                    className='inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-[12.5px] font-medium capitalize text-subtle shadow-[inset_0_0_0_1px_rgb(255_255_255/0.16)] hover:text-foreground'
+                  >
+                    {tag}
+                  </Link>
+                ))}
+                <span className='tabular-nums'>
+                  {formatDate(post.publishedAt)} · {post.views.toLocaleString()} {post.views === 1 ? 'view' : 'views'}
                 </span>
-                <span>
-                  <b>{post.views.toLocaleString()}</b> views
-                </span>
-                <span>
-                  <b>{post.remixCount.toLocaleString()}</b> {post.remixCount === 1 ? 'remix' : 'remixes'}
-                </span>
-              </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div className='mx-auto max-w-[1312px] px-4 pb-16 md:px-8'>
-        <Suspense fallback={null}>
-          <Lineage post={post} />
-        </Suspense>
-        <Suspense fallback={<PostGridSkeleton count={4} />}>
-          <Remixes post={post} viewerId={viewerId} />
-        </Suspense>
+        {post.remixCount > 0 && (
+          <Suspense fallback={<PostGridSkeleton count={4} />}>
+            <Remixes post={post} viewerId={viewerId} />
+          </Suspense>
+        )}
         <Suspense fallback={null}>
           <MoreFromAuthor postId={post.id} authorId={post.author.id} username={post.author.username} viewerId={viewerId} />
         </Suspense>
@@ -204,55 +183,14 @@ async function Band({ palette }: { palette: Promise<PaletteColor[]> }) {
   );
 }
 
-function SectionHeading({ title, count, action, icon }: { title: string; count?: number; action?: React.ReactNode; icon?: React.ReactNode }) {
+function SectionHeading({ title, count, action }: { title: string; count?: number; action?: React.ReactNode }) {
   return (
     <div className='mb-4 mt-12 flex items-center gap-2.5'>
-      {icon}
-      <h2 className='text-[17px] font-semibold tracking-[-0.02em]'>{title}</h2>
+      <h2 className='min-w-0 truncate text-[17px] font-semibold tracking-[-0.02em]'>{title}</h2>
       {count !== undefined && <span className='tabular-nums text-[13px] text-muted-foreground'>{count}</span>}
       <span className='flex-1' />
-      {action}
+      {action && <div className='shrink-0'>{action}</div>}
     </div>
-  );
-}
-
-async function Lineage({ post }: { post: PostDetail }) {
-  const ancestors = await getLineage(post.id);
-  if (ancestors.length === 0) return null;
-  const steps = [...ancestors, { kind: 'post' as const, name: post.name, href: post.path, image: post.image, author: post.author.username }];
-  return (
-    <section>
-      <SectionHeading title='Remix lineage' icon={<TreeStructure className='size-[18px] text-muted-foreground' />} />
-      <div className='vx-tile overflow-x-auto px-[18px] py-4'>
-        <ol className='flex min-w-max items-center gap-3'>
-          {steps.map((step, index) => {
-            const current = index === steps.length - 1;
-            return (
-              <li key={step.href} className='flex items-center gap-3'>
-                {index > 0 && <ArrowRight className='size-4 text-muted-foreground' />}
-                <Link
-                  href={step.href}
-                  aria-current={current ? 'page' : undefined}
-                  className={
-                    current
-                      ? 'flex items-center gap-3 rounded-[12px] bg-foreground/[0.06] px-3 py-2'
-                      : 'flex items-center gap-3 rounded-[12px] px-3 py-2 hover:bg-foreground/[0.04]'
-                  }
-                >
-                  <FlagImage src={step.image} alt='' maxHeight={30} fixed />
-                  <span>
-                    <b className='block text-[13.5px] font-semibold'>{step.name}</b>
-                    <span className='block text-[12px] text-muted-foreground'>
-                      {step.kind === 'flag' ? 'Real flag' : `@${step.author}`}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-    </section>
   );
 }
 
@@ -261,28 +199,8 @@ async function Remixes({ post, viewerId }: { post: PostDetail; viewerId: string 
   const page = await listPosts({ ...request, viewerId, limit: 8 });
   return (
     <section>
-      <SectionHeading
-        title='Remixes'
-        count={post.remixCount}
-        action={
-          <Button variant='neutral' size='sm' asChild>
-            <Link href={`/create?remixPost=${post.id}`}>
-              <Shuffle />
-              Remix this flag
-            </Link>
-          </Button>
-        }
-      />
-      <PostGrid
-        initial={page.posts}
-        hasMore={page.hasMore}
-        request={request}
-        empty={
-          <div className='rounded-2xl border border-dashed border-border px-6 py-8 text-center text-[14px] text-subtle'>
-            No remixes yet. Take it somewhere new and yours shows up here, credited back to @{post.author.username}.
-          </div>
-        }
-      />
+      <SectionHeading title='Remixes' count={post.remixCount} />
+      <PostGrid initial={page.posts} hasMore={page.hasMore} request={request} />
     </section>
   );
 }

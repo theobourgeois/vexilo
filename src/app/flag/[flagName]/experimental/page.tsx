@@ -222,7 +222,7 @@ export default async function ConsumerFlagPage({ params }: Props) {
   return (
     <div className='mx-auto max-w-[1312px] px-4 pb-16 md:px-8'>
       <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
-        <Link href='/' className='hover:text-foreground'>
+        <Link href='/browse' className='hover:text-foreground'>
           Browse
         </Link>
         <ChevronRight className='size-3' />

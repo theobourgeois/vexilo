@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vexilo Community Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+:root {
+  --background:#f3f2ef; --surface:#fff; --foreground:#1b1c1f; --subtle:#56575c; --muted:#e9e8e4;
+  --muted-foreground:#8b8a86; --main:#203f8f; --main-deep:#18306e; --main-soft:rgb(32 63 143/.09);
+  --main-foreground:#fff; --border:rgb(27 28 31/.14); --line:rgb(27 28 31/.08); --well:#ecebe7;
+  --stage:#ecebe7; --raised:var(--surface);
+  --sh-tile:0 0 0 1px rgb(27 28 31/.08); --sh-tile-hover:0 0 0 1px rgb(27 28 31/.16);
+  --sh-key:0 0 0 1px rgb(27 28 31/.14); --sh-well:inset 0 0 0 1px rgb(27 28 31/.06);
+  --sh-pop:0 0 0 1px rgb(27 28 31/.08),0 12px 32px -8px rgb(27 28 31/.2);
+  --flag-edge:rgb(27 28 31/.12); --logo-ink:#003566;
+  --maker:#b4541d; --maker-soft:rgb(225 120 50/.13);
+  --gold:#9a6a00; --gold-soft:rgb(217 154 11/.14);
+  --note:#fff7d6; --note-ink:#6b5300; --note-edge:rgb(160 120 0/.25);
+}
+html.dark {
+  --background:#131416; --surface:#1b1c1f; --foreground:#ecebe7; --subtle:#b0afab; --muted:#26272a;
+  --muted-foreground:#76777c; --main:#8aa6f5; --main-deep:#7391e8; --main-soft:rgb(138 166 245/.14);
+  --main-foreground:#0d1530; --border:rgb(255 255 255/.12); --line:rgb(255 255 255/.07); --well:#18191b;
+  --stage:#222327; --sh-tile:0 0 0 1px rgb(255 255 255/.07); --sh-tile-hover:0 0 0 1px rgb(255 255 255/.14);
+  --sh-key:0 0 0 1px rgb(255 255 255/.12); --sh-well:inset 0 0 0 1px rgb(255 255 255/.05);
+  --sh-pop:0 0 0 1px rgb(255 255 255/.08),0 16px 40px -8px rgb(0 0 0/.7);
+  --flag-edge:rgb(0 0 0/.3); --logo-ink:#e6e9ef;
+  --maker:#f0a36b; --maker-soft:rgb(240 163 107/.14);
+  --gold:#f2c14e; --gold-soft:rgb(242 193 78/.14);
+  --note:#2b2615; --note-ink:#e8d48a; --note-edge:rgb(232 212 138/.2);
+}
+*{box-sizing:border-box}
+html{-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--background);color:var(--foreground);font:14px/1.5 Poppins,ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+h1,h2,h3,h4{letter-spacing:-.02em;margin:0}
+p{margin:0}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+i.ph-bold,i.ph-fill{line-height:1}
+
+/* ── mockup chrome ── */
+.mk{position:sticky;top:0;z-index:100;background:#0e0f11;color:#e6e6e3;border-bottom:1px solid #000}
+.mk-in{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:6px;padding:8px 16px;overflow-x:auto}
+.mk b{font-size:12px;font-weight:600;letter-spacing:.02em;opacity:.55;margin-right:8px;white-space:nowrap}
+.mk button{padding:6px 11px;border-radius:8px;font-size:12.5px;color:#b9b9b5;white-space:nowrap}
+.mk button:hover{background:#ffffff14;color:#fff}
+.mk button.on{background:#fff;color:#111}
+.mk .sp{flex:1}
+.screen{display:none}
+.screen.on{display:block}
+.frame-label{max-width:1312px;margin:22px auto 0;padding:0 32px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.frame-label code{font:12.5px ui-monospace,Menlo,monospace;background:var(--surface);box-shadow:var(--sh-tile);padding:3px 8px;border-radius:7px;color:var(--subtle)}
+.frame-label span{color:var(--muted-foreground);font-size:13px}
+.notes{max-width:1312px;margin:28px auto 60px;padding:0 32px}
+.notes-in{background:var(--note);color:var(--note-ink);box-shadow:inset 0 0 0 1px var(--note-edge);border-radius:14px;padding:16px 20px}
+.notes h4{font-size:13px;margin-bottom:6px;display:flex;gap:6px;align-items:center}
+.notes ul{margin:0;padding-left:18px;font-size:13px}
+.notes li{margin:3px 0}
+
+/* ── site primitives ── */
+.wrap{max-width:1312px;margin:0 auto;padding:0 32px}
+.tile{border-radius:16px;background:var(--surface);box-shadow:var(--sh-tile)}
+.key{background:var(--raised);box-shadow:var(--sh-key)}
+.well{background:var(--well);box-shadow:var(--sh-well)}
+.label{font-size:12.5px;color:var(--muted-foreground)}
+.btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:10px;font-size:13.5px;font-weight:500;white-space:nowrap}
+.btn i{font-size:15px}
+.btn.primary{background:var(--main);color:var(--main-foreground)}
+.btn.primary:hover{background:var(--main-deep)}
+.btn.neutral{background:var(--raised);box-shadow:var(--sh-key);color:var(--foreground)}
+.btn.neutral:hover{background:color-mix(in srgb,var(--foreground) 5%,var(--raised))}
+.btn.sm{height:30px;padding:0 11px;font-size:12.5px;border-radius:9px}
+.btn.icon{width:36px;padding:0;justify-content:center}
+.btn.sm.icon{width:30px}
+.pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px 0 10px;border-radius:999px;font-size:13px;color:var(--subtle)}
+.pill i{font-size:13px}
+.pill.liked i{color:var(--main)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600}
+.chip.maker{background:var(--maker-soft);color:var(--maker)}
+.chip.gold{background:var(--gold-soft);color:var(--gold)}
+.chip.soft{background:var(--main-soft);color:var(--main)}
+.chip.plain{background:color-mix(in srgb,var(--foreground) 6%,transparent);color:var(--subtle);font-weight:500}
+.tag{display:inline-flex;height:28px;align-items:center;padding:0 11px;border-radius:999px;font-size:12.5px;background:var(--raised);box-shadow:var(--sh-key);color:var(--subtle)}
+.seg{display:inline-flex;padding:3px;border-radius:11px;gap:2px}
+.seg button{height:30px;padding:0 13px;border-radius:8px;font-size:13px;color:var(--subtle);display:inline-flex;align-items:center;gap:6px}
+.seg button.on{background:var(--surface);color:var(--foreground);box-shadow:var(--sh-key)}
+.seg button i{font-size:13px}
+.seg .n{font-size:11px;color:var(--muted-foreground)}
+.av{--c:#203f8f;display:inline-grid;place-items:center;border-radius:999px;background:var(--c);color:#fff;font-weight:600;flex-shrink:0;overflow:hidden}
+.av.xs{width:20px;height:20px;font-size:10px}
+.av.sm{width:28px;height:28px;font-size:12px}
+.av.md{width:40px;height:40px;font-size:15px}
+.av.xl{width:112px;height:112px;font-size:40px}
+.dot{width:8px;height:8px;border-radius:99px;background:#e5484d;box-shadow:0 0 0 2px var(--background)}
+
+/* flags */
+.flag{display:block;max-width:100%;filter:drop-shadow(0 0 .6px var(--flag-edge)) drop-shadow(0 10px 18px rgb(27 28 31/.12))}
+html.dark .flag{filter:drop-shadow(0 0 .6px rgb(0 0 0/.7)) drop-shadow(0 12px 22px rgb(0 0 0/.4))}
+.band .flag{filter:drop-shadow(0 0 1px rgb(255 255 255/.35)) drop-shadow(0 26px 30px rgb(0 0 0/.45))}
+.stage{display:grid;place-items:center;background:var(--stage);position:relative}
+
+/* header */
+.hdr{position:sticky;top:41px;z-index:40;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--background) 82%,transparent);backdrop-filter:blur(20px) saturate(1.5)}
+.hdr-in{max-width:1312px;margin:0 auto;height:64px;display:flex;align-items:center;gap:26px;padding:0 32px}
+.logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;letter-spacing:-.03em}
+.logo svg{width:34px;height:34px;color:var(--logo-ink)}
+.nav{display:flex;gap:2px}
+.nav a{position:relative;padding:7px 12px;border-radius:9px;font-size:14px;font-weight:500;color:var(--subtle)}
+.nav a:hover{background:color-mix(in srgb,var(--foreground) 6%,transparent);color:var(--foreground)}
+.nav a.on{background:color-mix(in srgb,var(--foreground) 7%,transparent);color:var(--foreground)}
+.nav .div{width:1px;background:var(--line);margin:6px 6px}
+.hdr .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.bell{position:relative}
+.bell .dot{position:absolute;top:6px;right:7px}
+
+/* cards */
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.card{display:flex;flex-direction:column;overflow:hidden;cursor:pointer;transition:box-shadow .2s}
+.card:hover{box-shadow:var(--sh-tile-hover)}
+.card .stage{height:200px;padding:26px 24px}
+.card .stage .flag{max-height:142px;max-width:88%}
+.card .stage .chip{position:absolute;left:10px;top:10px}
+.card .acts{position:absolute;right:10px;top:10px;display:flex;gap:6px;opacity:0;transform:translateY(-2px);transition:.2s}
+.card:hover .acts,.card.hover .acts{opacity:1;transform:none}
+.card .meta{display:flex;align-items:center;gap:10px;padding:12px 14px 13px 16px}
+.card .meta .t{min-width:0;flex:1}
+.card h3{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .by{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:12px;color:var(--muted-foreground)}
+.card .by b{font-weight:500;color:var(--subtle)}
+.card .sub{margin-top:2px;font-size:11.5px;color:var(--muted-foreground)}
+.card .stats{display:flex;gap:6px;align-items:center}
+.mini{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted-foreground)}
+
+/* band (like flag pages) */
+.band{color-scheme:dark;color:#fff;position:relative;isolation:isolate;
+  --foreground:#fff;--subtle:rgb(255 255 255/.82);--muted-foreground:rgb(255 255 255/.62);--line:rgb(255 255 255/.14);
+  --raised:rgb(255 255 255/.12);--sh-key:inset 0 0 0 1px rgb(255 255 255/.2);--well:rgb(255 255 255/.1);--sh-well:inset 0 0 0 1px rgb(255 255 255/.12);
+  --main:#fff;--main-deep:#e8e8e8;--main-foreground:#1b1c1f;--main-soft:rgb(255 255 255/.16);--stage:transparent}
+.band .btn.neutral:hover,.band .pill:hover{background:rgb(255 255 255/.2)}
+.crumbs{display:flex;align-items:center;gap:8px;padding:22px 0 16px;font-size:13px;color:var(--muted-foreground)}
+.crumbs i{font-size:11px}
+.crumbs b{font-weight:500;color:var(--foreground)}
+
+/* rail */
+.rail h4{font-size:13px;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.rail h4 a{font-size:12px;font-weight:500;color:var(--main)}
+.row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.row+.row{border-top:1px solid var(--line)}
+.row .grow{flex:1;min-width:0}
+.row .name{font-size:13.5px;font-weight:500}
+.row .s{font-size:12px;color:var(--muted-foreground)}
+
+.section-h{display:flex;align-items:center;gap:12px;margin:40px 0 16px}
+.section-h h2{font-size:20px;font-weight:600}
+.section-h .label{margin-left:2px}
+.section-h .sp{flex:1}
+
+/* modal */
+.scrim{background:color-mix(in srgb,#000 38%,transparent);border-radius:20px;padding:40px;display:grid;place-items:center}
+html.dark .scrim{background:rgb(0 0 0/.55)}
+.modal{width:100%;background:var(--surface);border-radius:18px;box-shadow:var(--sh-pop);overflow:hidden}
+.modal-h{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.modal-h h3{font-size:16px;font-weight:600;flex:1}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12.5px;font-weight:500;color:var(--subtle)}
+.input{height:40px;border-radius:10px;padding:0 12px;display:flex;align-items:center;gap:8px;font-size:14px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--border)}
+.input.ta{height:auto;min-height:82px;align-items:flex-start;padding:10px 12px;line-height:1.5}
+.input .pre{color:var(--muted-foreground)}
+.hint{font-size:12px;color:var(--muted-foreground)}
+
+.pop{width:380px;background:var(--surface);border-radius:16px;box-shadow:var(--sh-pop);overflow:hidden}
+.notif{display:flex;gap:11px;padding:12px 16px;align-items:flex-start}
+.notif+.notif{border-top:1px solid var(--line)}
+.notif.unread{background:var(--main-soft)}
+.notif .tx{flex:1;font-size:13px;line-height:1.45}
+.notif .tx b{font-weight:600}
+.notif .when{font-size:11.5px;color:var(--muted-foreground);margin-top:2px}
+.notif .thumb{width:46px;height:31px;flex-shrink:0;display:grid;place-items:center}
+.notif .thumb .flag{max-height:31px;max-width:46px}
+.notif .ic{position:relative}
+.notif .ic .badge{position:absolute;right:-4px;bottom:-4px;width:18px;height:18px;border-radius:99px;display:grid;place-items:center;font-size:10px;color:#fff;box-shadow:0 0 0 2px var(--surface)}
+
+.lineage{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lin-node{display:flex;align-items:center;gap:9px;padding:7px 12px 7px 8px;border-radius:12px;font-size:13px}
+.lin-node .flag{height:24px;width:auto}
+.lin-node small{display:block;font-size:11px;color:var(--muted-foreground);line-height:1.2}
+.lin-node b{font-weight:500;display:block;line-height:1.25}
+.lin-arrow{color:var(--muted-foreground);font-size:14px}
+.cur{box-shadow:inset 0 0 0 1.5px var(--foreground)}
+
+.choice{display:flex;gap:14px;padding:18px;border-radius:14px;box-shadow:inset 0 0 0 1px var(--border);cursor:pointer;align-items:flex-start}
+.choice:hover{box-shadow:inset 0 0 0 1px var(--foreground)}
+.choice.sel{box-shadow:inset 0 0 0 2px var(--main);background:var(--main-soft)}
+.choice .radio{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--border);margin-top:2px;flex-shrink:0}
+.choice.sel .radio{box-shadow:inset 0 0 0 5px var(--main)}
+.choice h4{font-size:15px;font-weight:600}
+.choice p{font-size:13px;color:var(--subtle);margin-top:3px}
+.choice ul{margin:8px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--muted-foreground)}
+.choice li{display:flex;gap:6px;align-items:center;margin-top:3px}
+
+.redirect{display:flex;align-items:center;gap:10px;font:12.5px ui-monospace,Menlo,monospace;padding:12px 14px;border-radius:12px;flex-wrap:wrap}
+.redirect .arrow{font-family:Poppins;color:var(--muted-foreground)}
+.redirect .code{font-family:Poppins;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;background:var(--main-soft);color:var(--main)}
+
+html.render body{background:transparent!important;margin:0;width:1280px;zoom:.556}
+html.render .mk,html.render .notes{display:none}
+html.render .screen.on{background:var(--background);border-radius:22px;overflow:hidden;padding-bottom:48px}
+html.render .hdr{position:relative;top:0}
+html.render .frame-label{margin-top:0;padding-top:20px}
+@media (max-width:1000px){
+  html:not(.render) .two-col{grid-template-columns:1fr!important}
+  html:not(.render) .nav{display:none}
+  html:not(.render) :is(.wrap,.hdr-in,.frame-label,.notes){padding-left:16px;padding-right:16px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs><g id="mark"><path fill="currentColor" d="M355.4,504.7C354.6,506.4 353.6,508.2 353,510C345.6,536.5 334.9,561.3 317.2,582.5C302.1,600.7 284.1,614.4 259.7,617.4C258.6,617.5 257.5,617.4 255.6,617.4C289.5,546.2 298.4,469.7 309.2,393.7C308.8,393.5 308.5,393.4 308.1,393.3C306.4,397.7 304.7,402.1 303,406.4C286,450.2 267.7,493.5 244.3,534.4C231.7,556.2 217,576.3 197.3,592.3C179.5,606.7 159.1,614.5 136.2,615.5C135.6,615.5 135,615.3 134.7,615.2C185.6,535.4 221.4,448.8 253.4,360.5C253,360.3 252.6,360 252.1,359.8C251.3,360.8 250.4,361.9 249.6,363C228.6,392.7 205.7,420.8 179.9,446.5C167.5,458.7 154.4,470 139.3,478.7C118.3,490.8 97,493.4 75.1,481.5C74.2,481 73.4,480.5 71.9,479.5C75.6,476.2 79,473.2 82.5,470.2C114.9,441.6 142.9,409 167.4,373.5C182.7,351.3 196.8,328.3 211.5,305.6C212.2,304.5 212.7,303.3 213.5,301.6C213.4,301 213.1,300.9 212.8,300.8C200.8,310 189.2,319.7 176.8,328.4C156.5,342.7 135,354.7 109.9,358.4C89.9,361.4 71.6,356.6 55.3,344.5C54.8,344.1 54.5,343.5 53.7,342.6C59.5,339.5 65.1,336.7 70.6,333.7C109.7,312.4 146.1,287.3 176.7,254.6C182.7,248.2 187.6,240.8 193.2,233.4C193.2,232.9 193,232.8 192.7,232.7C178.9,238 165.4,244.4 151.2,248.4C128,254.8 104.5,255.1 81.7,245.1C65.9,238.2 53.9,227 45.6,211.9C45.4,211.5 45.2,211 45,210.5C44.9,210.2 45,209.9 45,209.4C96,213.3 144.1,206 186.6,174.2C171.4,174.5 156.8,175.5 142.3,174.8C118.9,173.7 96.4,168.6 77,154.3C62.6,143.8 53,130 49.5,112.3C49.2,110.5 49.1,108.8 48.8,106.2C51.5,107.1 53.3,107.6 55.2,108.2C89.1,119.1 124,122.4 159.3,119.1C187.5,116.5 215.5,112.5 243.7,109.5C259.8,107.8 275.8,109 289.6,118.9C311.5,134.6 318.2,160.7 306.5,184.9C304.2,189.7 301.3,194.2 298.5,198.8C284.2,221.7 285.4,244.7 299.4,267C312.5,287.9 332.7,299.7 355.1,308.2C373.4,315.2 392.7,318.1 412,320.9C416.1,321.5 418.3,320.5 419.7,316.2C426.8,294.9 438.7,275.9 450,256.6C460.3,238.8 466.4,219.9 465.9,199.1C465.8,192.9 465.9,193 459.4,193.1C449.4,193.2 439.4,193.7 429.5,192.8C417.8,191.7 402.8,181.6 398.2,172.7C416.1,172.7 433.9,172.7 453,172.7C440.2,161.5 426.9,154.1 411.1,151.8C394.8,149.4 380.1,153.4 365.8,163.1C366.9,157.1 367.6,150.9 369.1,145C373.8,125.8 388.6,111.8 405.3,110C418.4,108.6 431.2,110.2 443.6,114.4C445.3,115 447,115.5 449.2,116.2C449.5,114.4 449.8,113.2 449.9,112C450.8,100.2 457.1,93.3 469,93.1C476.9,92.9 484.8,94.5 492.8,95.4C498,95.9 503.3,96.9 508.6,97C531.1,97.1 553.6,97.2 576.1,96.9C585.8,96.7 595.5,95.4 607,94.5C600.2,102.1 594.4,108.6 588.5,115.1C587,116.7 585.6,118.5 583.9,119.6C576.1,124.5 574.9,131.9 575,140.3C575.2,169.5 574.4,198.7 575.2,227.8C575.9,250.7 577.5,273.7 584.7,295.9C585.9,299.7 587.7,303.3 589,307C591.5,314.2 596.5,317.5 603.9,317.8C647,320 685.2,308.8 715.5,276.8C735.2,255.9 739.5,228.1 727.5,204.8C725.1,200.2 722.1,196 719.2,191.8C707.6,174.9 703.7,157.3 713.8,138.2C724.1,118.7 741,109.3 762.3,109.4C780.5,109.4 798.8,111.7 817,113.6C845.4,116.6 873.8,121.3 902.5,120C926.6,118.9 950.2,115.2 973,107C973.6,106.7 974.2,106.6 976.1,106.1C974.8,111.5 974.1,116.4 972.4,120.9C963.8,144 946.3,157.8 924,166.1C900.9,174.6 876.9,176.1 852.6,174.4C847.5,174 842.4,173.7 836.1,173.2C856.8,190.2 879.8,199.4 904.6,205C929.2,210.4 954,211.8 980.6,208.7C976.9,214.3 974.4,219 971.1,223C956.9,240.7 938,250 915.6,252C887,254.6 860.4,247.7 835.2,234.7C833.4,233.8 831.6,232.9 829.4,231.8C828.8,231.6 828.7,231.6 828.6,231.6C828.7,231.8 828.8,232 828.8,232.1C835,240.3 840.5,249.2 847.5,256.6C873.2,283.7 903.1,305.4 935.2,324C945.3,329.9 955.7,335.2 965.9,340.8C966.9,341.3 967.8,341.9 969.3,342.9C961.1,349.8 952.2,354.3 942.3,356.9C922.8,362 904.3,358.1 886.2,350.6C862.6,340.8 842.2,325.8 822.4,309.9C818.6,306.9 814.9,303.8 810.7,300.4C809.8,299.7 809.4,299.4 808.9,298.9C808.9,298.8 808.7,298.9 808.7,298.9C808.7,298.9 809,299 809,299.3C809.2,300.1 809.5,300.6 809.8,301.2C819.5,317.3 828.7,333.7 839,349.4C863.1,386.2 889.5,421.1 920.9,452C928.9,459.9 937.6,467.2 946,474.8C947.7,476.3 949.5,477.8 951.6,479.6C932.2,490.8 913,492.3 893.1,483.6C875,475.8 860.2,463.3 846.5,449.7C818.9,422.3 794.4,392.2 771.7,360.6C770.8,359.3 769.8,358 768.4,357C800.5,447 837.2,534.8 889.3,616.1C876.5,616 864.6,613.3 853.1,608.6C831.2,599.5 814.5,583.9 800.5,565.3C779.4,537.3 763.6,506.2 749.2,474.5C737.4,448.4 727,421.7 715.9,395.3C715.6,394.5 715.2,393.9 714.3,392.1C718,431.7 724.2,469.6 732.1,507.2C740,544.8 750,581.7 768.6,617.6C762.5,616.6 757.7,616.3 753.1,615C729.9,608.7 713.2,593.5 699.7,574.5C685.7,554.8 676.7,532.8 670.2,509.7C669.9,508.5 669.4,507.2 669.2,505.4C671.4,503.4 673.5,502 675.5,500.5C714.2,471.2 708.8,412.2 665.2,392.5C642,382.1 619.6,386.4 598.7,399.6C583.5,409.3 573.6,423.7 566,439.7C555.7,461.6 550.1,484.8 546,508.5C544.3,518.1 543.1,527.8 541.7,537.4C536.9,537.4 532.4,537.4 527.8,537.4C527.8,535.8 527.7,534.3 527.8,532.8C530,499.5 536.5,466.9 545.6,434.9C552.6,410.4 562.1,386.7 565.5,361.3C569,335.5 567.8,310.1 554.1,287.3C541.6,266.6 527.2,247 513.1,226.1C498.7,247.7 484.3,268.4 471.1,289.9C466.5,297.3 464,306.4 462.1,315.1C456.5,339.7 459.6,364.2 466.7,388C478.8,428 490.6,468 495.5,509.6C496.6,518.8 497.5,528.1 498.4,537.4C492.9,537.4 488.3,537.4 483.6,537.4C482.4,528.7 481.4,520.1 479.9,511.6C475.7,486.5 470.1,461.7 459,438.5C447.7,414.9 431.3,396.6 405,389.6C381.2,383.3 359.4,387.3 342.1,405.6C325,423.6 319.8,445.1 327.1,468.9C331.9,484.3 342.3,495.6 355.4,504.7M476.2,124.2C475.2,130.4 476.6,135.7 482.2,138.9C488.1,142.4 494.7,143.6 500.7,139.8C503.2,138.2 505.3,134.4 505.7,131.3C506.8,124.2 502,119 493.6,116.7C485.1,114.4 480,116.5 476.2,124.2z"/><path fill="currentColor" d="M654.6,512.3C651.7,532.1 653.6,551.7 657.4,571.3C639.4,554.9 626.1,535.7 620.1,510.9C619.1,512.5 618.2,513.4 617.9,514.4C615,524.1 612,533.8 609.4,543.6C608.2,547.9 609.2,551.9 612.3,555.6C633.8,581.9 655.1,608.4 676.5,634.8C677,635.5 677.6,636.3 678.4,637.5C667,637.5 656.1,637.5 644.8,637.5C645.4,638.4 645.7,639.2 646.3,639.9C667.4,662 690.2,682.2 714.1,701.2C715.8,702.7 719.1,703.2 721.4,702.7C739,699.3 756,693.8 771.6,684.9C777.6,681.5 782.8,676.7 788.3,672.3C799.4,663.3 811.3,661.7 824.2,668C836.5,674.1 845.1,688.7 844.1,701.3C844.1,701.4 843.9,701.5 843.6,701.9C841.2,700.7 838.7,699.5 836.1,698.4C824.5,693.1 812.4,691.9 800.6,696.6C786.3,702.3 772.5,709.3 758.5,715.8C758.7,716.5 758.9,717.2 759.1,717.9C765.7,717.5 772.3,717 778.9,716.5C789.7,715.7 800.5,714.8 811.3,714.1C822.9,713.3 831.2,718.5 836.3,728.8C843,742.2 842.4,755.5 834.7,768.3C833.8,769.7 832.6,770.8 830.9,772.9C830,770.5 829.2,768.9 828.7,767.3C824.2,753.9 815.4,745.3 801.2,743.6C785.7,741.7 770.1,740.5 754.5,739.1C753.8,739 753,739.2 750.5,739.4C753.8,741.4 755.8,742.7 757.8,743.9C765.2,748.5 772.7,752.8 779.8,757.8C794.3,767.9 796.9,781.8 787.4,796.8C778.3,811.5 758.9,818.8 744.7,812.9C744.8,812.6 744.7,812.2 744.9,812C755.8,800.2 755.4,787.2 748.1,774.1C734.7,750 714.4,735.8 686.7,733.3C669.6,731.7 655,743.1 651,760.3C650.5,762.7 650.1,765.1 649.6,767.6C637.8,761.4 628.4,741 631.5,728.9C634.8,715.9 647.2,708.3 661.7,710.3C672,711.8 682.4,713.2 692.8,714.7C693,714.3 693.2,713.9 693.5,713.5C667.3,697.1 641.1,680.7 614.6,664.1C610.2,671.2 606.2,677.5 601.8,684.5C600.2,682.5 599,681.3 598,679.9C589.8,668.5 581.7,657.1 573.5,645.7C572.1,643.7 570.5,641.4 568.4,640.3C565.7,638.9 562.1,637.4 559.5,638.1C555.6,639.2 554.7,643.4 555.4,647.3C557.8,659.2 559.3,671.4 562.9,682.9C583.2,747 619.8,799.2 675.9,837.1C676.9,837.7 677.9,838.4 678.8,839.1C679.1,839.2 679.2,839.6 680.1,840.8C674.7,842.6 669.7,844.7 664.6,845.9C638.3,851.9 615.4,844.6 595.6,827.1C576.1,809.7 563.1,787.6 551.3,764.7C546.5,755.4 542.2,745.8 536.9,736.6C538.3,745.3 539.5,754 541,762.7C545.1,785.6 550.4,808.1 560,829.3C562.3,834.3 564.8,839.2 567.8,843.8C569.4,846.3 569.4,848.1 568.2,850.7C554.1,879.8 536.7,906.7 514.6,930.4C514.2,930.9 513.6,931.2 512.4,932.1C506.8,926 500.9,920.1 495.7,913.7C480.2,894.4 467.4,873.3 456.6,851.1C455.7,849.2 455.2,846 456.2,844.3C468.7,822.3 475.4,798.3 480.9,773.8C483.6,761.8 485.8,749.7 487.2,737.3C484.4,743.5 481.6,749.7 478.7,755.9C467.9,778.1 455.7,799.5 439,818C421.5,837.3 400.4,849 373.6,847.9C363.4,847.5 353.5,845.5 343.7,840.4C345,839.2 345.8,838.4 346.8,837.7C405.8,797.2 445.2,742.5 465.1,673.8C467.4,665.8 468.3,657.5 469.7,649.3C470.1,647.3 470,645.3 469.7,643.3C468.8,637.1 462.9,634.1 458,638C453.8,641.2 450.2,645.2 446.9,649.4C438.4,659.8 430.3,670.6 421.8,681.4C416.3,676.3 411.1,671.5 405.3,666.2C380.6,681.8 355.3,697.7 330,713.7C330.2,714.1 330.3,714.5 330.5,714.9C338.4,713.8 346.3,712.4 354.3,711.6C360.5,710.9 367,710 373.1,711.1C386.5,713.5 394.6,726.4 392.3,739.9C390.3,751.4 384.4,760.5 375.2,768.1C374.7,767.3 374.3,766.8 374.2,766.3C370,741.8 354,729.8 329.7,734.3C305.2,738.8 287.1,752.7 275.3,774.5C268.1,787.8 267.9,801 280.2,812.9C266.1,816.8 254.2,814.4 244.1,805.3C240.3,801.8 237,797.3 234.5,792.7C227.9,780.1 230.5,768 241.9,759.4C250,753.4 258.9,748.3 267.4,742.8C268.9,741.8 270.3,740.8 271.4,738.7C260.4,739.6 249.4,740.4 238.3,741.4C232.5,742 226.8,742.9 221,743.8C206.6,745.9 198.5,755 194.4,768.4C194.1,769.5 193.8,770.6 193.4,771.7C193.4,772 193,772.1 192.2,772.8C185.5,764.6 181.9,755.5 182.3,744.9C182.5,741.3 183.4,737.7 184.5,734.2C189.6,719.2 199.7,712.9 215.5,714.3C230.7,715.6 246,716.7 261.3,717.9C262.4,718 263.5,717.9 264.7,717.5C248.1,707.8 232,696.9 212.3,694.3C202.2,693 192.8,695.7 183.9,700.4C182.6,701.1 181.3,701.8 178.9,703.1C179.3,699.6 179.4,696.9 179.9,694.3C185.6,666.7 216,654.3 236.9,673.3C256.1,690.8 279.9,697.5 304.3,702.4C306,702.8 308.5,702.2 309.8,701.1C332.7,680.5 355.5,659.8 378.3,639.1C378.7,638.8 378.8,638.3 379.3,637.4C368.2,637.4 357.5,637.4 345.6,637.4C351.7,630.5 357.2,624.1 362.8,617.9C381.8,596.8 400.8,575.9 419.7,554.8C420.9,553.4 422,551.3 422,549.6C421.3,532.8 414.6,518.1 405.2,502.7C403.9,517.1 399.4,529 392.8,540.1C386.3,550.9 378.6,560.9 367.9,570C371.7,550.1 372.9,531.4 369.2,512.2C376.9,513.9 384.3,516 392.8,518.4C391.4,513.2 390,509.6 389.4,505.9C388.1,497.9 386,489.8 386.2,481.8C386.4,469.1 396,460.9 408.7,460.7C417.9,460.6 425.2,464.8 431.1,471.1C448.4,489.8 456.3,512.9 462,538C456.4,538 451.6,537.8 446.8,538.1C439.6,538.5 435.4,543.1 434.9,550.3C434.4,558.4 437.8,563.5 445.1,565.1C447.2,565.5 449.4,565.7 451.5,565.7C461.7,565.7 471.8,565.7 482.7,565.7C470.5,600.8 444.8,619.6 411.2,629.8C439.4,638.9 465.2,637.2 487.6,613.4C482,643.7 494.3,666.8 512.7,687.6C531.4,667.1 543.3,643.8 538.2,614.3C547.8,625.3 559.6,631.6 573.5,634C587.3,636.4 600.7,634.8 614.9,629.4C579.9,619.8 555.3,600.3 543.2,565.7C545,565.7 545.9,565.7 546.9,565.7C557.3,565.7 567.6,566 577.9,565.4C586.8,564.8 591.2,559.2 590.9,550.2C590.6,542.3 586.1,538.3 577,538C572.7,537.8 568.5,537.9 563.8,537.9C567.2,520.7 572,505 580.5,490.8C585.2,482.8 591,475.4 597.3,468.7C604.1,461.5 613.3,459.1 623.1,461.4C635,464.1 642.1,476.5 639.6,490.5C638.1,499.4 635.6,508.1 633.3,518C640.9,516 647.7,514.1 654.6,512.3z"/><path fill="#FDB001" d="M654.8,512.2C647.7,514.1 640.9,516 633.3,518C635.6,508.1 638.1,499.4 639.6,490.5C642.1,476.5 635,464.1 623.1,461.4C613.3,459.1 604.1,461.5 597.3,468.7C591,475.4 585.2,482.8 580.5,490.8C572,505 567.2,520.7 563.8,537.9C568.5,537.9 572.7,537.8 577,538C586.1,538.3 590.6,542.3 590.9,550.2C591.2,559.2 586.8,564.8 577.9,565.4C567.6,566 557.3,565.7 546.9,565.7C545.9,565.7 545,565.7 543.2,565.7C555.3,600.3 579.9,619.8 614.9,629.4C600.7,634.8 587.3,636.4 573.5,634C559.6,631.6 547.8,625.3 538.2,614.3C543.3,643.8 531.4,667.1 512.7,687.6C494.3,666.8 482,643.7 487.6,613.4C465.2,637.2 439.4,638.9 411.2,629.8C444.8,619.6 470.5,600.8 482.7,565.7C471.8,565.7 461.7,565.7 451.5,565.7C449.4,565.7 447.2,565.5 445.1,565.1C437.8,563.5 434.4,558.4 434.9,550.3C435.4,543.1 439.6,538.5 446.8,538.1C451.6,537.8 456.4,538 462,538C456.3,512.9 448.4,489.8 431.1,471.1C425.2,464.8 417.9,460.6 408.7,460.7C396,460.9 386.4,469.1 386.2,481.8C386,489.8 388.1,497.9 389.4,505.9C390,509.6 391.4,513.2 392.8,518.4C384.3,516 376.9,513.9 369.1,511.8C364.4,509.5 360.2,507.2 355.7,504.8C342.3,495.6 331.9,484.3 327.1,468.9C319.8,445.1 325,423.6 342.1,405.6C359.4,387.3 381.2,383.3 405,389.6C431.3,396.6 447.7,414.9 459,438.5C470.1,461.7 475.7,486.5 479.9,511.6C481.4,520.1 482.4,528.7 483.6,537.4C488.3,537.4 492.9,537.4 498.4,537.4C497.5,528.1 496.6,518.8 495.5,509.6C490.6,468 478.8,428 466.7,388C459.6,364.2 456.5,339.7 462.1,315.1C464,306.4 466.5,297.3 471.1,289.9C484.3,268.4 498.7,247.7 513.1,226.1C527.2,247 541.6,266.6 554.1,287.3C567.8,310.1 569,335.5 565.5,361.3C562.1,386.7 552.6,410.4 545.6,434.9C536.5,466.9 530,499.5 527.8,532.8C527.7,534.3 527.8,535.8 527.8,537.4C532.4,537.4 536.9,537.4 541.7,537.4C543.1,527.8 544.3,518.1 546,508.5C550.1,484.8 555.7,461.6 566,439.7C573.6,423.7 583.5,409.3 598.7,399.6C619.6,386.4 642,382.1 665.2,392.5C708.8,412.2 714.2,471.2 675.5,500.5C673.5,502 671.4,503.4 669,505C664.2,507.5 659.6,509.8 654.8,512.2z"/></g></defs></svg>
+
+<div class="mk"><div class="mk-in">
+  <b>VEXILO · COMMUNITY MOCKUPS</b>
+  <button data-s="community" class="on">1 · Community</button>
+  <button data-s="profile">2 · Profile</button>
+  <button data-s="post">3 · Flag post</button>
+  <button data-s="edit">4 · Edit profile</button>
+  <button data-s="encyclopedia">5 · Encyclopedia</button>
+  <button data-s="flows">6 · Posting &amp; notifications</button>
+  <span class="sp"></span>
+  <button id="theme"><i class="ph-bold ph-moon"></i>&nbsp; Dark</button>
+</div></div>
+
+<!-- ═════════════════ 1. COMMUNITY ═════════════════ -->
+<section class="screen on" id="s-community">
+  <div class="frame-label"><code>/community</code><span>The home of everything people make. Browse (<code>/</code>) becomes real flags only.</span></div>
+  <div data-header="community"></div>
+
+  <div class="wrap">
+    <div style="display:flex;align-items:flex-end;gap:20px;margin-top:34px;flex-wrap:wrap">
+      <div style="flex:1;min-width:280px">
+        <h1 style="font-size:40px;font-weight:600;letter-spacing:-.035em;line-height:1.05">Community</h1>
+        <p style="color:var(--subtle);margin-top:8px;font-size:15px">Flags designed by Vexilo members. <b style="font-weight:500;color:var(--foreground)">838 designs</b> from <b style="font-weight:500;color:var(--foreground)">140 creators</b>.</p>
+      </div>
+      <a class="btn neutral"><i class="ph-bold ph-magnifying-glass"></i> Search designs</a>
+      <a class="btn primary"><i class="ph-bold ph-paint-brush"></i> Make a flag</a>
+    </div>
+
+    <a class="tile" style="display:flex;align-items:center;gap:14px;margin-top:24px;padding:12px 16px 12px 12px">
+      <div style="flex:1"><b style="font-weight:600">Hometown contest</b> <span style="color:var(--subtle)">· Voting, 214 entries, closes in 3 days</span></div>
+      <span class="btn sm neutral">Vote <i class="ph-bold ph-arrow-right"></i></span>
+    </a>
+
+    <div class="two-col" style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:28px;margin-top:26px">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <div class="seg well">
+            <button class="on"><i class="ph-bold ph-fire"></i> Popular</button>
+            <button><i class="ph-bold ph-clock"></i> New</button>
+            <button><i class="ph-bold ph-users"></i> Following</button>
+          </div>
+          <div class="seg well">
+            <button>Today</button><button class="on">This week</button><button>All time</button>
+          </div>
+          <span style="flex:1"></span>
+          <span class="tag"><i class="ph-bold ph-shuffle" style="margin-right:6px"></i>Remixes</span>
+          <span class="tag">Nordic cross</span>
+          <span class="tag">Fictional nations</span>
+        </div>
+        <div class="grid" id="community-grid"></div>
+      </div>
+
+      <aside class="rail" style="display:flex;flex-direction:column;gap:16px">
+        <div class="tile" style="padding:16px 18px">
+          <h4>Creators to follow <a>See all</a></h4>
+          <div id="creators"></div>
+        </div>
+        <div class="tile" style="padding:16px 18px">
+          <h4>Most remixed this week</h4>
+          <div id="remixed"></div>
+        </div>
+        <div class="tile" style="padding:16px 18px">
+          <h4>Top creators · November</h4>
+          <div id="topcreators"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="notes"><div class="notes-in">
+    <h4><i class="ph-bold ph-note-pencil"></i> Notes</h4>
+    <ul>
+      <li>Nav: <b>Flags</b> (the encyclopedia, now real flags only) and <b>Community</b> sit side by side. Create, Play and Contest stay. Leaderboard moves into Community as "Top creators."</li>
+      <li>Cards show the <b>author</b> instead of the catalogue number. Custom flags don't get <code>#0412</code> numbers, so numbering stays an encyclopedia thing.</li>
+      <li>The remix count shows on each card. Remixing is the main engagement loop, so it's out front.</li>
+      <li>The <b>Following</b> tab is there from day one but shows "Follow creators to fill this" until you follow someone. Popular is the default.</li>
+    </ul>
+  </div></div>
+</section>
+
+<!-- ═════════════════ 2. PROFILE ═════════════════ -->
+<section class="screen" id="s-profile">
+  <div class="frame-label"><code>/@marisol_v</code><span>Replaces <code>/profile/[userNumber]</code>, which redirects here.</span></div>
+  <div data-header=""></div>
+
+  <div class="band" id="profile-band" style="background:linear-gradient(160deg,hsl(155 42% 24%) 0%,hsl(155 42% 11%) 100%)">
+    <div class="wrap" style="position:relative;height:230px;overflow:hidden">
+      <div style="position:absolute;right:48px;top:34px;bottom:34px;display:grid;place-items:center" id="banner-flag"></div>
+      <span class="label" style="position:absolute;left:32px;top:20px;display:flex;align-items:center;gap:6px"><i class="ph-bold ph-flag-banner"></i> Flies Northern Accord</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div style="display:flex;gap:24px;align-items:flex-end;margin-top:-56px;position:relative;flex-wrap:wrap">
+      <span class="av xl" style="--c:#2f6b55;box-shadow:0 0 0 5px var(--background)">M</span>
+      <div style="flex:1;min-width:260px;padding-bottom:6px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h1 style="font-size:30px;font-weight:600;letter-spacing:-.035em">marisol_v</h1>
+          <span class="chip gold"><i class="ph-bold ph-trophy"></i> Contest winner</span>
+          <span class="chip soft"><i class="ph-bold ph-seal-check"></i> Trusted editor</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;padding-bottom:8px">
+        <a class="btn primary"><i class="ph-bold ph-user-plus"></i> Follow</a>
+        <a class="btn neutral icon"><i class="ph-bold ph-share-network"></i></a>
+        <a class="btn neutral icon"><i class="ph-bold ph-dots-three"></i></a>
+      </div>
+    </div>
+
+    <div class="two-col" style="display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:32px;margin-top:16px;align-items:start">
+      <div>
+        <p style="font-size:15px;max-width:620px;line-height:1.55">Designing flags for places that don't exist yet. Nordic crosses forever. Taking requests for D&amp;D nations, DMs open on Reddit.</p>
+        <div style="display:flex;gap:18px;margin-top:12px;font-size:13px;color:var(--muted-foreground);flex-wrap:wrap">
+          <span style="display:flex;gap:6px;align-items:center"><i class="ph-bold ph-link"></i><a style="color:var(--main);font-weight:500">reddit.com/u/marisol_v</a></span>
+          <span style="display:flex;gap:6px;align-items:center"><i class="ph-bold ph-map-pin"></i>Halifax</span>
+          <span style="display:flex;gap:6px;align-items:center"><i class="ph-bold ph-calendar-blank"></i>Joined March 2026</span>
+        </div>
+        <div style="display:flex;gap:22px;margin-top:14px;font-size:14px;color:var(--subtle)">
+          <span><b style="font-weight:600;color:var(--foreground)">129</b> followers</span>
+          <span><b style="font-weight:600;color:var(--foreground)">41</b> following</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div class="well" style="border-radius:14px;padding:13px 16px"><b style="display:block;font-size:22px;font-weight:600;letter-spacing:-.03em">38</b><span class="label">Designs</span></div>
+        <div class="well" style="border-radius:14px;padding:13px 16px"><b style="display:block;font-size:22px;font-weight:600;letter-spacing:-.03em">1,284</b><span class="label">Likes received</span></div>
+        <div class="well" style="border-radius:14px;padding:13px 16px"><b style="display:block;font-size:22px;font-weight:600;letter-spacing:-.03em">57</b><span class="label">Times remixed</span></div>
+      </div>
+    </div>
+
+    <div class="section-h"><i class="ph-bold ph-push-pin" style="color:var(--muted-foreground)"></i><h2 style="font-size:16px">Pinned</h2></div>
+    <div class="grid" id="pinned" style="grid-template-columns:repeat(3,1fr)"></div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:36px 0 16px;flex-wrap:wrap">
+      <div class="seg well">
+        <button class="on"><i class="ph-bold ph-paint-brush"></i> Designs <span class="n">38</span></button>
+        <button><i class="ph-bold ph-shuffle"></i> Remixes <span class="n">12</span></button>
+        <button><i class="ph-bold ph-heart"></i> Liked</button>
+        <button><i class="ph-bold ph-books"></i> Encyclopedia <span class="n">33</span></button>
+      </div>
+      <span style="flex:1"></span>
+      <div class="seg well"><button class="on">Newest</button><button>Most liked</button></div>
+    </div>
+    <div class="grid" id="profile-grid"></div>
+  </div>
+
+  <div class="notes"><div class="notes-in">
+    <h4><i class="ph-bold ph-note-pencil"></i> Notes</h4>
+    <ul>
+      <li><b>The banner is your profile flag.</b> The existing "profile flag" pick (any real flag or one of your designs) colors the band the same way flag pages do, and the flag sits in it. Nobody has to upload or crop a banner, and every profile still looks like a flag site.</li>
+      <li>Username only, no separate display name, to match the unique-username work from PR #45. Bio is 160 characters, plus one link and an optional location.</li>
+      <li>The <b>Encyclopedia</b> tab holds their contributions and edits to real flags, so both kinds of credit live on one profile but stay apart.</li>
+      <li>Up to 3 pinned designs. Badges reuse the existing contest-winner chip and add "Trusted editor" (from <code>is_trusted</code>).</li>
+    </ul>
+  </div></div>
+</section>
+
+<!-- ═════════════════ 3. POST ═════════════════ -->
+<section class="screen" id="s-post">
+  <div class="frame-label"><code>/@marisol_v/northern-accord</code><span>A custom flag's own page. Same band as real flags, but built around its author.</span></div>
+  <div data-header="community"></div>
+
+  <div class="band" style="background:linear-gradient(160deg,hsl(155 42% 24%) 0%,hsl(155 42% 11%) 100%)">
+    <div class="wrap" style="padding-bottom:44px">
+      <nav class="crumbs"><a>Community</a><i class="ph-bold ph-caret-right"></i><a>@marisol_v</a><i class="ph-bold ph-caret-right"></i><b>Northern Accord</b></nav>
+      <div class="two-col" style="display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:64px;align-items:center;padding-top:8px">
+        <div style="display:grid;place-items:center;min-height:330px" id="post-flag"></div>
+        <div>
+          <a style="display:inline-flex;align-items:center;gap:10px">
+            <span class="av md" style="--c:#2f6b55">M</span>
+            <span><b style="display:block;font-weight:600;font-size:14px">marisol_v</b><span class="label">129 followers</span></span>
+          </a>
+          <span class="btn sm neutral" style="margin-left:12px;vertical-align:top;margin-top:5px"><i class="ph-bold ph-user-plus"></i> Follow</span>
+          <h1 style="margin-top:18px;font-size:52px;font-weight:600;line-height:1.05;letter-spacing:-.035em">Northern Accord</h1>
+          <p style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="chip" style="background:rgb(255 255 255/.15);color:#fff"><i class="ph-bold ph-shuffle"></i> Remix</span>
+            <span style="font-size:13px;color:var(--muted-foreground)">Custom design · not an official flag</span>
+          </p>
+          <p style="margin-top:14px;max-width:540px;color:var(--subtle);font-size:14.5px;line-height:1.6">A union flag for an alternate Nordic federation where the Faroes lead the pact. Gold for the shared crown, the red fimbriation keeps the Faroese cross showing through.</p>
+          <div style="display:flex;gap:8px;margin-top:22px;flex-wrap:wrap">
+            <a class="btn primary"><i class="ph-fill ph-heart"></i> Liked · 412</a>
+            <a class="btn neutral"><i class="ph-bold ph-shuffle"></i> Remix</a>
+            <a class="btn neutral"><i class="ph-bold ph-bookmark-simple"></i> Save</a>
+            <a class="btn neutral icon"><i class="ph-bold ph-share-network"></i></a>
+            <a class="btn neutral icon"><i class="ph-bold ph-dots-three"></i></a>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:18px;flex-wrap:wrap">
+            <span class="tag">Nordic cross</span><span class="tag">Fictional nations</span><span class="tag">Alt history</span>
+          </div>
+          <p style="margin-top:18px;display:flex;gap:20px;font-size:13px;color:var(--muted-foreground);flex-wrap:wrap">
+            <span>Posted <b style="font-weight:500;color:var(--foreground)">Nov 12, 2026</b></span>
+            <span><b style="font-weight:500;color:var(--foreground)">2,140</b> views</span>
+            <span><b style="font-weight:500;color:var(--foreground)">8</b> remixes</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="section-h"><i class="ph-bold ph-tree-structure" style="color:var(--muted-foreground)"></i><h2 style="font-size:16px">Remix lineage</h2></div>
+    <div class="tile" style="padding:16px 18px">
+      <div class="lineage" id="lineage"></div>
+    </div>
+
+    <div class="section-h"><h2>Remixes</h2><span class="label">8</span><span class="sp"></span><a class="btn sm neutral"><i class="ph-bold ph-shuffle"></i> Remix this flag</a></div>
+    <div class="grid" id="remixes-grid"></div>
+
+    <div class="section-h"><h2>More from @marisol_v</h2><span class="sp"></span><a class="btn sm neutral">View profile <i class="ph-bold ph-arrow-right"></i></a></div>
+    <div class="grid" id="more-grid"></div>
+  </div>
+
+  <div class="notes"><div class="notes-in">
+    <h4><i class="ph-bold ph-note-pencil"></i> Notes</h4>
+    <ul>
+      <li>Same band layout as real flag pages, so the site still feels like one product. The difference is the <b>author block on top</b> and <b>Like</b> instead of Favorite.</li>
+      <li>The lineage strip makes remix credit visible: real flag → this design → its remixes. Every "Remix" adds a row, and the original author gets a notification.</li>
+      <li>No history, sources, timeline or catalogue facts. Those stay on encyclopedia pages. The owner sees <b>Edit in maker</b> and <b>Unpublish</b> in the ⋯ menu, with no review queue.</li>
+      <li>Pages are <code>noindex</code> until about 5 likes, so only well-received designs show up in search engines.</li>
+    </ul>
+  </div></div>
+</section>
+
+<!-- ═════════════════ 4. EDIT PROFILE ═════════════════ -->
+<section class="screen" id="s-edit">
+  <div class="frame-label"><code>/@marisol_v → Edit profile</code><span>A dialog over the profile page.</span></div>
+  <div class="wrap" style="margin-top:20px">
+    <div class="scrim">
+      <div class="modal" style="max-width:880px">
+        <div class="modal-h"><h3>Edit profile</h3><a class="btn sm neutral icon"><i class="ph-bold ph-x"></i></a></div>
+        <div class="two-col" style="display:grid;grid-template-columns:1fr 1fr">
+          <div style="padding:20px;display:flex;flex-direction:column;gap:16px;border-right:1px solid var(--line)">
+            <div style="display:flex;align-items:center;gap:14px">
+              <span class="av md" style="--c:#2f6b55;width:56px;height:56px;font-size:20px">M</span>
+              <a class="btn sm neutral"><i class="ph-bold ph-camera"></i> Change photo</a>
+              <a class="btn sm neutral" style="color:var(--muted-foreground)">Remove</a>
+            </div>
+            <div class="field"><label>Username</label><div class="input"><span class="pre">vexilo.org/@</span>marisol_v</div><span class="hint">Changing it updates your profile and design links. Old links redirect for 30 days.</span></div>
+            <div class="field"><label>Bio</label><div class="input ta">Designing flags for places that don't exist yet. Nordic crosses forever. Taking requests for D&amp;D nations, DMs open on Reddit.</div><span class="hint" style="text-align:right">128 / 160</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="field"><label>Link</label><div class="input"><i class="ph-bold ph-link" style="color:var(--muted-foreground)"></i>reddit.com/u/marisol_v</div></div>
+              <div class="field"><label>Location</label><div class="input">Halifax</div></div>
+            </div>
+          </div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+            <div class="field"><label>Profile flag</label><span class="hint" style="margin-top:-4px">Colors your banner and shows next to your name.</span></div>
+            <div class="band" style="border-radius:14px;height:120px;display:grid;place-items:center;background:linear-gradient(160deg,hsl(155 42% 24%) 0%,hsl(155 42% 11%) 100%)" id="edit-banner"></div>
+            <div class="seg well" style="align-self:flex-start"><button class="on">My designs</button><button>Real flags</button></div>
+            <div class="input"><i class="ph-bold ph-magnifying-glass" style="color:var(--muted-foreground)"></i><span class="pre">Search your designs…</span></div>
+            <div id="picker" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"></div>
+            <div class="field" style="margin-top:4px"><label>Pinned designs <span class="hint">· up to 3</span></label></div>
+            <div id="pin-picker" style="display:flex;gap:8px"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--line)">
+          <a class="btn neutral">Cancel</a><a class="btn primary">Save profile</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes"><div class="notes-in">
+    <h4><i class="ph-bold ph-note-pencil"></i> Notes</h4>
+    <ul>
+      <li>Everything on one dialog. The existing avatar cropper opens from "Change photo."</li>
+      <li>The profile flag picker has two tabs, your designs and real flags. The preview band recolors live as you pick.</li>
+      <li>Bio and link go through the same moderation filter as flag names. Links are <code>rel="nofollow ugc"</code>.</li>
+    </ul>
+  </div></div>
+</section>
+
+<!-- ═════════════════ 5. ENCYCLOPEDIA ═════════════════ -->
+<section class="screen" id="s-encyclopedia">
+  <div class="frame-label"><code>/</code> and <code>/flag/Faroe Islands</code><span>What changes on the encyclopedia side.</span></div>
+  <div data-header="flags"></div>
+
+  <div class="wrap">
+    <h2 style="font-size:14px;font-weight:600;color:var(--muted-foreground);margin:28px 0 12px;text-transform:uppercase;letter-spacing:.06em">Browse</h2>
+    <div class="tile" style="padding:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="input" style="flex:1;min-width:260px;height:44px"><i class="ph-bold ph-magnifying-glass" style="color:var(--muted-foreground)"></i><span class="pre">Search 15,553 flags…</span><span style="margin-left:auto" class="chip plain">/</span></div>
+      <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--subtle);padding:0 6px">
+        <span style="width:34px;height:20px;border-radius:99px;background:var(--muted);box-shadow:var(--sh-well);position:relative"><span style="position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:99px;background:var(--surface);box-shadow:var(--sh-key)"></span></span>
+        Include community designs
+      </label>
+    </div>
+    <div class="grid" id="browse-grid" style="margin-top:16px"></div>
+
+    <h2 style="font-size:14px;font-weight:600;color:var(--muted-foreground);margin:44px 0 12px;text-transform:uppercase;letter-spacing:.06em">Flag page · new section</h2>
+  </div>
+
+  <div class="band" style="background:linear-gradient(160deg,hsl(212 50% 30%) 0%,hsl(212 50% 15%) 100%)">
+    <div class="wrap" style="padding-bottom:36px">
+      <nav class="crumbs"><a>Flags</a><i class="ph-bold ph-caret-right"></i><a>Europe</a><i class="ph-bold ph-caret-right"></i><b>Faroe Islands</b></nav>
+      <div class="two-col" style="display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:56px;align-items:center">
+        <div style="display:grid;place-items:center;min-height:240px"><img class="flag" style="max-height:230px" src="https://flagcdn.com/fo.svg" alt=""></div>
+        <div>
+          <p style="font-size:13px;color:var(--muted-foreground)">#0412 · Europe</p>
+          <h1 style="font-size:50px;font-weight:600;letter-spacing:-.035em;line-height:1.05;margin-top:4px">Faroe Islands</h1>
+          <p style="margin-top:12px;color:var(--subtle);max-width:520px">Merkið, a red Nordic cross outlined in blue on white, adopted in 1940…</p>
+          <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap">
+            <a class="btn neutral"><i class="ph-bold ph-heart"></i> 34</a>
+            <a class="btn primary"><i class="ph-bold ph-shuffle"></i> Remix this flag</a>
+            <a class="btn neutral"><i class="ph-bold ph-pencil-simple"></i> Edit</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div style="padding:6px 0 0;color:var(--muted-foreground);font-size:13px;text-align:center">· · · history, colors, facts, related flags (unchanged) · · ·</div>
+    <div class="section-h">
+      <h2>Community remixes</h2><span class="label">23 designs based on Faroe Islands</span><span class="sp"></span>
+      <a class="btn sm neutral">See all <i class="ph-bold ph-arrow-right"></i></a>
+    </div>
+    <div class="grid" id="fo-remixes"></div>
+
+    <h2 style="font-size:14px;font-weight:600;color:var(--muted-foreground);margin:44px 0 12px;text-transform:uppercase;letter-spacing:.06em">Old links keep working</h2>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div class="redirect tile"><span>/flag/Northern%20Accord</span><span class="arrow"><i class="ph-bold ph-arrow-right"></i></span><span>/@marisol_v/northern-accord</span><span class="code">301</span></div>
+      <div class="redirect tile"><span>/profile/3f2a…c91e</span><span class="arrow"><i class="ph-bold ph-arrow-right"></i></span><span>/@marisol_v</span><span class="code">301</span></div>
+    </div>
+  </div>
+
+  <div class="notes"><div class="notes-in">
+    <h4><i class="ph-bold ph-note-pencil"></i> Notes</h4>
+    <ul>
+      <li>Browse, search, tags, Flag of the Day, quizzes and the sitemap show <b>real flags only</b>. Search has one toggle to include community designs.</li>
+      <li>The orange "Custom" and "Remix" badges go away on Browse because nothing custom is left there.</li>
+      <li>Every real flag gets a <b>Community remixes</b> row and a prominent <b>Remix</b> button. Search traffic on real flags (the SEO asset) leads people into the maker and the community.</li>
+      <li>Every moved flag 301-redirects to its new URL, so no links or search rankings are lost.</li>
+    </ul>
+  </div></div>
+</section>
+
+<!-- ═════════════════ 6. FLOWS ═════════════════ -->
+<section class="screen" id="s-flows">
+  <div class="frame-label"><code>Post flag</code> · <code>Publish from maker</code> · <code>Notifications</code></div>
+  <div class="wrap" style="margin-top:20px">
+    <div class="two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+
+      <div class="scrim" style="padding:28px">
+        <div class="modal">
+          <div class="modal-h"><h3>What are you posting?</h3><a class="btn sm neutral icon"><i class="ph-bold ph-x"></i></a></div>
+          <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+            <div class="choice sel">
+              <span class="radio"></span>
+              <div><h4>Something I designed</h4><p>Your own flag, made in the maker or uploaded.</p>
+                <ul><li><i class="ph-bold ph-check"></i>Goes on your profile right away</li><li><i class="ph-bold ph-check"></i>Others can like and remix it</li></ul></div>
+            </div>
+            <div class="choice">
+              <span class="radio"></span>
+              <div><h4>A flag that exists</h4><p>A real flag: a country, city, org, movement, or one from a game or show.</p>
+                <ul><li><i class="ph-bold ph-check"></i>Added to the encyclopedia after review</li><li><i class="ph-bold ph-check"></i>Needs a source</li></ul></div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--line)"><a class="btn primary">Continue <i class="ph-bold ph-arrow-right"></i></a></div>
+        </div>
+      </div>
+
+      <div class="scrim" style="padding:28px">
+        <div class="modal">
+          <div class="modal-h"><h3>Publish to your profile</h3><a class="btn sm neutral icon"><i class="ph-bold ph-x"></i></a></div>
+          <div style="padding:18px;display:flex;flex-direction:column;gap:14px">
+            <div class="stage" style="height:150px;border-radius:12px" id="publish-flag"></div>
+            <div class="field"><label>Name</label><div class="input">Northern Accord</div></div>
+            <div class="field"><label>Link</label><div class="input"><span class="pre">vexilo.org/@marisol_v/</span>northern-accord</div></div>
+            <div class="field"><label>Description <span class="hint">· optional</span></label><div class="input ta" style="min-height:62px">A union flag for an alternate Nordic federation…</div></div>
+            <div class="field"><label>Tags</label><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag">Nordic cross ×</span><span class="tag">Fictional nations ×</span><span class="tag" style="color:var(--muted-foreground)">+ Add</span></div></div>
+            <div class="well" style="border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;font-size:13px">
+              <img class="flag" src="https://flagcdn.com/fo.svg" style="height:20px" alt=""><span style="flex:1;color:var(--subtle)">Credits <b style="font-weight:500;color:var(--foreground)">Faroe Islands</b> as the original</span><i class="ph-bold ph-check-circle" style="color:var(--main)"></i>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--line)"><a class="btn neutral">Keep private</a><a class="btn primary"><i class="ph-bold ph-globe-hemisphere-west"></i> Publish</a></div>
+        </div>
+      </div>
+
+      <div style="grid-column:1/-1;display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:1;min-width:300px">
+          <div data-header="community" data-bell-open="1" style="border-radius:16px;overflow:hidden;box-shadow:var(--sh-tile)"></div>
+          <div style="display:flex;justify-content:flex-end;padding-right:120px;margin-top:-4px">
+            <div class="pop" style="position:relative;z-index:2">
+              <div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)"><b style="flex:1;font-weight:600">Notifications</b><a style="font-size:12px;color:var(--main);font-weight:500">Mark all read</a></div>
+              <div id="notifs"></div>
+              <a style="display:block;text-align:center;padding:11px;font-size:13px;font-weight:500;color:var(--main);border-top:1px solid var(--line)">See all</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes"><div class="notes-in">
+    <h4><i class="ph-bold ph-note-pencil"></i> Notes</h4>
+    <ul>
+      <li><b>Post flag</b> asks one question first. That answer is what keeps the two sides separate from now on.</li>
+      <li>Publishing from the maker reuses My Flags: a saved design is private until you hit Publish, which only sets <code>published_at</code>. No review queue. Reports and admin takedowns handle moderation.</li>
+      <li>Similar notifications get grouped ("ana and 11 others liked…") so busy flags don't spam you. Encyclopedia events like approved edits show up in the same list.</li>
+    </ul>
+  </div></div>
+</section>
+
+<script>
+/* ── flag artwork for the made-up designs ── */
+const svg=(w,h,inner,cls='flag',style='')=>`<svg class="${cls}" style="${style}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
+const R=(x,y,w,h,c)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`;
+const STAR=(cx,cy,r,c,n=5,ir=.42,rot=-90)=>{let p=[];for(let i=0;i<n*2;i++){const a=(rot+i*180/n)*Math.PI/180,rr=i%2?r*ir:r;p.push((cx+rr*Math.cos(a)).toFixed(1)+','+(cy+rr*Math.sin(a)).toFixed(1))}return `<polygon points="${p.join(' ')}" fill="${c}"/>`};
+const ART={
+  northern:()=>svg(360,220,R(0,0,360,220,'#1f5a43')+R(100,0,40,220,'#e0b23c')+R(0,90,360,40,'#e0b23c')+R(110,0,20,220,'#c8352b')+R(0,100,360,20,'#c8352b')),
+  tidewater:()=>svg(300,200,R(0,0,300,67,'#0f6e78')+R(0,67,300,66,'#ece0c4')+R(0,133,300,67,'#14305a')+`<circle cx="150" cy="100" r="44" fill="#14305a"/><path d="M118 104q8-10 16 0t16 0 16 0 16 0" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M118 88q8-10 16 0t16 0 16 0 16 0" stroke="#ece0c4" stroke-width="5" fill="none" stroke-linecap="round"/>`),
+  halvard:()=>svg(300,200,R(0,0,150,200,'#7a1f2b')+R(150,0,150,200,'#f7f4ee')+STAR(75,100,44,'#e5b53c')),
+  solace:()=>svg(300,200,R(0,0,300,200,'#1d5fae')+`<polygon points="300,0 300,200 0,200" fill="#f2c230"/>`+STAR(84,70,36,'#fff',7,.5)),
+  ember:()=>svg(400,200,R(0,0,400,200,'#16161a')+R(0,50,400,100,'#e2622b')+`<circle cx="200" cy="150" r="56" fill="#ffd27a"/>`+R(0,150,400,50,'#16161a')),
+  canada:()=>svg(400,200,R(0,0,400,200,'#fff')+R(0,0,100,200,'#d52b1e')+R(300,0,100,200,'#d52b1e')+STAR(200,100,62,'#d52b1e',8,.48,-90)+`<circle cx="200" cy="100" r="15" fill="#fff"/>`),
+  vael:()=>svg(300,200,R(0,0,300,200,'#4b2a7b')+`<polygon points="0,0 120,100 0,200" fill="#f4efe6"/>`+STAR(175,100,15,'#e8c25a')+STAR(220,100,15,'#e8c25a')+STAR(265,100,15,'#e8c25a')),
+  pacific:()=>svg(400,200,R(0,0,400,200,'#3a8fd9')+R(0,170,400,30,'#fff')+STAR(250,50,16,'#fff',7,.48)+STAR(300,95,13,'#fff',7,.48)+STAR(250,135,16,'#fff',7,.48)+STAR(205,88,12,'#fff',7,.48)+STAR(272,104,7,'#fff')),
+  aurel:()=>svg(300,200,R(0,0,150,100,'#0b3d91')+R(150,0,150,100,'#f7f4ee')+R(0,100,150,100,'#f7f4ee')+R(150,100,150,100,'#c8102e')+`<circle cx="150" cy="100" r="34" fill="#e8b33c"/><circle cx="150" cy="100" r="22" fill="#0b3d91"/>`),
+  moonhaven:()=>svg(300,200,R(0,0,300,200,'#12193a')+`<circle cx="112" cy="100" r="46" fill="#f1efe8"/><circle cx="130" cy="92" r="40" fill="#12193a"/>`+STAR(170,78,13,'#f1efe8')),
+  brannoch:()=>svg(300,200,R(0,0,300,200,'#2e6e57')+R(100,0,100,200,'#f4efe3')+`<polygon points="150,58 192,100 150,142 108,100" fill="#1b1c1f"/>`),
+  saltire:()=>svg(300,200,R(0,0,300,200,'#163f7a')+`<path d="M0 0L300 200M300 0L0 200" stroke="#fff" stroke-width="34"/>`+R(130,0,40,200,'#c8202f')),
+  faroeGold:()=>svg(360,220,R(0,0,360,220,'#f7f4ee')+R(90,0,60,220,'#e0b23c')+R(0,80,360,60,'#e0b23c')+R(105,0,30,220,'#1f5a43')+R(0,95,360,30,'#1f5a43')),
+  faroeNight:()=>svg(360,220,R(0,0,360,220,'#14233f')+R(90,0,60,220,'#f7f4ee')+R(0,80,360,60,'#f7f4ee')+R(105,0,30,220,'#c8352b')+R(0,95,360,30,'#c8352b')),
+  faroeSplit:()=>svg(360,220,R(0,0,180,220,'#f7f4ee')+R(180,0,180,220,'#2860a8')+R(90,0,60,220,'#2860a8')+R(0,80,360,60,'#2860a8')+R(105,0,30,220,'#d32f2f')+R(0,95,360,30,'#d32f2f')),
+  northernStar:()=>svg(360,220,R(0,0,360,220,'#1f5a43')+R(100,0,40,220,'#e0b23c')+R(0,90,360,40,'#e0b23c')+R(110,0,20,220,'#c8352b')+R(0,100,360,20,'#c8352b')+STAR(260,50,22,'#e0b23c')),
+  northernSea:()=>svg(360,220,R(0,0,360,220,'#1d4e7a')+R(100,0,40,220,'#e0b23c')+R(0,90,360,40,'#e0b23c')+R(110,0,20,220,'#1f5a43')+R(0,100,360,20,'#1f5a43')),
+  northernPale:()=>svg(360,220,R(0,0,360,220,'#e9efe9')+R(100,0,40,220,'#1f5a43')+R(0,90,360,40,'#1f5a43')+R(110,0,20,220,'#e0b23c')+R(0,100,360,20,'#e0b23c')),
+};
+const real=c=>`<img class="flag" src="https://flagcdn.com/${c}.svg" alt="">`;
+
+const U={
+  marisol_v:'#2f6b55', kestrel:'#8a3b2e', 'ana.flags':'#6b4bb0', jules:'#1f5e8f', tobias_vx:'#9a6a00',
+  oddvexi:'#3d4a5c', ramona:'#b0456b', nordicnerd:'#2c6e8f', halcyon:'#5a7d2a', pennant_pete:'#7a4a2a'
+};
+const av=(u,s='xs')=>`<span class="av ${s}" style="--c:${U[u]}">${u[0].toUpperCase()}</span>`;
+
+function card(d){
+  return `<article class="tile card${d.hover?' hover':''}">
+    <div class="stage">${d.remix?`<span class="chip maker"><i class="ph-bold ph-shuffle"></i> ${d.remix}</span>`:''}
+      <div class="acts"><span class="btn sm neutral icon" title="Remix"><i class="ph-bold ph-shuffle"></i></span><span class="btn sm neutral icon" title="Save"><i class="ph-bold ph-bookmark-simple"></i></span></div>
+      ${d.art}</div>
+    <div class="meta"><div class="t"><h3>${d.name}</h3>
+      ${d.by?`<div class="by">${av(d.by)}<b>@${d.by}</b>${d.ago?` · ${d.ago}`:''}</div>`:`<div class="sub">${d.sub||''}</div>`}</div>
+      <div class="stats">${d.remixes!=null?`<span class="mini" title="Remixes"><i class="ph-bold ph-shuffle"></i>${d.remixes}</span>`:''}
+      <span class="pill key${d.liked?' liked':''}"><i class="${d.liked?'ph-fill':'ph-bold'} ph-heart"></i>${d.likes}</span></div>
+    </div></article>`;
+}
+
+const POSTS=[
+  {name:'Northern Accord',art:ART.northern(),by:'marisol_v',likes:412,remixes:8,remix:'Remix of Faroe Islands',ago:'2w',liked:true,hover:true},
+  {name:'Republic of Tidewater',art:ART.tidewater(),by:'kestrel',likes:288,remixes:3,ago:'4d'},
+  {name:'Ember Confederation',art:ART.ember(),by:'ana.flags',likes:251,remixes:11,ago:'6d'},
+  {name:'Canada, reimagined',art:ART.canada(),by:'jules',likes:197,remixes:2,remix:'Remix of Canada',ago:'3d'},
+  {name:'Kingdom of Vael',art:ART.vael(),by:'tobias_vx',likes:164,remixes:5,ago:'5d'},
+  {name:'Solace Archipelago',art:ART.solace(),by:'ramona',likes:150,remixes:1,ago:'1w'},
+  {name:'Pacific Union',art:ART.pacific(),by:'halcyon',likes:131,remixes:4,ago:'2d'},
+  {name:'Free City of Halvard',art:ART.halvard(),by:'oddvexi',likes:98,remixes:0,ago:'6d'},
+  {name:'Moonhaven',art:ART.moonhaven(),by:'nordicnerd',likes:87,remixes:2,ago:'1d'},
+];
+document.getElementById('community-grid').innerHTML=POSTS.map(card).join('');
+
+document.getElementById('creators').innerHTML=[
+  ['ana.flags','46 designs · 2.1k likes',false],['kestrel','22 designs · 980 likes',true],['tobias_vx','31 designs · 860 likes',false],['ramona','12 designs · 540 likes',false],['halcyon','9 designs · 410 likes',false]
+].map(([u,s,f])=>`<div class="row">${av(u,'sm')}<div class="grow"><div class="name">@${u}</div><div class="s">${s}</div></div><span class="btn sm ${f?'neutral':'primary'}">${f?'<i class="ph-bold ph-check"></i> Following':'Follow'}</span></div>`).join('');
+
+document.getElementById('remixed').innerHTML=[
+  ['fo','Faroe Islands',23],['ca','Canada',19],['jp','Japan',17],['br','Brazil',12]
+].map(([c,n,k])=>`<div class="row"><span style="width:40px;display:grid;place-items:center"><img class="flag" style="max-height:24px;max-width:40px" src="https://flagcdn.com/${c}.svg" alt=""></span><div class="grow"><div class="name">${n}</div><div class="s">${k} remixes</div></div><i class="ph-bold ph-caret-right" style="color:var(--muted-foreground)"></i></div>`).join('');
+
+document.getElementById('topcreators').innerHTML=[
+  ['ana.flags',1,'2,140'],['marisol_v',2,'1,284'],['kestrel',3,'980']
+].map(([u,r,l])=>`<div class="row"><span style="width:18px;font-weight:600;color:var(--muted-foreground);font-size:13px">${r}</span>${av(u,'sm')}<div class="grow"><div class="name">@${u}</div></div><span class="mini"><i class="ph-bold ph-heart"></i>${l}</span></div>`).join('');
+
+/* profile */
+document.getElementById('banner-flag').innerHTML=ART.northern().replace('class="flag"','class="flag" style="height:162px;width:auto"');
+document.getElementById('pinned').innerHTML=[
+  {name:'Northern Accord',art:ART.northern(),likes:412,remixes:8,sub:'Remix of Faroe Islands · Nov 12'},
+  {name:'Faroe, but gold',art:ART.faroeGold(),likes:233,remixes:6,sub:'Remix of Faroe Islands · Oct 30'},
+  {name:'Port Aurel',art:ART.aurel(),likes:176,remixes:2,sub:'Hometown contest · 1st place'},
+].map(card).join('');
+document.getElementById('profile-grid').innerHTML=[
+  {name:'Isle of Brannoch',art:ART.brannoch(),likes:64,remixes:1,sub:'Nov 24'},
+  {name:'Saltire League',art:ART.saltire(),likes:58,remixes:0,sub:'Nov 20'},
+  {name:'Faroe Night',art:ART.faroeNight(),likes:91,remixes:2,sub:'Remix of Faroe Islands · Nov 18'},
+  {name:'Moonhaven II',art:ART.moonhaven(),likes:40,remixes:0,sub:'Remix of @nordicnerd · Nov 9'},
+  {name:'Solace (alt)',art:ART.solace(),likes:22,remixes:0,sub:'Remix of @ramona · Nov 2'},
+  {name:'Halvard Free State',art:ART.halvard(),likes:37,remixes:1,sub:'Oct 28'},
+].map(card).join('');
+
+/* post */
+document.getElementById('post-flag').innerHTML=ART.northern().replace('class="flag"','class="flag" style="width:100%;max-width:520px;height:auto"');
+document.getElementById('lineage').innerHTML=`
+  <a class="lin-node well">${real('fo').replace('class="flag"','class="flag" style="height:24px"')}<span><small>Real flag</small><b>Faroe Islands</b></span></a>
+  <i class="ph-bold ph-arrow-right lin-arrow"></i>
+  <span class="lin-node well cur">${ART.northern().replace('class="flag"','class="flag" style="height:24px;width:auto"')}<span><small>@marisol_v</small><b>Northern Accord</b></span></span>
+  <i class="ph-bold ph-arrow-right lin-arrow"></i>
+  <span class="lin-node well">${ART.northernStar().replace('class="flag"','class="flag" style="height:24px;width:auto"')}<span><small>@kestrel</small><b>Accord of Stars</b></span></span>
+  <span class="lin-node well">${ART.northernSea().replace('class="flag"','class="flag" style="height:24px;width:auto"')}<span><small>@nordicnerd</small><b>Sea Accord</b></span></span>
+  <span class="lin-node" style="color:var(--main);font-weight:500">+6 more</span>`;
+document.getElementById('remixes-grid').innerHTML=[
+  {name:'Accord of Stars',art:ART.northernStar(),by:'kestrel',likes:73,remixes:1,ago:'5d'},
+  {name:'Sea Accord',art:ART.northernSea(),by:'nordicnerd',likes:51,remixes:0,ago:'1w'},
+  {name:'Pale Accord',art:ART.northernPale(),by:'halcyon',likes:29,remixes:0,ago:'3d'},
+  {name:'Faroe Split',art:ART.faroeSplit(),by:'pennant_pete',likes:12,remixes:0,ago:'1d'},
+].map(card).join('');
+document.getElementById('more-grid').innerHTML=[
+  {name:'Faroe, but gold',art:ART.faroeGold(),by:'marisol_v',likes:233,remixes:6,ago:'4w'},
+  {name:'Port Aurel',art:ART.aurel(),by:'marisol_v',likes:176,remixes:2,ago:'6w'},
+  {name:'Isle of Brannoch',art:ART.brannoch(),by:'marisol_v',likes:64,remixes:1,ago:'3d'},
+  {name:'Saltire League',art:ART.saltire(),by:'marisol_v',likes:58,remixes:0,ago:'1w'},
+].map(card).join('');
+
+/* edit */
+document.getElementById('edit-banner').innerHTML=ART.northern().replace('class="flag"','class="flag" style="height:78px;width:auto"');
+const pick=[['northern',1],['faroeGold'],['aurel'],['brannoch'],['saltire'],['faroeNight'],['halvard'],['moonhaven']];
+document.getElementById('picker').innerHTML=pick.map(([k,on])=>`<span style="height:58px;border-radius:10px;display:grid;place-items:center;background:var(--stage);${on?'box-shadow:inset 0 0 0 2px var(--main)':''};position:relative">${ART[k]().replace('class="flag"','class="flag" style="max-height:34px;max-width:52px;width:auto;height:auto"')}${on?'<i class="ph-fill ph-check-circle" style="position:absolute;right:4px;top:4px;color:var(--main);font-size:14px"></i>':''}</span>`).join('');
+document.getElementById('pin-picker').innerHTML=['northern','faroeGold','aurel'].map(k=>`<span style="flex:1;height:54px;border-radius:10px;display:grid;place-items:center;background:var(--stage);position:relative">${ART[k]().replace('class="flag"','class="flag" style="max-height:32px;max-width:52px;width:auto;height:auto"')}<i class="ph-bold ph-x" style="position:absolute;right:5px;top:5px;font-size:11px;color:var(--muted-foreground)"></i></span>`).join('')+`<span style="width:54px;height:54px;border-radius:10px;display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--border);color:var(--muted-foreground);opacity:.5"><i class="ph-bold ph-plus"></i></span>`;
+
+/* encyclopedia */
+document.getElementById('browse-grid').innerHTML=[
+  {name:'Faroe Islands',art:real('fo'),likes:34,sub:'#0412 · Europe',hover:true},
+  {name:'Bhutan',art:real('bt'),likes:29,sub:'#0077 · Asia'},
+  {name:'Nepal',art:real('np'),likes:31,sub:'#0301 · Asia'},
+  {name:'Brazil',art:real('br'),likes:27,sub:'#0091 · South America'},
+].map(d=>card(d).replace(/<span class="btn sm neutral icon" title="Save">.*?<\/span>/,'')).join('');
+document.getElementById('fo-remixes').innerHTML=[
+  {name:'Northern Accord',art:ART.northern(),by:'marisol_v',likes:412,remixes:8,ago:'2w'},
+  {name:'Faroe, but gold',art:ART.faroeGold(),by:'marisol_v',likes:233,remixes:6,ago:'4w'},
+  {name:'Faroe Night',art:ART.faroeNight(),by:'marisol_v',likes:91,remixes:2,ago:'9d'},
+  {name:'Faroe Split',art:ART.faroeSplit(),by:'pennant_pete',likes:12,remixes:0,ago:'1d'},
+].map(card).join('');
+
+/* flows */
+document.getElementById('publish-flag').innerHTML=ART.northern().replace('class="flag"','class="flag" style="height:104px;width:auto"');
+const th=k=>`<span class="thumb">${ART[k]().replace('class="flag"','class="flag" style="max-height:31px;max-width:46px;width:auto;height:auto"')}</span>`;
+document.getElementById('notifs').innerHTML=[
+  [1,'kestrel','#e2622b','ph-shuffle','<b>@kestrel</b> remixed <b>Northern Accord</b>','2m','northernStar'],
+  [1,'ana.flags','#e5484d','ph-heart','<b>@ana.flags</b> and <b>11 others</b> liked <b>Northern Accord</b>','1h','northern'],
+  [0,'jules','#203f8f','ph-user-plus','<b>@jules</b> started following you','3h',null],
+  [0,'halcyon','#e2622b','ph-shuffle','<b>@halcyon</b> remixed <b>Faroe, but gold</b>','Yesterday','faroeGold'],
+  [0,null,'#1f7a4d','ph-check','Your edit to <b>Faroe Islands</b> was approved','2d',null],
+].map(([u,who,c,ic,tx,when,k])=>`<div class="notif${u?' unread':''}">
+  <span class="ic">${who?av(who,'md').replace('av md','av md'):'<span class="av md" style="--c:var(--muted);color:var(--foreground)"><i class="ph-bold ph-books"></i></span>'}<span class="badge" style="background:${c}"><i class="${ic==='ph-heart'?'ph-fill':'ph-bold'} ${ic}"></i></span></span>
+  <div class="tx">${tx}<div class="when">${when}</div></div>${k?th(k):''}</div>`).join('');
+
+/* headers */
+function header(active,bellOpen){
+  const L=(k,l,extra='')=>`<a class="${active===k?'on':''}">${l}${extra}</a>`;
+  return `<header class="hdr" ${bellOpen?'style="position:relative;top:0"':''}><div class="hdr-in">
+    <a class="logo"><svg viewBox="0 0 1024 1024"><use href="#mark"/></svg>Vexilo</a>
+    <nav class="nav">${L('flags','Flags')}${L('community','Community')}<span class="div"></span>${L('create','Create')}${L('play','Play','<span class="dot" style="position:absolute;right:5px;top:6px;width:6px;height:6px"></span>')}${L('contest','Contest')}</nav>
+    <div class="right">
+      <span class="btn neutral icon"><i class="ph-bold ph-moon"></i></span>
+      <span class="btn neutral icon bell" ${bellOpen?'style="box-shadow:inset 0 0 0 1.5px var(--foreground)"':''}><i class="ph-bold ph-bell"></i><span class="dot"></span></span>
+      <span class="btn primary"><i class="ph-bold ph-plus"></i> Post flag</span>
+      ${av('marisol_v','sm').replace('av sm','av sm" style="--c:#2f6b55;width:34px;height:34px')}
+    </div></div></header>`;
+}
+document.querySelectorAll('[data-header]').forEach(el=>el.innerHTML=header(el.dataset.header,el.dataset.bellOpen));
+
+/* chrome */
+const btns=document.querySelectorAll('.mk button[data-s]');
+function show(s){btns.forEach(b=>b.classList.toggle('on',b.dataset.s===s));document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('on',x.id==='s-'+s));try{history.replaceState(null,'','#'+s)}catch(e){}scrollTo(0,0)}
+btns.forEach(b=>b.onclick=()=>show(b.dataset.s));
+if(window.RENDER){document.documentElement.classList.add('render');show(RENDER)}else if(location.hash) show(location.hash.slice(1));
+document.getElementById('theme').onclick=e=>{const d=document.documentElement.classList.toggle('dark');e.currentTarget.innerHTML=`<i class="ph-bold ph-${d?'sun':'moon'}"></i>&nbsp; ${d?'Light':'Dark'}`};
+if(new URLSearchParams(location.search).get('dark')) document.getElementById('theme').click();
+</script>
+</body>
+</html>

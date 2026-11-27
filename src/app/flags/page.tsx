@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getCollectionFlags } from '@/actions/collections';
+import BrowseTabs from '@/components/browse-tabs';
 import FlagImage from '@/components/FlagImage';
 import { COLLECTION_GROUPS, COLLECTIONS, collectionPath } from '@/lib/collections';
 import { absoluteUrl } from '@/lib/seo';
@@ -21,9 +22,12 @@ export default async function CollectionsIndex() {
 
   return (
     <div className='mx-auto max-w-[1312px] px-4 pb-16 md:px-8'>
-      <div className='pb-[18px] pt-7'>
-        <h1 className='text-[22px] font-semibold tracking-[-0.03em]'>Flag collections</h1>
-        <p className='mt-0.5 text-[13px] text-muted-foreground'>Flags grouped by colour, pattern, symbol and topic.</p>
+      <div className='flex flex-wrap items-end gap-x-5 gap-y-3 pb-[18px] pt-8'>
+        <div className='min-w-[260px] flex-1'>
+          <h1 className='text-[34px] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[40px]'>Flag collections</h1>
+          <p className='mt-2 text-[15px] text-subtle'>Real flags grouped by colour, pattern, symbol and topic.</p>
+        </div>
+        <BrowseTabs active='collections' />
       </div>
       {COLLECTION_GROUPS.map((group) => (
         <section key={group} className='mt-6'>

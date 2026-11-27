@@ -2,7 +2,7 @@
 
 import sharp from 'sharp';
 import { getServerAuthSession } from '@/lib/auth';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { storedFileUrl } from '@/lib/storage/local-storage';
 import { extractPalette } from '@/lib/flag-palette';
 import { uploadFile } from '@/lib/storage/s3';
 
@@ -33,7 +33,7 @@ export async function uploadStudioImage(dataUrl: string) {
     await uploadFile(png, process.env.S3_BUCKET_NAME!, key, 'image/png');
     return {
       success: true as const,
-      url: `${CLOUD_FRONT_URL}/${key}`,
+      url: storedFileUrl(key),
       aspect: width / height,
       colors: palette.map((color) => color.hex.toUpperCase()),
     };
