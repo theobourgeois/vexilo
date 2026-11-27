@@ -14,7 +14,7 @@ import Contributors, { type Contributor, type EditEntry } from './Contributors';
 import FlagActions from './FlagActions';
 import FavoriteCount from './FavoriteCount';
 import RelatedFlagCards from './RelatedFlagCards';
-import ExpandableDescription from './ExpandableDescription';
+import DescriptionBox, { MAX_OPEN_LINES } from './DescriptionBox';
 import FlagViewer from './FlagViewer';
 import FlagViewTracker from './FlagViewTracker';
 import FlagTimeline from './FlagTimeline';
@@ -362,6 +362,12 @@ function collectSources(own: string[], researched: FlagAiResearchSource[]) {
   });
 }
 
+/** Roughly when a description runs past the lines the hero shows in full. A guess from the raw text,
+ *  so the server renders it boxed; the box measures the real thing once it's on screen. */
+function isLongDescription(text: string) {
+  return text.length > 620 || text.split('\n').length > MAX_OPEN_LINES;
+}
+
 function HistoryHeading() {
   return (
     <h2 className='mb-3.5 flex items-center gap-2 text-[17px] font-semibold tracking-[-0.02em]'>
@@ -505,6 +511,8 @@ export default async function FlagPage({
       return flag.link;
     }
   })();
+  const description = flag.displayDescription ?? '';
+  const longDescription = isLongDescription(description);
   const storyProps = { history, flagName: flag.name, promptForHistory: !madeInMaker };
 
   return (
@@ -568,9 +576,9 @@ export default async function FlagPage({
                   )}
                 </p>
               )}
-              {flag.displayDescription && (
+              {description && (
                 <div className='mt-3.5 max-w-[560px]'>
-                  <ExpandableDescription description={flag.displayDescription} />
+                  <DescriptionBox text={description} long={longDescription} />
                 </div>
               )}
               <div className='mt-6'>
