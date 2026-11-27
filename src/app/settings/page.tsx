@@ -12,7 +12,7 @@ import { Check, Flag, Loader2, Search, Trash2, Upload, X } from '@/components/ic
 import FlagImage from '@/components/FlagImage';
 import { cn } from '@/lib/utils';
 import {
-  changeName,
+  changeUsername,
   changeIsAnonymous,
   getUserData,
   changeFavoriteFlag,
@@ -24,27 +24,10 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
 import { toastErrorWithLogin } from '@/lib/toast-auth';
+import { USERNAME_MAX, USERNAME_RULES, usernameSchema } from '@/lib/username';
+import { AvatarCropper } from '@/components/avatar-cropper';
 
 const PROFILE_PICTURE_MAX_SOURCE_BYTES = 15 * 1024 * 1024;
-const PROFILE_PICTURE_UPLOAD_SIZE = 512;
-
-/** Center-crops an image to a square and shrinks it so uploads stay small. */
-async function toSquareWebp(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
-  const size = Math.min(side, PROFILE_PICTURE_UPLOAD_SIZE);
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  canvas
-    .getContext('2d')!
-    .drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
-  bitmap.close();
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Encoding failed'))), 'image/webp', 0.9),
-  );
-}
-
 function SettingsPanel({
   title,
   description,
@@ -76,6 +59,7 @@ export default function SettingsPage() {
   const [flagSearch, setFlagSearch] = useState('');
   const [isFlagDropdownOpen, setIsFlagDropdownOpen] = useState(false);
   const [isPictureLoading, setIsPictureLoading] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const flagDropdownRef = useRef<HTMLDivElement>(null);
   const pictureInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -119,14 +103,15 @@ export default function SettingsPage() {
 
   const handleNameChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      toast.error('Name cannot be empty');
+    const parsed = usernameSchema.safeParse(name);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await changeName(name.trim());
+      const result = await changeUsername(parsed.data);
       queryClient.invalidateQueries({ queryKey: ['userData'] });
       if (result.success) {
         await updateSession();
@@ -135,13 +120,13 @@ export default function SettingsPage() {
         toastErrorWithLogin(result.message);
       }
     } catch {
-      toast.error('Failed to update name. Please try again.');
+      toast.error('Failed to update username. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -153,13 +138,18 @@ export default function SettingsPage() {
       toast.error('Image must be 15 MB or smaller.');
       return;
     }
+    setCropFile(file);
+  };
 
+  /** Uploads the square the person chose in the cropper. */
+  const handlePictureCrop = async (image: Blob) => {
     setIsPictureLoading(true);
     try {
       const formData = new FormData();
-      formData.append('image', await toSquareWebp(file), 'avatar.webp');
+      formData.append('image', image, 'avatar.webp');
       const result = await changeProfilePicture(formData);
       if (result.success) {
+        setCropFile(null);
         await updateSession();
         queryClient.invalidateQueries({ queryKey: ['userData'] });
         toast.success(result.message);
@@ -275,7 +265,7 @@ export default function SettingsPage() {
 
       <div className='space-y-4'>
         {/* Profile */}
-        <SettingsPanel title='Profile' description='Your name and picture as shown on flags, edits and the leaderboard.'>
+        <SettingsPanel title='Profile' description='Your username and picture as shown on flags, edits and the leaderboard.'>
           <div className='mb-5 flex flex-wrap items-center gap-4'>
             <Avatar className='size-16 text-xl'>
               <AvatarImage src={profilePicture || ''} alt={displayName} />
@@ -283,7 +273,7 @@ export default function SettingsPage() {
             </Avatar>
             <div className='min-w-0 flex-1'>
               <p className='text-[13px] font-medium'>Profile picture</p>
-              <p className='mt-0.5 text-[13px] text-muted-foreground'>PNG, JPG, WebP or GIF. Cropped to a square.</p>
+              <p className='mt-0.5 text-[13px] text-muted-foreground'>PNG, JPG, WebP or GIF. You choose how it&apos;s cropped.</p>
             </div>
             <div className='flex gap-2'>
               <input
@@ -293,6 +283,7 @@ export default function SettingsPage() {
                 className='hidden'
                 onChange={handlePictureChange}
               />
+              <AvatarCropper file={cropFile} onCancel={() => setCropFile(null)} onCrop={handlePictureCrop} />
               <Button
                 variant='neutral'
                 onClick={() => pictureInputRef.current?.click()}
@@ -316,15 +307,21 @@ export default function SettingsPage() {
           </div>
           <form onSubmit={handleNameChange} className='space-y-2'>
             <Label htmlFor='name' className='text-[13px] font-medium'>
-              Display name
+              Username
             </Label>
             <div className='flex flex-col gap-2 sm:flex-row'>
               <Input
                 id='name'
                 type='text'
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder='Enter your display name'
+                // Spaces become underscores as you type, since usernames can't have them.
+                onChange={(e) => setName(e.target.value.replace(/\s/g, '_'))}
+                placeholder='your_username'
+                maxLength={USERNAME_MAX}
+                autoCapitalize='none'
+                autoCorrect='off'
+                spellCheck={false}
+                aria-describedby='name-rules'
                 disabled={isLoading}
                 className='flex-1'
               />
@@ -339,6 +336,9 @@ export default function SettingsPage() {
                 )}
               </Button>
             </div>
+            <p id='name-rules' className='text-[13px] text-muted-foreground'>
+              {USERNAME_RULES} Must be unique.
+            </p>
           </form>
         </SettingsPanel>
 
@@ -457,7 +457,7 @@ export default function SettingsPage() {
                 Anonymous mode
               </Label>
               <p className='mt-1 text-[13px] text-muted-foreground'>
-                Your name won&apos;t appear on leaderboards and your profile will be hidden.
+                Your username won&apos;t appear on leaderboards and your profile will be hidden.
               </p>
             </div>
             <Switch

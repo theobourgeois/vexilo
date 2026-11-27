@@ -4,6 +4,8 @@ import { db } from '@/db';
 import { emailChallenges, users } from '@/db/schema';
 import { allowAuthAttempt } from '@/lib/auth-rate-limit';
 import { emailDeliveryConfigured, sendVerificationEmail } from '@/lib/email';
+import { USERNAME_PATTERN, isReservedUsername } from '@/lib/username';
+import { availableUsername, isUsernameConflict, isUsernameTaken } from '@/lib/username-db';
 import {
   CODE_LIFETIME_MS,
   generateVerificationCode,
@@ -196,25 +198,51 @@ export async function completeEmailVerification(
     .returning({ id: emailChallenges.id });
   if (!attempt) return invalid;
   const hash = verificationCodeHash(email, id, code);
+  const username = await signupUsername(email, id);
+  if (!username) return invalid;
   // Consumption and account activation share one transaction. Concurrent correct
   // submissions cannot replay the code or overwrite a verified/OAuth account.
-  const result = await db.execute<{ id: string }>(sql`
-    with consumed as (
-      delete from ${emailChallenges}
-      where email = ${email} and id = ${id} and code_hash = ${hash}
-        and expires_at > now() and attempts <= ${MAX_CODE_ATTEMPTS}
-      returning *
-    ), activated as (
-      update ${users} u set name = c.name, hashed_password = c.hashed_password, email_verified = now()
-      from consumed c where c.user_id = u.id and u.email_verified is null and u.hashed_password is not null
-      returning u.id
-    ), created as (
-      insert into ${users} (name, email, hashed_password, email_verified)
-      select name, email, hashed_password, now() from consumed where user_id is null
-      on conflict (lower(email)) do nothing returning id
-    ) select id from activated union all select id from created
-  `);
+  let result;
+  try {
+    result = await db.execute<{ id: string }>(sql`
+      with consumed as (
+        delete from ${emailChallenges}
+        where email = ${email} and id = ${id} and code_hash = ${hash}
+          and expires_at > now() and attempts <= ${MAX_CODE_ATTEMPTS}
+        returning *
+      ), activated as (
+        update ${users} u set name = ${username}, hashed_password = c.hashed_password, email_verified = now()
+        from consumed c where c.user_id = u.id and u.email_verified is null and u.hashed_password is not null
+        returning u.id
+      ), created as (
+        insert into ${users} (name, email, hashed_password, email_verified)
+        select ${username}, email, hashed_password, now() from consumed where user_id is null
+        on conflict (lower(email)) do nothing returning id
+      ) select id from activated union all select id from created
+    `);
+  } catch (error) {
+    // Someone took the name between the check above and now. The code is still unused.
+    if (isUsernameConflict(error))
+      return { success: false, message: 'Your username was just taken. Enter the code again to get a new one.' };
+    throw error;
+  }
   return result.rows.length > 0
     ? { success: true, message: 'Email verified.' }
     : invalid;
+}
+
+/**
+ * The username a pending signup activates with: what they asked for if it's still
+ * free, else a free variant of it. Signups started before usernames get one too.
+ */
+async function signupUsername(email: string, id: string) {
+  const [challenge] = await db
+    .select({ name: emailChallenges.name, userId: emailChallenges.userId })
+    .from(emailChallenges)
+    .where(and(eq(emailChallenges.email, email), eq(emailChallenges.id, id)))
+    .limit(1);
+  if (!challenge) return null;
+  const valid = USERNAME_PATTERN.test(challenge.name) && !isReservedUsername(challenge.name);
+  if (valid && !(await isUsernameTaken(challenge.name, challenge.userId))) return challenge.name;
+  return availableUsername(challenge.name);
 }

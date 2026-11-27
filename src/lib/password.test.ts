@@ -27,14 +27,14 @@ test('password hashes use random salts and verify only the matching password', a
 
 test('signup normalizes email and validates password length without trimming passwords', () => {
   const result = signupSchema.safeParse({
-    name: ' New User ',
+    name: ' New_User ',
     email: ' NEW@EXAMPLE.COM ',
     password: ' keep spaces ',
   });
   assert.equal(result.success, true);
   if (result.success) {
     assert.equal(result.data.email, 'new@example.com');
-    assert.equal(result.data.name, 'New User');
+    assert.equal(result.data.name, 'New_User');
     assert.equal(result.data.password, ' keep spaces ');
   }
   for (const patch of [

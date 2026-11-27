@@ -90,7 +90,7 @@ export default function CommunityGuidelinesPage() {
                         This helps showcase active contributors and celebrate our community members.
                     </p>
                     <p>
-                        You can change your display name at any time on the{" "}
+                        You can change your username at any time on the{" "}
                         <Link
                             href="/settings"
                             className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"

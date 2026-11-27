@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GoogleLogo, Loader2 } from '@/components/icons';
 import { safeCallbackUrl } from '@/lib/sign-in';
+import { USERNAME_MAX, USERNAME_MIN, USERNAME_RULES } from '@/lib/username';
 
 export function SignInForm() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -334,15 +335,26 @@ export function SignInForm() {
             {mode === 'signup' && (
               <div className='space-y-1.5'>
                 <label htmlFor='auth-name' className='text-sm font-medium'>
-                  Name
+                  Username
                 </label>
                 <Input
                   id='auth-name'
                   name='name'
-                  autoComplete='name'
-                  maxLength={100}
+                  // Not 'username': password managers would save it as the sign-in, which is the email.
+                  autoComplete='nickname'
+                  autoCapitalize='none'
+                  autoCorrect='off'
+                  spellCheck={false}
+                  minLength={USERNAME_MIN}
+                  maxLength={USERNAME_MAX}
+                  pattern='[A-Za-z0-9_]+'
+                  title={USERNAME_RULES}
+                  aria-describedby='auth-name-rules'
                   required
                 />
+                <p id='auth-name-rules' className='text-xs text-muted-foreground'>
+                  {USERNAME_RULES} You can change it later.
+                </p>
               </div>
             )}
             <div className='space-y-1.5'>

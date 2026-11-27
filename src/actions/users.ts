@@ -7,6 +7,8 @@ import { deleteFileFromUrl, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
 import { CLOUD_FRONT_URL } from "@/lib/constant";
 import { eq } from "drizzle-orm";
+import { usernameSchema } from "@/lib/username";
+import { isUsernameConflict, isUsernameTaken } from "@/lib/username-db";
 import sharp from "sharp";
 
 // Matches Next's default server action body limit; the client shrinks images first.
@@ -14,21 +16,37 @@ const PROFILE_PICTURE_MAX_BYTES = 1024 * 1024;
 const PROFILE_PICTURE_SIZE = 256;
 const PROFILE_PICTURE_PREFIX = "avatars/";
 
-export async function changeName(name: string) {
+export async function changeUsername(username: string) {
   const session = await getServerAuthSession();
 
   if (!session?.user) {
     return {
       success: false,
-      message: "You must be logged in to change your name.",
+      message: "You must be logged in to change your username.",
     };
   }
 
-  await db.update(users).set({ name }).where(eq(users.id, session.user.id));
+  const parsed = usernameSchema.safeParse(username);
+  if (!parsed.success) {
+    return { success: false, message: parsed.error.issues[0].message };
+  }
+  if (await isUsernameTaken(parsed.data, session.user.id)) {
+    return { success: false, message: "That username is taken. Try another." };
+  }
+
+  try {
+    await db.update(users).set({ name: parsed.data }).where(eq(users.id, session.user.id));
+  } catch (error) {
+    if (isUsernameConflict(error)) {
+      return { success: false, message: "That username is taken. Try another." };
+    }
+    throw error;
+  }
 
   return {
     success: true,
-    message: "Name changed successfully.",
+    message: "Username changed.",
+    username: parsed.data,
   };
 }
 
