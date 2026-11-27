@@ -317,8 +317,15 @@ const DivisionArt = React.memo(function DivisionArt({
 
 function FieldImage({ field, W, href }: { field: Extract<StudioField, { kind: 'image' }>; W: number; href?: string }) {
   const live = useRecolored(field.src, field.palette, field.colors);
-  return <image href={href ?? live} width={W} height={1} preserveAspectRatio='none' />;
+  return <image href={href ?? live} width={W * IMAGE_UNITS} height={IMAGE_UNITS} transform={`scale(${1 / IMAGE_UNITS})`} preserveAspectRatio='none' />;
 }
+
+/**
+ * Images are drawn this many times bigger and scaled back down. Firefox rounds an image's box to
+ * 1/60 of a unit in its own coordinates, and a flag unit is the whole flag's height, so at 1:1
+ * a close zoom shows emblems visibly bigger and off from where they are (and their selection box).
+ */
+const IMAGE_UNITS = 1000;
 
 const LayerArt = React.memo(function LayerArt({
   layer,
@@ -341,12 +348,12 @@ const LayerArt = React.memo(function LayerArt({
         <image
           key={i}
           href={url}
-          x={-w / 2}
-          y={-h / 2}
-          width={w}
-          height={h}
+          x={(-w / 2) * IMAGE_UNITS}
+          y={(-h / 2) * IMAGE_UNITS}
+          width={w * IMAGE_UNITS}
+          height={h * IMAGE_UNITS}
           preserveAspectRatio='none'
-          transform={`translate(${copy.cx} ${copy.cy}) rotate(${copy.rot}) scale(${layer.flipX ? -1 : 1} ${layer.flipY ? -1 : 1})`}
+          transform={`translate(${copy.cx} ${copy.cy}) rotate(${copy.rot}) scale(${(layer.flipX ? -1 : 1) / IMAGE_UNITS} ${(layer.flipY ? -1 : 1) / IMAGE_UNITS})`}
         />
       ))}
     </g>
