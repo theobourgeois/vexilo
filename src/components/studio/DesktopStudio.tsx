@@ -10,12 +10,15 @@ import {
   ContestEntryDialog,
   ContestPill,
   ContextMenu,
+  GalleryPill,
   ExportMenu,
   FlagName,
   Glance,
   PostDialog,
   RatioControl,
+  postLabel,
   RemixPill,
+  SaveButton,
   StartOver,
   UndoRedo,
   useExport,
@@ -23,6 +26,7 @@ import {
   WavePreview,
   ZoomControl,
   type Contest,
+  type Gallery,
   type Remix,
 } from './chrome';
 import type { FieldPart } from './divisions';
@@ -52,13 +56,17 @@ export function DesktopStudio({
   emblems,
   remix,
   contest,
+  gallery,
   onStartOver,
+  startOverLabel,
 }: {
   studio: Studio;
   emblems: StudioEmblem[] | null;
   remix: Remix;
   contest: Contest;
+  gallery: Gallery;
   onStartOver?: () => void;
+  startOverLabel?: string;
 }) {
   const [panel, setPanel] = React.useState<Panel | null>('emblems');
   const [view, setView] = React.useState<View>({ zoom: 1, panX: 0, panY: 0 });
@@ -78,6 +86,7 @@ export function DesktopStudio({
   useShortcuts(studio, {
     setView,
     onExport: exporter.png,
+    onSave: contest ? undefined : gallery.save,
     onPasteFiles: (files) => importImages(files),
     setPanel: (next) => setPanel((current) => (current === next ? null : next)),
     tool: draw.tool,
@@ -167,13 +176,15 @@ export function DesktopStudio({
       <header className='absolute left-5 right-5 top-5 grid h-[52px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 rounded-[14px] bg-surface py-1.5 pl-2 pr-1.5 shadow-pop'>
         <div className='flex min-w-0 items-center gap-1.5'>
           <FlagName studio={studio} className='h-9 max-w-[360px] text-[18px]' />
+          <GalleryPill gallery={gallery} />
           <RemixPill remix={remix} />
           <ContestPill contest={contest} />
-          <StartOver remix={remix} onStartOver={onStartOver} />
+          <StartOver remix={remix} onStartOver={onStartOver} label={startOverLabel} />
         </div>
         <ToolPicker tool={draw.tool} onChange={setTool} />
         <div className='flex items-center justify-end gap-1.5'>
           <UndoRedo studio={studio} />
+          {!contest && <SaveButton gallery={gallery} />}
           <ExportMenu studio={studio}>
             <Button variant='neutral' size='sm' aria-label='Export'>
               <Download />
@@ -182,7 +193,7 @@ export function DesktopStudio({
           </ExportMenu>
           <Button size='sm' onClick={() => setPosting(true)}>
             {contest ? <Trophy /> : <Send />}
-            {contest ? (contest.entry ? 'Update entry' : 'Submit entry') : 'Post'}
+            {contest ? (contest.entry ? 'Update entry' : 'Submit entry') : postLabel(gallery)}
           </Button>
         </div>
       </header>
@@ -207,7 +218,7 @@ export function DesktopStudio({
       {contest ? (
         <ContestEntryDialog studio={studio} contest={contest} open={posting} onOpenChange={setPosting} />
       ) : (
-        <PostDialog studio={studio} remix={remix} open={posting} onOpenChange={setPosting} />
+        <PostDialog studio={studio} remix={remix} gallery={gallery} open={posting} onOpenChange={setPosting} />
       )}
     </div>
   );

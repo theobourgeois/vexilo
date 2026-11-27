@@ -20,6 +20,8 @@ export function useShortcuts(
   options: {
     setView: React.Dispatch<React.SetStateAction<View>>;
     onExport: () => void;
+    /** ⌘S: keeps the flag in My flags. */
+    onSave?: () => void;
     /** Images pasted from the system clipboard. Returns whether it used them. */
     onPasteFiles?: (files: File[]) => Promise<boolean>;
     setPanel?: (panel: Panel) => void;
@@ -72,7 +74,7 @@ export function useShortcuts(
         if (key === 'd') return run(() => actions.duplicateSelected());
         if (key === 'a') return run(actions.selectAll);
         if (key === 'e') return run(options.onExport);
-        if (key === 's') return run(() => undefined);
+        if (key === 's') return run(() => options.onSave?.());
         if (key === ']') return run(() => actions.arrange(e.shiftKey ? 'front' : 1));
         if (key === '[') return run(() => actions.arrange(e.shiftKey ? 'back' : -1));
         if (key === '0') return run(() => options.setView({ zoom: 1, panX: 0, panY: 0 }));

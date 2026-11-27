@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Coffee, Menu, Plus } from '@/components/icons';
 import { Button } from './ui/button';
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from './ui/drawer';
@@ -17,6 +18,7 @@ export function HamburgerMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const dailyPending = useDailyPending();
+  const { status } = useSession();
 
   return (
     <Drawer direction='right' open={open} onOpenChange={setOpen}>
@@ -55,6 +57,18 @@ export function HamburgerMenu() {
                 </Link>
               );
             })}
+            {status === 'authenticated' && (
+              <Link
+                href='/my-flags'
+                onClick={() => setOpen(false)}
+                className={cn(
+                  'flex items-center rounded-[10px] px-3 py-2.5 text-[15px] font-medium text-subtle transition-colors hover:bg-foreground/[0.06] hover:text-foreground',
+                  pathname.startsWith('/my-flags') && 'bg-foreground/[0.07] text-foreground',
+                )}
+              >
+                My flags
+              </Link>
+            )}
             <a
               href='https://buymeacoffee.com/theobourgeois'
               target='_blank'

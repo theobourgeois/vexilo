@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from './ui/button';
-import { LogOut, Moon, Settings, Shield, Sun, User } from '@/components/icons';
+import { Flag, LogOut, Moon, Settings, Shield, Sun, User } from '@/components/icons';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import {
   DropdownMenu,
@@ -69,6 +69,10 @@ export function AuthHeader() {
         <DropdownMenuItem onClick={() => router.push(`/profile/${userData?.user?.userNumber || 'me'}`)}>
           <User />
           Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push('/my-flags')}>
+          <Flag />
+          My flags
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push('/settings')}>
           <Settings />

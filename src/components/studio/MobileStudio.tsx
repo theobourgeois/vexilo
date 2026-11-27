@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import {
   AlignCentre,
   ArrowLeft,
+  Check,
   Copy,
+  Loader2,
   Emblems,
   FlipHorizontal,
   GroupIcon,
@@ -18,6 +20,7 @@ import {
   Palette,
   Repeat,
   RotateQuarter,
+  Save,
   SquaresFour,
   SwapColors,
   Text,
@@ -31,7 +34,9 @@ import {
   ContestPill,
   ExportMenu,
   FlagName,
+  GalleryPill,
   PostDialog,
+  postLabel,
   RatioControl,
   RemixPill,
   StartOver,
@@ -39,6 +44,7 @@ import {
   ViewModeControl,
   WavePreview,
   type Contest,
+  type Gallery,
   type Remix,
 } from './chrome';
 import type { StudioEmblem } from './model';
@@ -126,13 +132,17 @@ export function MobileStudio({
   emblems,
   remix,
   contest,
+  gallery,
   onStartOver,
+  startOverLabel,
 }: {
   studio: Studio;
   emblems: StudioEmblem[] | null;
   remix: Remix;
   contest: Contest;
+  gallery: Gallery;
   onStartOver?: () => void;
+  startOverLabel?: string;
 }) {
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [tool, setTool] = React.useState<'repeat' | 'outline' | 'align' | 'opacity' | null>(null);
@@ -149,18 +159,35 @@ export function MobileStudio({
   return (
     <div className='fixed inset-0 z-30 flex flex-col bg-stage'>
       <header className='flex h-14 shrink-0 items-center gap-1 border-b border-line bg-background/90 px-2 backdrop-blur-xl'>
-        <Link href='/' aria-label='Back' className='grid size-10 shrink-0 place-items-center rounded-[10px] text-subtle active:bg-foreground/[0.06]'>
+        <Link href={gallery.savedId ? '/my-flags' : '/'} aria-label={gallery.savedId ? 'Back to My flags' : 'Back'} className='grid size-10 shrink-0 place-items-center rounded-[10px] text-subtle active:bg-foreground/[0.06]'>
           <ArrowLeft className='size-5' />
         </Link>
         <FlagName studio={studio} className='h-9 min-w-0 flex-1 text-[16px]' />
         <UndoRedo studio={studio} />
+        {!contest && (
+          <button
+            type='button'
+            onClick={gallery.save}
+            disabled={gallery.saving}
+            aria-label={gallery.savedId && !gallery.dirty ? 'Saved to My flags' : 'Save to My flags'}
+            className='grid size-10 shrink-0 place-items-center rounded-[10px] text-subtle active:bg-foreground/[0.06]'
+          >
+            {gallery.saving ? (
+              <Loader2 className='size-5 animate-spin' />
+            ) : gallery.savedId && !gallery.dirty ? (
+              <Check className='size-5' />
+            ) : (
+              <Save className='size-5' />
+            )}
+          </button>
+        )}
         <ExportMenu studio={studio}>
           <button type='button' aria-label='Export' className='grid size-10 shrink-0 place-items-center rounded-[10px] text-subtle active:bg-foreground/[0.06]'>
             <MoreHorizontal className='size-5' />
           </button>
         </ExportMenu>
         <Button size='sm' className='ml-1' onClick={() => setPosting(true)}>
-          {contest ? (contest.entry ? 'Update' : 'Submit') : 'Post'}
+          {contest ? (contest.entry ? 'Update' : 'Submit') : postLabel(gallery, true)}
         </Button>
       </header>
 
@@ -171,11 +198,12 @@ export function MobileStudio({
         ) : (
           <WavePreview doc={studio.doc} className='absolute inset-0' />
         )}
-        {(remix || contest || onStartOver) && (
+        {(remix || contest || onStartOver || gallery.status === 'posted' || gallery.status === 'review') && (
           <div className='absolute left-3 top-3 flex items-center gap-1.5'>
+            <GalleryPill gallery={gallery} />
             <RemixPill remix={remix} />
             <ContestPill contest={contest} />
-            <StartOver remix={remix} onStartOver={onStartOver} className='bg-surface' />
+            <StartOver remix={remix} onStartOver={onStartOver} label={startOverLabel} className='bg-surface' />
           </div>
         )}
       </main>
@@ -363,7 +391,7 @@ export function MobileStudio({
       {contest ? (
         <ContestEntryDialog studio={studio} contest={contest} open={posting} onOpenChange={setPosting} />
       ) : (
-        <PostDialog studio={studio} remix={remix} open={posting} onOpenChange={setPosting} />
+        <PostDialog studio={studio} remix={remix} gallery={gallery} open={posting} onOpenChange={setPosting} />
       )}
     </div>
   );

@@ -1,11 +1,12 @@
 'use server';
 
 import { db } from '@/db';
-import { flagRequests, flags, leaderboard, users, flagTags } from '@/db/schema';
+import { flagRequests, flags, leaderboard, users, flagTags, savedFlags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { Flag, RelatedFlag } from '@/lib/types';
-import { and, count, eq, inArray, max, ne, sql } from 'drizzle-orm';
-import { UnsafeImageError, base64ImageToS3URI, deleteFileFromUrl } from '@/lib/storage/s3';
+import { and, count, eq, inArray, max, sql } from 'drizzle-orm';
+import { UnsafeImageError, base64ImageToS3URI } from '@/lib/storage/s3';
+import { deleteImageIfUnused } from '@/lib/storage/unused-image';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
 import { cacheDel } from '@/db/redis';
 import { relatedFlagsCacheKey, TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
@@ -146,36 +147,10 @@ export async function getPendingFlagRequests(page: number, limit: number) {
   };
 }
 
-/**
- * Deletes a stored image unless a flag still uses it. Requests can point at any
- * CloudFront URL (including another flag's image), so never delete blindly.
- */
-async function deleteImageIfUnused(
-  imageUrl: string,
-  options: { uploadsOnly?: boolean; ignoreFlagId?: string } = {},
-) {
-  if (!imageUrl.startsWith(`${CLOUD_FRONT_URL}/`)) return;
-  if (options.uploadsOnly && !imageUrl.startsWith(`${CLOUD_FRONT_URL}/images/`)) return;
-
-  const [inUse] = await db
-    .select({ id: flags.id })
-    .from(flags)
-    .where(
-      and(
-        eq(flags.image, imageUrl),
-        options.ignoreFlagId ? ne(flags.id, options.ignoreFlagId) : undefined,
-      ),
-    )
-    .limit(1);
-  if (inUse) return;
-
-  await deleteFileFromUrl(imageUrl);
-}
-
 async function declineRequest(flagRequest: typeof flagRequests.$inferSelect) {
   // Only new flags own their image; only clean up images uploaded for the request.
   if (!flagRequest.flagId) {
-    await deleteImageIfUnused(flagRequest.flag.flagImage, { uploadsOnly: true });
+    await deleteImageIfUnused(flagRequest.flag.flagImage, { prefix: 'images/' });
   }
 
   await db
@@ -304,6 +279,8 @@ async function publishNewFlagRequest(flagRequest: FlagRequestRow) {
       flagId: flag.id,
     })
     .where(eq(flagRequests.id, flagRequest.id));
+  // Posted from My Flags: the saved flag now points at what it became.
+  await db.update(savedFlags).set({ flagId: flag.id }).where(eq(savedFlags.requestId, flagRequest.id));
 
   expireCache(FLAGS_TAG);
   await cacheDel('leaderboard', TOP_CONTRIBUTORS_CACHE_KEY);
@@ -359,6 +336,22 @@ async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
     flagRequest.flag.description === flagRequest.oldFlag?.description
       ? flag.description
       : flagRequest.flag.description;
+  // A new design only comes from the flag's maker, updating it from My Flags.
+  const [fromMaker] = flagRequest.flag.design
+    ? await db
+        .select({ id: savedFlags.id })
+        .from(savedFlags)
+        .where(
+          and(
+            eq(savedFlags.requestId, flagRequest.id),
+            eq(savedFlags.flagId, flag.id),
+            eq(savedFlags.userId, flagRequest.userId),
+          ),
+        )
+        .limit(1)
+    : [];
+  const nextDesign = fromMaker ? (flagRequest.flag.design ?? flag.design) : flag.design;
+
   // Flag maker tags (remix, custom) stay on for good, whatever the edit says.
   const requestedTags = tagsChanged ? flagRequest.flag.tags : flag.tags;
   const newTags = [...requestedTags, ...flag.tags.filter((tag) => MAKER_TAGS.includes(tag) && !requestedTags.includes(tag))];
@@ -373,6 +366,7 @@ async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
       sources: nextSources,
       description: nextDescription,
       tags: newTags,
+      design: nextDesign,
       updatedAt: new Date(),
     })
     .where(eq(flags.id, flagRequest.flagId ?? ''));
@@ -494,6 +488,8 @@ export async function createFlagRequest(
   flag: Omit<Flag, 'index' | 'id'>,
   flagId?: string,
   userMessage?: string,
+  /** Posted from My Flags: the caller's saved flag this request is for. */
+  options: { savedFlagId?: string } = {},
 ) {
   const session = await getServerAuthSession();
   if (!session?.user) {
@@ -587,6 +583,14 @@ export async function createFlagRequest(
     })
     .returning();
 
+  // Linked before any auto-approval, which publishes it to the saved flag.
+  if (options.savedFlagId) {
+    await db
+      .update(savedFlags)
+      .set({ requestId: flagRequest.id })
+      .where(and(eq(savedFlags.id, options.savedFlagId), eq(savedFlags.userId, session.user.id)));
+  }
+
   const autoApproved = user.isTrusted
     ? await autoApproveFlagRequest(flagRequest)
     : false;
@@ -594,6 +598,7 @@ export async function createFlagRequest(
   return {
     success: true,
     autoApproved,
+    requestId: flagRequest.id,
     message: autoApproved
       ? 'Flag published.'
       : 'Flag request created successfully.',
