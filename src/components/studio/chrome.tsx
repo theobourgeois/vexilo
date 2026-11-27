@@ -71,7 +71,8 @@ import { FlagArt } from './FlagArt';
 import { clipsBelow, clipTargets, samePart } from './clip';
 import { fieldPartAt } from './divisions';
 import { EXPORT_WIDTH, flagWidth, RATIOS, type StudioDoc } from './model';
-import type { View } from './StudioCanvas';
+import { LayerThumb } from './panels';
+import type { MenuAt, View } from './StudioCanvas';
 import { canGroup, makeShapes } from './tools';
 import { ToolButton } from './ui';
 import type { Studio } from './use-studio';
@@ -794,7 +795,7 @@ export function ContextMenu({
   onClose,
 }: {
   studio: Studio;
-  at: { x: number; y: number; onLayer: boolean } | null;
+  at: MenuAt | null;
   onClose: () => void;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
@@ -842,6 +843,8 @@ export function ContextMenu({
       ? clipTargets(studio.design).find((t) => samePart(t.ref, { divisionId: under.divisionId!, part: under.part }))
       : null;
   const clip = single?.clip;
+  // Layers stacked under the click, top first, so ones hidden behind others can be picked.
+  const stack = (at.under ?? []).flatMap((id) => studio.design.layers.find((l) => l.id === id) ?? []);
   return (
     <div
       ref={ref}
@@ -850,6 +853,26 @@ export function ContextMenu({
       style={{ left: pos.x, top: pos.y }}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {stack.length > 1 && (
+        <>
+          <div className='px-2.5 pb-1 pt-1.5 text-xs font-medium text-subtle'>Select layer</div>
+          <div className='max-h-56 overflow-y-auto'>
+            {stack.map((layer) => (
+              <button
+                key={layer.id}
+                type='button'
+                onClick={() => (studio.setSelection([layer.id]), onClose())}
+                className='flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm font-medium outline-none hover:bg-foreground/[0.06] [&>span:first-child]:size-6 [&>span:first-child]:rounded-[5px]'
+              >
+                <LayerThumb layer={layer} />
+                <span className='min-w-0 flex-1 truncate'>{layer.name}</span>
+                {studio.selection.includes(layer.id) && <Check className='size-4 shrink-0 text-subtle' />}
+              </button>
+            ))}
+          </div>
+          <div className='my-1 h-px bg-line' />
+        </>
+      )}
       {hasLayers && (
         <>
           {item('Copy', <Copy />, actions.copy)}

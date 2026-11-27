@@ -945,7 +945,7 @@ function ShapeThumb({ layer }: { layer: StudioLayer }) {
   );
 }
 
-function LayerThumb({ layer }: { layer: StudioLayer }) {
+export function LayerThumb({ layer }: { layer: StudioLayer }) {
   if (layer.shape) return <ShapeThumb layer={layer} />;
   return <ImageThumb layer={layer} />;
 }

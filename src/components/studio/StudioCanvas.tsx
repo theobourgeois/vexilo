@@ -62,6 +62,7 @@ import { divisionKey, FIELD, type Studio } from './use-studio';
 import { layerAffine, localContours, withContours } from './vector';
 
 export type View = { zoom: number; panX: number; panY: number };
+export type MenuAt = { x: number; y: number; onLayer: boolean; under?: string[] };
 export type Rect = { x: number; y: number; w: number; h: number };
 export type Insets = { top: number; right: number; bottom: number; left: number };
 
@@ -220,7 +221,8 @@ export function StudioCanvas({
   setView: React.Dispatch<React.SetStateAction<View>>;
   insets: Insets;
   touch?: boolean;
-  onContextMenu?: (at: { x: number; y: number; onLayer: boolean }) => void;
+  /** `under` is every layer under the pointer, top first. */
+  onContextMenu?: (at: MenuAt) => void;
   onDoubleClickLayer?: (id: string, at: { x: number; y: number }) => void;
   onDoubleClickField?: (part: FieldPart, at: { x: number; y: number }) => void;
   onDropEmblem?: (emblemId: string, at: { x: number; y: number }) => void;
@@ -288,14 +290,26 @@ export function StudioCanvas({
   const anchors = React.useMemo(() => fieldAnchors(design), [design]);
 
   // A selected layer can be grabbed where its clip hides it, so one clipped out of sight can still be moved back.
-  const hitTest = (u: number, v: number) => {
+  const hits = (layer: StudioLayer, u: number, v: number) => {
+    if (layer.hidden || layer.locked) return false;
     const reach = 5 / scale;
-    for (let i = design.layers.length - 1; i >= 0; i--) {
-      const layer = design.layers[i];
-      if (layer.hidden || layer.locked) continue;
-      if (selection.includes(layer.id) ? layerAt(design, layer, W, u, v, reach, false) : onFlag(u, v) && layerAt(design, layer, W, u, v, reach)) return layer;
-    }
+    return selection.includes(layer.id) ? layerAt(design, layer, W, u, v, reach, false) : onFlag(u, v) && layerAt(design, layer, W, u, v, reach);
+  };
+  const hitTest = (u: number, v: number) => {
+    for (let i = design.layers.length - 1; i >= 0; i--) if (hits(design.layers[i], u, v)) return design.layers[i];
     return null;
+  };
+  /** Every layer under a point, top first. */
+  const layersAt = (u: number, v: number) => design.layers.filter((layer) => hits(layer, u, v)).reverse();
+  /**
+   * ⌘/Ctrl-click digs down through a stack: the next layer under the point below the one selected
+   * there, and back to the top after the bottom.
+   */
+  const deeperAt = (u: number, v: number) => {
+    const stack = layersAt(u, v);
+    const from = stack.findIndex((l) => selection.includes(l.id));
+    const after = [...stack.slice(from + 1), ...stack.slice(0, from + 1)];
+    return after.find((l) => !selection.includes(l.id)) ?? stack[0] ?? null;
   };
   /** What a click on a layer picks: its whole group, unless the selection is already inside that group. */
   const unitOf = (layer: StudioLayer) =>
@@ -684,7 +698,7 @@ export function StudioCanvas({
     }
 
     const [u, v] = toUnits(point);
-    const hit = hitTest(u, v);
+    const hit = (e.metaKey || e.ctrlKey) && !e.shiftKey ? deeperAt(u, v) : hitTest(u, v);
     if (hit) {
       const unit = unitOf(hit);
       if (e.shiftKey) {
@@ -1105,10 +1119,12 @@ export function StudioCanvas({
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
     const [u, v] = toUnits(local(e));
-    const hit = hitTest(u, v);
+    const under = layersAt(u, v);
+    // A layer already picked from lower in the stack stays picked.
+    const hit = under.find((l) => selection.includes(l.id)) ?? under[0] ?? null;
     if (hit && !selection.includes(hit.id)) setSelection(unitOf(hit));
     if (!hit && onFlag(u, v) && selection.length === 0) setSelection(fieldSelection(u, v));
-    onContextMenu?.({ x: e.clientX, y: e.clientY, onLayer: Boolean(hit) });
+    onContextMenu?.({ x: e.clientX, y: e.clientY, onLayer: Boolean(hit), under: under.map((l) => l.id) });
   }
 
   function nearestAnchor(u: number, v: number) {
