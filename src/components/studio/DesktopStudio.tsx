@@ -34,7 +34,7 @@ import { DEFAULT_DRAW, ToolOptions, ToolPicker, type DrawSettings, type ToolKind
 import { documentColors, pixelSize, type StudioEmblem } from './model';
 import { useImageImport } from './import-image';
 import { ColoursPanel, EmblemsPanel, LayersPanel, LayoutPanel, PanelTitle } from './panels';
-import { StudioCanvas, type View } from './StudioCanvas';
+import { StudioCanvas, type MenuAt, type View } from './StudioCanvas';
 import { Inspector } from './inspector';
 import { ColorPicker } from './ui';
 import { useShortcuts, type Panel } from './use-shortcuts';
@@ -71,7 +71,7 @@ export function DesktopStudio({
   const [panel, setPanel] = React.useState<Panel | null>('emblems');
   const [view, setView] = React.useState<View>({ zoom: 1, panX: 0, panY: 0 });
   const [mode, setMode] = React.useState<'flat' | 'wave'>('flat');
-  const [menu, setMenu] = React.useState<{ x: number; y: number; onLayer: boolean } | null>(null);
+  const [menu, setMenu] = React.useState<MenuAt | null>(null);
   const [posting, setPosting] = React.useState(false);
   const [colorTarget, setColorTarget] = React.useState<ColorTarget | null>(null);
   const [draw, setDraw] = React.useState<DrawSettings>(DEFAULT_DRAW);
