@@ -62,14 +62,14 @@ export default async function CommunityPage({ searchParams }: { searchParams: Se
         </Button>
       </div>
 
-      <div className='mt-7 grid gap-7 lg:grid-cols-[minmax(0,1fr)_300px]'>
+      <div className='mt-7 grid grid-cols-[minmax(0,1fr)] gap-7 lg:grid-cols-[minmax(0,1fr)_300px]'>
         <div className='min-w-0'>
           <FeedControls sort={sort} range={range} tag={tag} remixes={remixes} search={search} tags={tags} />
           <Suspense key={JSON.stringify({ sort, range, tag, search, remixes })} fallback={<PostGridSkeleton count={9} />}>
             <Feed sort={sort} range={range} tag={tag} search={search} remixes={remixes} viewerId={viewerId} />
           </Suspense>
         </div>
-        <aside className='flex flex-col gap-4'>
+        <aside className='flex min-w-0 flex-col gap-4'>
           <Suspense fallback={<div className='vx-tile h-[260px] animate-pulse' />}>
             <Rail viewerId={viewerId} />
           </Suspense>
