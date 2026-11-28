@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { deleteMyFlag, duplicateMyFlag, type MyFlag } from '@/actions/my-flags';
 import FlagImage from '@/components/FlagImage';
-import { Check, Clock, Copy, Edit, ExternalLink, Flag, GoogleLogo, Loader2, MoreHorizontal, Plus, Shuffle, Trash2 } from '@/components/icons';
+import EditPostDetailsDialog, { type PostDetails } from '@/components/community/EditPostDetailsDialog';
+import { Check, Copy, Edit, ExternalLink, Flag, GoogleLogo, Heart, Loader2, MoreHorizontal, Pencil, Plus, Shuffle, Trash2 } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -20,13 +21,12 @@ import { Segmented } from '@/components/ui/segmented';
 import { openSignIn } from '@/lib/sign-in';
 import { cn } from '@/lib/utils';
 
-type Filter = 'all' | 'drafts' | 'posted' | 'review';
+type Filter = 'all' | 'drafts' | 'posted';
 
 const FILTERS: Record<Filter, (flag: MyFlag) => boolean> = {
   all: () => true,
-  drafts: (flag) => flag.status === 'draft' || flag.status === 'declined',
+  drafts: (flag) => flag.status === 'draft',
   posted: (flag) => flag.status === 'posted',
-  review: (flag) => flag.status === 'review' || flag.updatePending,
 };
 
 function timeAgo(date: Date) {
@@ -50,30 +50,15 @@ const pill = 'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 
 
 function StatusPill({ flag }: { flag: MyFlag }) {
   if (flag.status === 'posted') {
-    return flag.updatePending ? (
-      <span className={cn(pill, 'bg-[rgb(217_154_11/0.14)] text-[#9a6a00] dark:text-[#f2c14e]')}>
-        <Clock />
-        Update in review
-      </span>
-    ) : (
+    return (
       <span className={cn(pill, 'bg-[rgb(34_160_90/0.13)] text-[#17794a] dark:bg-[rgb(80_200_130/0.14)] dark:text-[#6fd39b]')}>
         <Check />
         Posted
-      </span>
-    );
-  }
-  if (flag.status === 'review') {
-    return (
-      <span className={cn(pill, 'bg-[rgb(217_154_11/0.14)] text-[#9a6a00] dark:text-[#f2c14e]')}>
-        <Clock />
-        In review
-      </span>
-    );
-  }
-  if (flag.status === 'declined') {
-    return (
-      <span title='A moderator didn’t approve this one. You can still change it and post it again.' className={cn(pill, 'bg-foreground/[0.06] text-subtle')}>
-        Not approved
+        {flag.likes > 0 && (
+          <span className='inline-flex items-center gap-1 font-medium opacity-80'>
+            · <Heart weight='fill' /> {flag.likes.toLocaleString()}
+          </span>
+        )}
       </span>
     );
   }
@@ -84,14 +69,17 @@ function FlagTile({
   flag,
   onDuplicate,
   onDelete,
+  onEditDetails,
   busy,
 }: {
   flag: MyFlag;
   onDuplicate: () => void;
   onDelete: () => void;
+  onEditDetails: () => void;
   busy: boolean;
 }) {
-  const editHref = `/create?flag=${flag.id}`;
+  // Flags uploaded as pictures have no design to open, so they open their post.
+  const editHref = flag.hasDesign ? `/create?flag=${flag.id}` : (flag.path ?? '/my-flags');
   return (
     <article className='vx-tile group relative flex flex-col overflow-hidden transition-shadow duration-200 hover:shadow-tile-hover'>
       <Link href={editHref} aria-label={`Edit ${flag.name}`} className='flag-stage bg-stage relative h-[208px] px-6 py-7'>
@@ -116,12 +104,19 @@ function FlagTile({
             <span className='shrink-0'>Edited {timeAgo(flag.updatedAt)}</span>
           </p>
         </div>
-        <Button variant='neutral' size='sm' asChild>
-          <Link href={editHref}>
-            <Edit />
-            Edit
-          </Link>
-        </Button>
+        {flag.hasDesign ? (
+          <Button variant='neutral' size='sm' asChild>
+            <Link href={editHref}>
+              <Edit />
+              Edit
+            </Link>
+          </Button>
+        ) : (
+          <Button variant='neutral' size='sm' onClick={onEditDetails}>
+            <Pencil />
+            Details
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant='ghost' size='icon-sm' aria-label={`More for ${flag.name}`} disabled={busy}>
@@ -129,18 +124,26 @@ function FlagTile({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end'>
-            {flag.flagName && (
+            {flag.path && (
               <DropdownMenuItem asChild>
-                <Link href={`/flag/${encodeURIComponent(flag.flagName)}`}>
+                <Link href={flag.path}>
                   <ExternalLink />
-                  View on Browse
+                  View post
                 </Link>
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={onDuplicate}>
-              <Copy />
-              Duplicate
-            </DropdownMenuItem>
+            {flag.hasDesign && flag.status === 'posted' && (
+              <DropdownMenuItem onClick={onEditDetails}>
+                <Pencil />
+                Edit details
+              </DropdownMenuItem>
+            )}
+            {flag.hasDesign && (
+              <DropdownMenuItem onClick={onDuplicate}>
+                <Copy />
+                Duplicate
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className='text-bad focus:text-bad'>
               <Trash2 />
@@ -163,7 +166,7 @@ function Header({ count, children }: { count?: number; children?: React.ReactNod
             <span className='tabular-nums text-sm font-normal tracking-normal text-muted-foreground'>{count.toLocaleString()}</span>
           )}
         </h1>
-        <p className='mt-0.5 text-[13px] text-muted-foreground'>Flags you’ve made in the flag maker. Open one to keep working on it.</p>
+        <p className='mt-0.5 text-[13px] text-muted-foreground'>Everything you’ve designed: drafts only you can see, and posts on your profile.</p>
       </div>
       {children}
     </div>
@@ -206,13 +209,13 @@ export default function MyFlags({ flags: initial }: { flags: MyFlag[] }) {
   const [filter, setFilter] = React.useState<Filter>('all');
   const [busy, setBusy] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState<MyFlag | null>(null);
+  const [details, setDetails] = React.useState<PostDetails | null>(null);
   React.useEffect(() => setFlags(initial), [initial]);
 
   const shown = flags.filter(FILTERS[filter]);
   const counts = {
     drafts: flags.filter(FILTERS.drafts).length,
     posted: flags.filter(FILTERS.posted).length,
-    review: flags.filter(FILTERS.review).length,
   };
 
   async function duplicate(flag: MyFlag) {
@@ -257,7 +260,7 @@ export default function MyFlags({ flags: initial }: { flags: MyFlag[] }) {
         <Empty
           icon={<Flag />}
           title='No flags yet'
-          body='Design a flag in the flag maker and press Save. It’ll be kept here, whether you post it or not.'
+          body='Design a flag in the flag maker and press Save. Drafts stay here, just for you, until you post them.'
           action={newFlag}
         />
       ) : (
@@ -271,16 +274,11 @@ export default function MyFlags({ flags: initial }: { flags: MyFlag[] }) {
               { value: 'all', label: 'All' },
               { value: 'drafts', label: `Drafts${counts.drafts ? ` · ${counts.drafts}` : ''}` },
               { value: 'posted', label: `Posted${counts.posted ? ` · ${counts.posted}` : ''}` },
-              { value: 'review', label: `In review${counts.review ? ` · ${counts.review}` : ''}` },
             ]}
           />
           {shown.length === 0 ? (
             <p className='vx-tile px-6 py-12 text-center text-sm text-muted-foreground'>
-              {filter === 'posted'
-                ? 'None of your flags are on Browse yet. Open one and press Post.'
-                : filter === 'review'
-                  ? 'Nothing is waiting for a moderator.'
-                  : 'Every flag here has been posted.'}
+              {filter === 'posted' ? 'You haven’t posted any flags yet. Open one and press Post.' : 'Every flag here is posted.'}
             </p>
           ) : (
             <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
@@ -291,6 +289,7 @@ export default function MyFlags({ flags: initial }: { flags: MyFlag[] }) {
                   busy={busy === flag.id}
                   onDuplicate={() => duplicate(flag)}
                   onDelete={() => setDeleting(flag)}
+                  onEditDetails={() => setDetails({ id: flag.id, name: flag.name, description: flag.description, tags: flag.tags })}
                 />
               ))}
             </div>
@@ -298,15 +297,20 @@ export default function MyFlags({ flags: initial }: { flags: MyFlag[] }) {
         </>
       )}
 
+      <EditPostDetailsDialog
+        post={details}
+        open={details !== null}
+        onOpenChange={(open) => !open && setDetails(null)}
+        onSaved={(saved) => setFlags((current) => current.map((f) => (f.id === saved.id ? { ...f, ...saved } : f)))}
+      />
+
       <Dialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <DialogContent className='w-[calc(100%-2rem)] max-w-[420px] gap-4 sm:max-w-[420px]'>
           <DialogTitle>Delete {deleting?.name}?</DialogTitle>
           <DialogDescription className='text-[13.5px] text-subtle'>
-            {deleting?.flagName
-              ? 'It comes out of My flags. The posted flag stays on Browse, but you won’t be able to open its design here again.'
-              : deleting?.status === 'review'
-                ? 'It comes out of My flags. The post waiting for review isn’t withdrawn.'
-                : 'This can’t be undone.'}
+            {deleting?.status === 'posted'
+              ? 'It comes off your profile too, with its likes, and its link stops working. This can’t be undone. To keep it but hide it, open it and take the post down instead.'
+              : 'This can’t be undone.'}
           </DialogDescription>
           <div className='flex justify-end gap-2'>
             <Button variant='neutral' onClick={() => setDeleting(null)}>

@@ -17,6 +17,7 @@ import {
 } from './ui/dropdown-menu';
 import { getUserData } from '@/actions/users';
 import FlagImage from './FlagImage';
+import { profilePath } from '@/lib/post-slug';
 
 export function AuthHeader() {
   const { data: session, status } = useSession();
@@ -66,7 +67,11 @@ export function AuthHeader() {
           )}
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push(`/profile/${userData?.user?.userNumber || 'me'}`)}>
+        <DropdownMenuItem onClick={() => router.push(
+              userData?.user && !userData.user.isAnonymous && userData.user.name
+                ? profilePath(userData.user.name)
+                : `/profile/${userData?.user?.userNumber || 'me'}`,
+            )}>
           <User />
           Profile
         </DropdownMenuItem>

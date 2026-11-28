@@ -1,6 +1,4 @@
-import { db } from "@/db";
-import { flagOfTheDay, flags } from "@/db/schema";
-import { count, eq } from "drizzle-orm";
+import { generateFlagOfTheDay } from "@/actions/flags";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -10,18 +8,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const flagCount = (await db.select({ count: count() }).from(flags))?.[0]
-      .count;
-    const randomIndex = Math.floor(Math.random() * flagCount);
-    const fotd = await db
-      .select()
-      .from(flags)
-      .where(eq(flags.index, randomIndex))
-      .limit(1);
-
-    await db.insert(flagOfTheDay).values({
-      flagId: fotd[0].id,
-    });
+    // Picks a real flag: never one that moved to the community, never a design.
+    await generateFlagOfTheDay();
 
     return NextResponse.json(
       { message: "Flag of the day generated" },

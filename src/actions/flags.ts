@@ -10,6 +10,7 @@ import {
   flagRequests,
   flags,
   flagTags,
+  flagViewDaily,
   reports,
   type FlagAiStructuredData,
   users,
@@ -22,12 +23,15 @@ import { getTrait, isColorFamily, parseFlagQuery } from '@/lib/flag-search-terms
 import { Flag } from '@/lib/types';
 import { unstable_cache } from 'next/cache';
 import { getLiveFavorites } from './collections';
+import { inEncyclopedia } from '@/lib/encyclopedia';
 import {
   and,
   asc,
   count,
   desc,
   eq,
+  gt,
+  gte,
   ilike,
   inArray,
   ne,
@@ -366,8 +370,8 @@ const getCachedFlagsByIds = unstable_cache(
         relatedFlags: flags.relatedFlags,
       })
       .from(flags)
-      .where(inArray(flags.id, flagIds)),
-  ['flags-by-ids-v1'],
+      .where(and(inArray(flags.id, flagIds), inEncyclopedia)),
+  ['flags-by-ids-v2'],
   { revalidate: FLAG_PAGE_CACHE_SECONDS, tags: [FLAGS_TAG] },
 );
 
@@ -398,6 +402,30 @@ async function getSharedFlagsByIds(flagIds: string[]) {
 async function getFlagsByIds(flagIds: string[]) {
   const [rows, overlay] = await Promise.all([getSharedFlagsByIds(flagIds), getLiveFavorites(flagIds)]);
   return withFavorites(rows, overlay);
+}
+
+/** The real flags with the most views over the last 7 days, most first. The id list is shared and cached for an hour. */
+const getCachedMostViewedIds = unstable_cache(
+  async (limit: number) => {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const total = sql<number>`sum(${flagViewDaily.views})`.mapWith(Number);
+    const rows = await db
+      .select({ id: flagViewDaily.flagId, total })
+      .from(flagViewDaily)
+      .innerJoin(flags, eq(flags.id, flagViewDaily.flagId))
+      .where(and(gte(flagViewDaily.day, since), inEncyclopedia))
+      .groupBy(flagViewDaily.flagId)
+      .orderBy(desc(total))
+      .limit(limit);
+    return rows.map((row) => row.id);
+  },
+  ['most-viewed-week-v1'],
+  { revalidate: 60 * 60, tags: [FLAGS_TAG] },
+);
+
+export async function getMostViewedFlagsThisWeek(limit = 4) {
+  const ids = await getCachedMostViewedIds(Math.min(Math.max(limit, 1), 12));
+  return getFlagsByIds(ids);
 }
 
 // Helper function to update tag counts when tags are added or removed
@@ -524,6 +552,7 @@ export async function getTopFlagTags(limit: number) {
   const topTags = await db
     .select({ tag: flagTags.tag, count: flagTags.count })
     .from(flagTags)
+    .where(gt(flagTags.count, 0))
     .orderBy(desc(flagTags.count))
     .limit(clampedLimit);
 
@@ -542,7 +571,7 @@ export async function getAllFlagTags(
   const tags = await db
     .select({ tag: flagTags.tag, count: flagTags.count })
     .from(flagTags)
-    .where(search ? ilike(flagTags.tag, `%${search}%`) : sql`1=1`)
+    .where(and(gt(flagTags.count, 0), search ? ilike(flagTags.tag, `%${search}%`) : undefined))
     .orderBy(desc(flagTags.count))
     .limit(limit)
     .offset(offset);
@@ -550,7 +579,7 @@ export async function getAllFlagTags(
   const totalCount = await db
     .select({ count: count() })
     .from(flagTags)
-    .where(search ? ilike(flagTags.tag, `%${search}%`) : sql`1=1`);
+    .where(and(gt(flagTags.count, 0), search ? ilike(flagTags.tag, `%${search}%`) : undefined));
 
   return {
     tags,
@@ -648,6 +677,7 @@ async function getFlagDetailFromNameQuery(flagName: string) {
       createdAt: flags.createdAt,
       relatedFlags: flags.relatedFlags,
       remixOf: flags.remixOf,
+      movedToPostId: flags.movedToPostId,
       metadataId: flagAiMetadata.id,
       metadataFlagId: flagAiMetadata.flagId,
       metadataGenerationStatus: flagAiMetadata.generationStatus,
@@ -668,13 +698,15 @@ async function getFlagDetailFromNameQuery(flagName: string) {
     .from(flags)
     .leftJoin(flagAiMetadata, eq(flagAiMetadata.flagId, flags.id))
     .where(eq(flags.name, flagName))
+    // A real flag wins over a moved one with the same name.
+    .orderBy(sql`${flags.movedToPostId} IS NOT NULL`)
     .limit(1);
 }
 
 /** A flag page's shared data, cached for a day or until a flag is edited. */
 const getCachedFlagDetailRow = unstable_cache(
   async (flagName: string) => (await getFlagDetailFromNameQuery(flagName))[0] ?? null,
-  ['flag-detail-v1'],
+  ['flag-detail-v2'],
   { revalidate: FLAG_PAGE_CACHE_SECONDS, tags: [FLAGS_TAG] },
 );
 
@@ -718,6 +750,7 @@ export async function getFlagDetailFromName(flagName: string) {
     createdAt: row.createdAt,
     relatedFlags: row.relatedFlags,
     remixOf: row.remixOf,
+    movedToPostId: row.movedToPostId,
     metadata,
     displayDescription,
     displayTags,
@@ -732,7 +765,7 @@ async function getLinkedFlagIds(flagId: string, ownRelated: string[]) {
   const linkingHere = await db
     .select({ id: flags.id })
     .from(flags)
-    .where(sql`related_flags @> ${JSON.stringify([flagId])}::jsonb`);
+    .where(and(sql`related_flags @> ${JSON.stringify([flagId])}::jsonb`, inEncyclopedia));
   return Array.from(new Set([...ownRelated, ...linkingHere.map((flag) => flag.id)].filter(Boolean)));
 }
 
@@ -743,7 +776,7 @@ async function getFlagIdsBySharedTags(flagId: string, tags: string[], limit: num
   const rows = await db
     .select({ id: flags.id })
     .from(flags)
-    .where(and(ne(flags.id, flagId), sql`${flags.tags} && ${tagArray}`))
+    .where(and(ne(flags.id, flagId), sql`${flags.tags} && ${tagArray}`, inEncyclopedia))
     .orderBy(
       sql`cardinality(ARRAY(SELECT unnest(${flags.tags}) INTERSECT SELECT unnest(${tagArray}))) DESC`,
       desc(flags.favorites),
@@ -820,7 +853,7 @@ async function rankSimilarByMetadata(flagId: string, source: RecommendationMetad
     })
     .from(flagAiMetadata)
     .innerJoin(flags, eq(flags.id, flagAiMetadata.flagId))
-    .where(ne(flagAiMetadata.flagId, flagId));
+    .where(and(ne(flagAiMetadata.flagId, flagId), inEncyclopedia));
 
   return candidates
     .map((candidate) => ({
@@ -887,7 +920,7 @@ export async function getRandomFlagsForQuiz(count = 32) {
   const rows = await db
     .select({ id: flags.id, name: flags.name, image: flags.image })
     .from(flags)
-    .where(and(inArray(flags.index, [...picks]), sql`${flags.design} is null`, sql`${flags.remixOf} is null`));
+    .where(and(inArray(flags.index, [...picks]), sql`${flags.design} is null`, sql`${flags.remixOf} is null`, inEncyclopedia));
   return rows.slice(0, size);
 }
 
@@ -1065,12 +1098,12 @@ const getCachedFlagsPage = unstable_cache(
         sources: flags.sources,
       })
       .from(flags)
-      .where(and(search.where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`))
+      .where(and(search.where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`, inEncyclopedia))
       .orderBy(...search.orderBy(orderByClause(orderBy, orderDirection)))
       .limit(limit)
       .offset((page - 1) * limit);
   },
-  ['browse-flags-v1'],
+  ['browse-flags-v2'],
   { revalidate: BROWSE_CACHE_SECONDS, tags: [FLAGS_TAG] },
 );
 
@@ -1080,10 +1113,10 @@ const getCachedFlagsCount = unstable_cache(
     const [{ count: total }] = await db
       .select({ count: count() })
       .from(flags)
-      .where(and(where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`));
+      .where(and(where, tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`, inEncyclopedia));
     return total;
   },
-  ['browse-flags-count-v1'],
+  ['browse-flags-count-v2'],
   { revalidate: BROWSE_CACHE_SECONDS, tags: [FLAGS_TAG] },
 );
 
@@ -1156,6 +1189,7 @@ export async function getUserFavorites(
         search.where,
         await isFavorite(userId),
         tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`,
+        inEncyclopedia,
       ),
     )
     .orderBy(...search.orderBy(orderByClause(orderBy)))
@@ -1209,6 +1243,7 @@ export async function getFavoriteFlagsCount(query?: string, tag?: string, filter
         buildFlagSearch(query, filters).where,
         await isFavorite(),
         tag ? sql`${flags.tags} @> ARRAY[${tag}]` : sql`1=1`,
+        inEncyclopedia,
       ),
     );
 
@@ -1273,13 +1308,17 @@ export async function createAdminFlags(flagList: Flag[]) {
 }
 
 export async function generateFlagOfTheDay() {
-  const flagCount = await getFlagsCount('');
-  const randomIndex = Math.floor(Math.random() * flagCount);
-  const fotd = await db
-    .select()
+  // The first real flag at or after a random index: indexes have gaps (deleted and moved flags).
+  const max = await getMaxFlagIndex();
+  const randomIndex = Math.floor(Math.random() * (max + 1));
+  const real = and(inEncyclopedia, sql`${flags.design} is null`, sql`${flags.remixOf} is null`);
+  let fotd = await db
+    .select({ id: flags.id })
     .from(flags)
-    .where(eq(flags.index, randomIndex))
+    .where(and(sql`${flags.index} >= ${randomIndex}`, real))
+    .orderBy(asc(flags.index))
     .limit(1);
+  if (!fotd[0]) fotd = await db.select({ id: flags.id }).from(flags).where(real).orderBy(asc(flags.index)).limit(1);
 
   await db.insert(flagOfTheDay).values({
     flagId: fotd[0].id,
@@ -1438,6 +1477,7 @@ export async function getUserFlags(userNumber: string, page: number) {
         eq(flagRequests.userId, user.id),
         eq(flagRequests.approved, true),
         eq(flagRequests.isEdit, false),
+        inEncyclopedia,
       ),
     )
     .orderBy(desc(flagRequests.createdAt))
@@ -1452,11 +1492,13 @@ export async function getUserFlags(userNumber: string, page: number) {
   const totalFlagsCount = await db
     .select({ count: count() })
     .from(flagRequests)
+    .innerJoin(flags, eq(flags.id, sql`${flagRequests.flagId}::uuid`))
     .where(
       and(
         eq(flagRequests.userId, user.id),
         eq(flagRequests.approved, true),
         eq(flagRequests.isEdit, false),
+        inEncyclopedia,
       ),
     );
 
@@ -1477,22 +1519,26 @@ export async function getUserContributionCounts(userNumber: string) {
   const totalFlagCount = await db
     .select({ count: count() })
     .from(flagRequests)
+    .innerJoin(flags, eq(flags.id, sql`${flagRequests.flagId}::uuid`))
     .where(
       and(
         eq(flagRequests.userId, user.id),
         eq(flagRequests.approved, true),
         eq(flagRequests.isEdit, false),
+        inEncyclopedia,
       ),
     );
 
   const totalEditCount = await db
     .select({ count: count() })
     .from(flagRequests)
+    .innerJoin(flags, eq(flags.id, sql`${flagRequests.flagId}::uuid`))
     .where(
       and(
         eq(flagRequests.userId, user.id),
         eq(flagRequests.approved, true),
         eq(flagRequests.isEdit, true),
+        inEncyclopedia,
       ),
     );
 
@@ -1531,7 +1577,7 @@ export async function getProfileUserFavorites(
   const totalFlagsCount = await db
     .select({ count: count() })
     .from(flags)
-    .where(await isFavorite(user.id));
+    .where(and(await isFavorite(user.id), inEncyclopedia));
 
   return {
     flags: userFlags,
@@ -1578,6 +1624,7 @@ export async function getUserEditedFlags(userNumber: string, page: number) {
         eq(flagRequests.userId, user.id),
         eq(flagRequests.approved, true),
         eq(flagRequests.isEdit, true),
+        inEncyclopedia,
       ),
     )
     .orderBy(desc(flagRequests.createdAt))
@@ -1587,11 +1634,13 @@ export async function getUserEditedFlags(userNumber: string, page: number) {
   const totalEditedFlagsCount = await db
     .select({ count: count() })
     .from(flagRequests)
+    .innerJoin(flags, eq(flags.id, sql`${flagRequests.flagId}::uuid`))
     .where(
       and(
         eq(flagRequests.userId, user.id),
         eq(flagRequests.approved, true),
         eq(flagRequests.isEdit, true),
+        inEncyclopedia,
       ),
     );
 

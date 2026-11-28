@@ -127,7 +127,7 @@ export default function TagsPage() {
 						{tags.map((tag) => (
 							<li key={tag.tag} className="shadow-[0_-1px_0_var(--line)]">
 								<Link
-									href={`/?tag=${encodeURIComponent(tag.tag)}`}
+									href={`/browse?tag=${encodeURIComponent(tag.tag)}`}
 									className="group flex h-11 items-center gap-3 rounded-xl px-3.5 transition-colors hover:bg-foreground/[0.03]"
 								>
 									<span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-subtle transition-colors group-hover:text-foreground">

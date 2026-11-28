@@ -69,7 +69,7 @@ export default async function CollectionPage({ params }: Props) {
         })}
       />
       <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
-        <Link href='/' className='hover:text-foreground'>
+        <Link href='/browse' className='hover:text-foreground'>
           Browse
         </Link>
         <ChevronRight className='size-3' />

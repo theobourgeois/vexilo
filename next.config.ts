@@ -23,7 +23,28 @@ const FLAG_PAGE_CDN_CACHE = {
   headers: [{ key: 'Vercel-CDN-Cache-Control', value: 's-maxage=86400' }],
 };
 
+/**
+ * The flag grid used to be the homepage, so searches and filters were `/?q=…`. `/` is now the hub;
+ * any of those old query links goes to the same view on /browse (the query string comes along).
+ */
+const OLD_BROWSE_QUERY_KEYS = ['q', 'tag', 'color', 'trait', 'favorites', 'page', 'orderBy', 'orderDirection'];
+
 const nextConfig: NextConfig = {
+  async redirects() {
+    return OLD_BROWSE_QUERY_KEYS.map((key) => ({
+      source: '/',
+      has: [{ type: 'query' as const, key }],
+      destination: '/browse',
+      permanent: true,
+    }));
+  },
+  // Profiles and posts live at /@username and /@username/slug; "@" can't start a route folder, so they're served from /u.
+  async rewrites() {
+    return [
+      { source: '/@:username', destination: '/u/:username' },
+      { source: '/@:username/:rest*', destination: '/u/:username/:rest*' },
+    ];
+  },
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }, FLAG_PAGE_CDN_CACHE];
   },

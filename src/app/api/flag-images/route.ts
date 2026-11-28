@@ -1,7 +1,7 @@
 import { UnsafeImageError, uploadFile } from "@/lib/storage/s3";
 import { getServerAuthSession } from "@/lib/auth";
 import { MAX_FLAG_IMAGE_BYTES } from "@/lib/batch-flags";
-import { CLOUD_FRONT_URL } from "@/lib/constant";
+import { storedFileUrl } from "@/lib/storage/local-storage";
 import { NextResponse } from "next/server";
 
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
@@ -58,5 +58,5 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  return NextResponse.json({ url: `${CLOUD_FRONT_URL}/${key}` });
+  return NextResponse.json({ url: storedFileUrl(key) });
 }

@@ -1,5 +1,6 @@
 import { MAX_FLAG_IMAGE_BYTES } from '@/lib/batch-flags';
 import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { isLocalStorage, isStoredFileUrl } from '@/lib/storage/local-storage';
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 
@@ -22,7 +23,9 @@ export async function rasterizeFlag(src: string, cacheControl = 'public, max-age
   } catch {
     return NextResponse.json({ message: 'Invalid image URL.' }, { status: 400 });
   }
-  if (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname)) {
+  // Local dev serves uploads from its own /local-uploads route over http.
+  const localUpload = isLocalStorage() && isStoredFileUrl(url.href);
+  if (!localUpload && (url.protocol !== 'https:' || !ALLOWED_HOSTS.has(url.hostname))) {
     return NextResponse.json({ message: 'Unsupported image host.' }, { status: 400 });
   }
 

@@ -9,7 +9,8 @@ import {
   normalizeFlagNameForComparison,
   parseWikimediaFileTitle,
 } from '@/lib/batch-flags';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { storedFileUrl } from '@/lib/storage/local-storage';
+import { inEncyclopedia } from '@/lib/encyclopedia';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { UnsafeImageError, uploadFile } from '@/lib/storage/s3';
 
@@ -136,7 +137,7 @@ export async function resolveWikimediaFlag(
     success: true,
     name: flagNameFromFileName(fileName),
     fileName,
-    imageUrl: `${CLOUD_FRONT_URL}/${key}`,
+    imageUrl: storedFileUrl(key),
     source: info.descriptionurl,
   };
 }
@@ -191,6 +192,8 @@ export async function findExistingFlags(
       .select({ name: flags.name, sources: flags.sources })
       .from(flags)
       .where(
+        and(
+        inEncyclopedia,
         or(
           sql`lower(regexp_replace(${flags.name}, '^the\\s+', '', 'i')) in (${lowerNameList})`,
           sourceUrls.length > 0
@@ -199,6 +202,7 @@ export async function findExistingFlags(
                 sql`, `,
               )}]::text[]`
             : undefined,
+        ),
         ),
       ),
     db

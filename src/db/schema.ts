@@ -6,6 +6,7 @@ import {
   index,
   integer,
   pgTableCreator,
+  serial,
   primaryKey,
   text,
   timestamp,
@@ -153,6 +154,12 @@ export const users = createTable('user', {
   favoriteFlagId: uuid('favorite_flag_id').references(() => flags.id, {
     onDelete: 'set null',
   }),
+  // A profile flag that's one of their own posts; favoriteFlagId is for real flags.
+  profilePostId: uuid('profile_post_id').references((): AnyPgColumn => savedFlags.id, { onDelete: 'set null' }),
+  bio: varchar('bio', { length: 160 }).notNull().default(''),
+  link: varchar('link', { length: 200 }).notNull().default(''),
+  location: varchar('location', { length: 60 }).notNull().default(''),
+  pinnedPostIds: uuid('pinned_post_ids').array().notNull().default(sql`'{}'::uuid[]`),
 }, (table) => [
   uniqueIndex('user_email_unique').on(sql`lower(${table.email})`),
   uniqueIndex('user_name_unique').on(sql`lower(${table.name})`),
@@ -265,6 +272,10 @@ export const flags = createTable(
     // Flags made in the flag maker: the flag it remixed (if any) and the editable design.
     remixOf: uuid('remix_of').references((): AnyPgColumn => flags.id, { onDelete: 'set null' }),
     design: jsonb('design').$type<StoredStudioDesign>(),
+    // Moved to the community (see scripts/community/move-custom-flags.ts). Every encyclopedia
+    // list skips these; see `inEncyclopedia` in src/lib/encyclopedia.ts. Not a foreign key, so a
+    // deleted post doesn't put its old flag back.
+    movedToPostId: uuid('moved_to_post_id'),
   },
   (table) => ({
     indexUnique: uniqueIndex('index_unique').on(table.index),
@@ -490,10 +501,12 @@ export const flagRequests = createTable('flag_request', {
 ]);
 
 /**
- * A flag someone made in the flag maker and kept, posted or not: their My Flags gallery.
- * `image` is a picture of the design as last saved (or as posted). Posting links the row to its
- * request (`requestId`), and to the flag once it's published (`flagId`); an update to a posted
- * flag goes through a new edit request, which `requestId` then points at.
+ * A flag someone made and kept: their My Flags gallery, and their posts. A post is a saved flag
+ * with `publishedAt` set; it lives at /@username/slug. Uploaded designs (and flags moved over
+ * from the encyclopedia) have no maker `design`, only an `image`.
+ *
+ * `flagId` and `requestId` are from before posts: a design posted to the encyclopedia, and the
+ * request that did it. A moved flag keeps its `flagId` (the old row, marked `movedToPostId`).
  */
 export const savedFlags = createTable(
   'saved_flag',
@@ -501,13 +514,23 @@ export const savedFlags = createTable(
     id: uuid('id').primaryKey().defaultRandom(),
     userId: uuid('user_id')
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+      .references((): AnyPgColumn => users.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 120 }).notNull(),
-    design: jsonb('design').$type<StoredStudioDesign>().notNull(),
+    design: jsonb('design').$type<StoredStudioDesign>(),
     image: varchar('image', { length: 1000 }).notNull(),
-    remixOf: uuid('remix_of').references(() => flags.id, { onDelete: 'set null' }),
-    flagId: uuid('flag_id').references(() => flags.id, { onDelete: 'set null' }),
+    remixOf: uuid('remix_of').references((): AnyPgColumn => flags.id, { onDelete: 'set null' }),
+    remixOfPostId: uuid('remix_of_post_id').references((): AnyPgColumn => savedFlags.id, { onDelete: 'set null' }),
+    flagId: uuid('flag_id').references((): AnyPgColumn => flags.id, { onDelete: 'set null' }),
     requestId: uuid('request_id').references(() => flagRequests.id, { onDelete: 'set null' }),
+    slug: varchar('slug', { length: 80 }),
+    description: text('description').notNull().default(''),
+    tags: text('tags').array().notNull().default([]),
+    publishedAt: timestamp('published_at', { mode: 'date' }),
+    likes: integer('likes').notNull().default(0),
+    views: integer('views').notNull().default(0),
+    /** Colours read from `paletteImage`; read again once the image changes. */
+    palette: jsonb('palette').$type<{ hex: string; name: string; share: number }[]>(),
+    paletteImage: varchar('palette_image', { length: 1000 }),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
@@ -516,6 +539,99 @@ export const savedFlags = createTable(
     uniqueIndex('saved_flag_flag_idx').on(table.flagId),
     uniqueIndex('saved_flag_request_idx').on(table.requestId),
     index('saved_flag_image_idx').on(table.image),
+    uniqueIndex('saved_flag_slug_idx').on(table.userId, table.slug),
+    index('saved_flag_published_idx').on(table.publishedAt.desc()).where(sql`${table.publishedAt} IS NOT NULL`),
+    index('saved_flag_likes_idx').on(table.likes.desc(), table.publishedAt.desc()).where(sql`${table.publishedAt} IS NOT NULL`),
+    index('saved_flag_remix_of_idx').on(table.remixOf).where(sql`${table.publishedAt} IS NOT NULL`),
+    index('saved_flag_remix_of_post_idx').on(table.remixOfPostId).where(sql`${table.publishedAt} IS NOT NULL`),
+  ],
+);
+
+export const postLikes = createTable(
+  'post_like',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => savedFlags.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.postId] }),
+    index('post_like_post_idx').on(table.postId),
+    index('post_like_user_idx').on(table.userId, table.createdAt.desc()),
+  ],
+);
+
+export const follows = createTable(
+  'follow',
+  {
+    followerId: uuid('follower_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    followingId: uuid('following_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.followerId, table.followingId] }),
+    index('follow_following_idx').on(table.followingId),
+    check('follow_not_self', sql`${table.followerId} <> ${table.followingId}`),
+  ],
+);
+
+export type NotificationType = 'like' | 'follow' | 'remix';
+
+/** Likes, follows and remixes, for the bell. One per actor, kind and post; grouped when shown. */
+export const notifications = createTable(
+  'notification',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: varchar('type', { length: 16 }).$type<NotificationType>().notNull(),
+    postId: uuid('post_id').references(() => savedFlags.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    readAt: timestamp('read_at', { mode: 'date' }),
+  },
+  (table) => [
+    index('notification_user_idx').on(table.userId, table.createdAt.desc()),
+    // NULLS NOT DISTINCT in the migration, so one follow notification per follower too.
+    uniqueIndex('notification_once_idx').on(table.userId, table.actorId, table.type, table.postId),
+  ],
+);
+
+/**
+ * What the community move changed, so it can be undone, and so /flag/ links to moved flags
+ * keep redirecting after the old rows are gone. No foreign keys: it outlives those rows.
+ */
+export const postMoves = createTable(
+  'post_move',
+  {
+    id: serial('id').primaryKey(),
+    batchId: uuid('batch_id').notNull(),
+    // Null for a saved flag that was waiting for review and was published without it.
+    flagId: uuid('flag_id'),
+    flagName: varchar('flag_name', { length: 255 }).notNull(),
+    postId: uuid('post_id').notNull(),
+    createdPost: boolean('created_post').notNull(),
+    previous: jsonb('previous').$type<Record<string, unknown> | null>(),
+    profileUserIds: uuid('profile_user_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    closedRequestIds: uuid('closed_request_ids').array().notNull().default(sql`'{}'::uuid[]`),
+    revertedAt: timestamp('reverted_at', { mode: 'date' }),
+    movedAt: timestamp('moved_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('post_move_flag_idx').on(table.flagId),
+    index('post_move_name_idx').on(table.flagName),
+    index('post_move_batch_idx').on(table.batchId),
   ],
 );
 

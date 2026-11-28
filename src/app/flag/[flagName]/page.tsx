@@ -4,12 +4,15 @@ import {
   getFlagEditHistory,
 } from '@/actions/flags';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, ChevronRight } from '@/components/icons';
+import { ArrowLeft, BookOpen, ChevronRight, Shuffle } from '@/components/icons';
 import { after } from 'next/server';
 import { addCacheTag } from '@vercel/functions';
 import { FLAGS_TAG } from '@/lib/cache-tags';
 import { Button } from '@/components/ui/button';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
+import { getPostPathById, listPosts } from '@/lib/posts';
+import PostCard from '@/components/community/PostCard';
 import Contributors, { type Contributor, type EditEntry } from './Contributors';
 import FlagActions from './FlagActions';
 import FavoriteCount from './FavoriteCount';
@@ -57,6 +60,8 @@ function flagPageTitle(flag: { name: string; metadata?: { historicalContext?: st
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const flagName = decodeURIComponent((await params).flagName);
   const flag = await getFlagDetailFromName(flagName);
+  // The page redirects to the post; it streams (loading.tsx), so that arrives as an instant meta refresh.
+  if (flag?.movedToPostId) return { robots: { index: false } };
   if (flag) {
     const pageUrl = absoluteUrl(flagPath(flag.name));
     const title = flagPageTitle(flag);
@@ -267,6 +272,42 @@ async function RelatedFlagsSection({ flagId }: { flagId: string }) {
   );
 }
 
+/** The flag page is the same for everyone, so its remixes are too: cached for an hour. */
+const getFlagRemixes = unstable_cache(
+  async (flagId: string) => listPosts({ remixOfFlagId: flagId, sort: 'popular', range: 'all', viewerId: null, limit: 4 }),
+  ['flag-remixes-v1'],
+  { revalidate: 3600 },
+);
+
+async function CommunityRemixesSection({ flagId, flagName }: { flagId: string; flagName: string }) {
+  const { posts } = await getFlagRemixes(flagId);
+  return (
+    <section className='mt-14'>
+      <div className='mb-4 flex flex-wrap items-center gap-3'>
+        <h2 className='text-[17px] font-semibold tracking-[-0.02em]'>Community remixes</h2>
+        <span className='flex-1' />
+        <Button variant='neutral' size='sm' asChild>
+          <Link href={`/create?remix=${flagId}`} rel='nofollow'>
+            <Shuffle />
+            Remix this flag
+          </Link>
+        </Button>
+      </div>
+      {posts.length > 0 ? (
+        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </div>
+      ) : (
+        <p className='rounded-2xl border border-dashed border-border px-6 py-8 text-center text-[14px] text-subtle'>
+          Nobody has remixed {flagName} yet. Start from it in the flag maker and post yours to the community.
+        </p>
+      )}
+    </section>
+  );
+}
+
 // Streams in after the page so the edit history query doesn't block it.
 async function ContributorsSection({ flagId }: { flagId: string }) {
   const editHistory = await getFlagEditHistory(flagId);
@@ -449,6 +490,12 @@ export default async function FlagPage({
   if (!flag) {
     notFound();
   }
+  // Made-up flags moved to the community: old links go to the post, or nowhere if it was taken down.
+  if (flag.movedToPostId) {
+    const path = await getPostPathById(flag.movedToPostId);
+    if (path) permanentRedirect(path);
+    notFound();
+  }
 
   after(async () => {
     try {
@@ -526,13 +573,13 @@ export default async function FlagPage({
         </Suspense>
         <div className='mx-auto max-w-[1312px] px-4 pb-10 md:px-8 lg:pb-12'>
           <nav className='flex items-center gap-2 pb-4 pt-[22px] text-[13px] text-muted-foreground'>
-            <Link href='/' className='hover:text-foreground'>
+            <Link href='/browse' className='hover:text-foreground'>
               Browse
             </Link>
             {firstTag && (
               <>
                 <ChevronRight className='size-3' />
-                <Link href={`/?tag=${encodeURIComponent(firstTag)}`} className='hover:text-foreground'>
+                <Link href={`/browse?tag=${encodeURIComponent(firstTag)}`} className='hover:text-foreground'>
                   {firstTag}
                 </Link>
               </>
@@ -671,6 +718,12 @@ export default async function FlagPage({
         >
           <RelatedFlagsSection flagId={flag.id} />
         </Suspense>
+
+        {!madeInMaker && (
+          <Suspense fallback={null}>
+            <CommunityRemixesSection flagId={flag.id} flagName={flag.name} />
+          </Suspense>
+        )}
       </div>
     </>
   );

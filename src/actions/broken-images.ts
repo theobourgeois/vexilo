@@ -4,7 +4,8 @@ import { db } from '@/db';
 import { flagColors, flags } from '@/db/schema';
 import { getServerAuthSession } from '@/lib/auth';
 import { findImageReplacements, isImageGone, replaceFlagImage } from '@/lib/storage/flag-image-repair';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
+import { inEncyclopedia } from '@/lib/encyclopedia';
 
 async function isAdmin() {
   const session = await getServerAuthSession();
@@ -28,7 +29,7 @@ export async function getBrokenImageFlags(): Promise<BrokenImageFlag[] | null> {
     .select({ id: flags.id, name: flags.name, index: flags.index, image: flags.image })
     .from(flags)
     .innerJoin(flagColors, eq(flagColors.flagId, flags.id))
-    .where(sql`jsonb_array_length(${flagColors.colors}) = 0`)
+    .where(and(sql`jsonb_array_length(${flagColors.colors}) = 0`, inEncyclopedia))
     .orderBy(asc(flags.name));
 
   const result: BrokenImageFlag[] = [];

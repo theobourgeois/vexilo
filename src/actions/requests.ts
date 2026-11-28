@@ -7,9 +7,9 @@ import { Flag, RelatedFlag } from '@/lib/types';
 import { and, count, eq, inArray, max, sql } from 'drizzle-orm';
 import { UnsafeImageError, base64ImageToS3URI } from '@/lib/storage/s3';
 import { deleteImageIfUnused } from '@/lib/storage/unused-image';
-import { CLOUD_FRONT_URL } from '@/lib/constant';
+import { isStoredFileUrl } from '@/lib/storage/local-storage';
 import { cacheDel } from '@/db/redis';
-import { relatedFlagsCacheKey, TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
+import { LEADERBOARD_CACHE_KEY, relatedFlagsCacheKey, TOP_CONTRIBUTORS_CACHE_KEY } from '@/lib/cache-keys';
 import { saveFlagColorsLater } from '@/lib/flag-palette';
 import { upsertFlagMetadataMirror } from './flag-ai-metadata';
 import { findExistingFlags } from './batch-flags';
@@ -283,7 +283,7 @@ async function publishNewFlagRequest(flagRequest: FlagRequestRow) {
   await db.update(savedFlags).set({ flagId: flag.id }).where(eq(savedFlags.requestId, flagRequest.id));
 
   expireCache(FLAGS_TAG);
-  await cacheDel('leaderboard', TOP_CONTRIBUTORS_CACHE_KEY);
+  await cacheDel(LEADERBOARD_CACHE_KEY, TOP_CONTRIBUTORS_CACHE_KEY);
   await cacheDel('tags');
 
   return flag.id;
@@ -398,7 +398,7 @@ async function publishFlagEditRequest(flagRequest: FlagRequestRow) {
     .where(eq(flagRequests.id, flagRequest.id));
 
   expireCache(FLAGS_TAG);
-  await cacheDel('leaderboard', TOP_CONTRIBUTORS_CACHE_KEY);
+  await cacheDel(LEADERBOARD_CACHE_KEY, TOP_CONTRIBUTORS_CACHE_KEY);
   await cacheDel('tags');
   await cacheDel(`flag-${flagRequest.flagId}`);
   await cacheDel(`recommendations-${flagRequest.flagId}`, relatedFlagsCacheKey(flagRequest.flagId ?? ''));
@@ -1002,7 +1002,7 @@ export async function submitAiFlagDrafts(drafts: AiFlagDraftSubmission[]) {
   const invalid = drafts.find(
     (draft) =>
       !draft.flagName.trim() ||
-      !draft.flagImage.startsWith(`${CLOUD_FRONT_URL}/`) ||
+      !isStoredFileUrl(draft.flagImage) ||
       (draft.imageOrigin === 'commons' && draft.sources.length === 0),
   );
   if (invalid) {

@@ -100,7 +100,7 @@ export function Leaderboard() {
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
                                                             <Link
-                                                                href={`/flag/${encodeURIComponent(user.favoriteFlag.name)}`}
+                                                                href={user.favoriteFlag.href}
                                                                 className="absolute -bottom-1 -left-1 w-6 h-4 rounded border border-white/30 shadow-[0_2px_4px_oklch(0%_0_0/0.4)] overflow-hidden bg-background hover:scale-110 transition-transform"
                                                             >
                                                                 <Image

@@ -180,10 +180,12 @@ export const getServerAuthSession = async () => {
     .select({
       passwordAccount: sql<boolean>`${users.hashedPassword} is not null`,
       emailVerified: users.emailVerified,
+      name: users.name,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
   if (!user || (user.passwordAccount && !user.emailVerified)) return null;
-  return session;
+  // The username can change after the session was issued; links built from it use the current one.
+  return { ...session, user: { ...session.user, name: user.name } };
 };

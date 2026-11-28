@@ -1,8 +1,9 @@
 import { db } from "@/db";
 import { flags } from "@/db/schema";
+import { inEncyclopedia } from '@/lib/encyclopedia';
 
 export async function GET() {
-  const flagsData = await db.select().from(flags);
+  const flagsData = await db.select().from(flags).where(inEncyclopedia);
 
   const urls = [
     ...flagsData.map(
