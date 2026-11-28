@@ -6,7 +6,7 @@ import { firstFreeSlug, slugBase } from '../../src/lib/post-slug';
 
 /**
  * Moves flags people designed out of the encyclopedia and onto their makers' profiles as posts.
- * Needs drizzle/0022_community_posts.sql applied first.
+ * Needs drizzle/0023_community_posts.sql applied first.
  *
  * What moves:
  *   - every flag made in the flag maker (it has a `design`)
