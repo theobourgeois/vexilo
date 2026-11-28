@@ -74,9 +74,12 @@ async function main() {
     // Don't wait behind a long lock on a live database; fail and try again later instead.
     await client.query(`SET LOCAL lock_timeout = '5s'`);
     // Nothing else posts, reviews or favorites these flags halfway through.
-    await client.query(
-      'LOCK TABLE vexilo_flag, vexilo_saved_flag, vexilo_favorite, vexilo_flag_request IN SHARE ROW EXCLUSIVE MODE',
-    );
+    // A dry run rolls back, so it skips the lock and never holds up the live site.
+    if (!dryRun) {
+      await client.query(
+        'LOCK TABLE vexilo_flag, vexilo_saved_flag, vexilo_favorite, vexilo_flag_request IN SHARE ROW EXCLUSIVE MODE',
+      );
+    }
 
     const { rows: candidates } = await client.query<Candidate>(
       `SELECT f.id, f.name, f.image, f.description, f.tags, f.views, f.remix_of, f.design,
@@ -117,76 +120,95 @@ async function main() {
       taken.get(user_id)!.add(slug);
     }
 
-    let created = 0;
-    let published = 0;
+    // Work out every post first, then write them in a few set-based statements: one round trip per
+    // statement rather than three per flag, so a slow link to the database can't stretch the
+    // transaction (and its lock) out. Timestamps, designs and other flag columns are copied in SQL,
+    // never through JS, so nothing is reformatted on the way.
+    type Planned = { flag_id: string; post_id: string; user_id: string; slug: string; tags: string[]; saved: boolean };
+    const planned: Planned[] = [];
+    const moveRows: { flag_id: string; flag_name: string; post_id: string; created_post: boolean; previous: unknown }[] = [];
     for (const flag of owned) {
       const userId = (flag.saved_user_id ?? flag.requester)!;
       const slugs = taken.get(userId) ?? new Set<string>();
       taken.set(userId, slugs);
+      const slug = (flag.saved_id && flag.saved_slug) || firstFreeSlug(slugBase(flag.name), slugs);
+      slugs.add(slug);
       const tags = flag.tags.filter((tag) => !DROP_TAGS.has(tag.toLowerCase()));
-      const publishedAt = flag.published_at ?? flag.created_at;
-
-      let postId: string;
-      if (flag.saved_id) {
-        // Their saved flag becomes the post. Its picture is their latest save, which is what
-        // posting an update would have sent anyway.
-        const slug = flag.saved_slug ?? firstFreeSlug(slugBase(flag.name), slugs);
-        slugs.add(slug);
-        await client.query(
-          `UPDATE vexilo_saved_flag
-              SET slug = $2, description = $3, tags = $4, published_at = COALESCE(published_at, $5),
-                  views = views + $6
-            WHERE id = $1`,
-          [flag.saved_id, slug, flag.description, tags, publishedAt, flag.views],
-        );
-        postId = flag.saved_id;
-        published++;
-      } else {
-        const slug = firstFreeSlug(slugBase(flag.name), slugs);
-        slugs.add(slug);
-        const { rows } = await client.query<{ id: string }>(
-          `INSERT INTO vexilo_saved_flag
-             (user_id, name, design, image, remix_of, flag_id, slug, description, tags, published_at, views, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-           RETURNING id`,
-          [
-            userId,
-            flag.name.slice(0, 120),
-            flag.design === null ? null : JSON.stringify(flag.design),
-            flag.image,
-            flag.remix_of,
-            flag.id,
-            slug,
-            flag.description,
-            tags,
-            publishedAt,
-            flag.views,
-            flag.created_at,
-            flag.updated_at,
-          ],
-        );
-        postId = rows[0].id;
-        created++;
-      }
-
-      const previous = flag.saved_id
-        ? {
-            slug: flag.saved_slug,
-            description: flag.saved_description,
-            tags: flag.saved_tags,
-            published_at: flag.saved_published_at,
-            likes: flag.saved_likes,
-            views: flag.saved_views,
-            remix_of_post_id: flag.saved_remix_of_post_id,
-          }
-        : null;
-      await client.query(`UPDATE vexilo_flag SET moved_to_post_id = $2 WHERE id = $1`, [flag.id, postId]);
-      await client.query(
-        `INSERT INTO vexilo_post_move (batch_id, flag_id, flag_name, post_id, created_post, previous)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [batchId, flag.id, flag.name, postId, !flag.saved_id, previous === null ? null : JSON.stringify(previous)],
-      );
+      // A saved flag becomes the post (its picture is their latest save, which is what posting an
+      // update would have sent anyway); an upload gets a new post.
+      const postId = flag.saved_id ?? randomUUID();
+      planned.push({ flag_id: flag.id, post_id: postId, user_id: userId, slug, tags, saved: !!flag.saved_id });
+      moveRows.push({
+        flag_id: flag.id,
+        flag_name: flag.name,
+        post_id: postId,
+        created_post: !flag.saved_id,
+        previous: flag.saved_id
+          ? {
+              slug: flag.saved_slug,
+              description: flag.saved_description,
+              tags: flag.saved_tags,
+              published_at: flag.saved_published_at,
+              likes: flag.saved_likes,
+              views: flag.saved_views,
+              remix_of_post_id: flag.saved_remix_of_post_id,
+            }
+          : null,
+      });
       if (verbose) console.log(`${flag.saved_id ? 'publish' : 'create '} ${flag.name}`);
+    }
+    const published = planned.filter((p) => p.saved).length;
+    const created = planned.length - published;
+
+    // When the flag went up: its first approved request, else when the row was made.
+    const firstApproved = (flagAlias: string) =>
+      `COALESCE((SELECT r.approved_at FROM vexilo_flag_request r
+                  WHERE r.flag_id = ${flagAlias}.id::text AND r.approved AND NOT r.is_edit
+                  ORDER BY r.created_at ASC LIMIT 1), ${flagAlias}.created_at)`;
+    const recordset = `jsonb_to_recordset($1::jsonb) AS p(flag_id uuid, post_id uuid, user_id uuid, slug text, tags jsonb, saved boolean)`;
+    const plannedJson = JSON.stringify(planned);
+
+    const publishedRows = await client.query(
+      `UPDATE vexilo_saved_flag s
+          SET slug = p.slug, description = f.description,
+              tags = ARRAY(SELECT jsonb_array_elements_text(p.tags)),
+              published_at = COALESCE(s.published_at, ${firstApproved('f')}),
+              views = s.views + f.views
+         FROM ${recordset}
+         JOIN vexilo_flag f ON f.id = p.flag_id
+        WHERE p.saved AND s.id = p.post_id`,
+      [plannedJson],
+    );
+    const createdRows = await client.query(
+      `INSERT INTO vexilo_saved_flag
+         (id, user_id, name, design, image, remix_of, flag_id, slug, description, tags, published_at, views, created_at, updated_at)
+       SELECT p.post_id, p.user_id, left(f.name, 120), f.design, f.image, f.remix_of, f.id, p.slug, f.description,
+              ARRAY(SELECT jsonb_array_elements_text(p.tags)), ${firstApproved('f')}, f.views, f.created_at, f.updated_at
+         FROM ${recordset}
+         JOIN vexilo_flag f ON f.id = p.flag_id
+        WHERE NOT p.saved`,
+      [plannedJson],
+    );
+    const markedRows = await client.query(
+      `UPDATE vexilo_flag f SET moved_to_post_id = p.post_id FROM ${recordset} WHERE f.id = p.flag_id`,
+      [plannedJson],
+    );
+    const loggedRows = await client.query(
+      `INSERT INTO vexilo_post_move (batch_id, flag_id, flag_name, post_id, created_post, previous)
+       SELECT $2, m.flag_id, m.flag_name, m.post_id, m.created_post, m.previous
+         FROM jsonb_to_recordset($1::jsonb) AS m(flag_id uuid, flag_name text, post_id uuid, created_post boolean, previous jsonb)`,
+      [JSON.stringify(moveRows), batchId],
+    );
+    if (
+      publishedRows.rowCount !== published ||
+      createdRows.rowCount !== created ||
+      markedRows.rowCount !== planned.length ||
+      loggedRows.rowCount !== planned.length
+    ) {
+      throw new Error(
+        `Row counts don't match the plan: published ${publishedRows.rowCount}/${published}, created ${createdRows.rowCount}/${created}, ` +
+          `marked ${markedRows.rowCount}/${planned.length}, logged ${loggedRows.rowCount}/${planned.length}`,
+      );
     }
 
     // Saved flags waiting for review: publish them, and close the request.
