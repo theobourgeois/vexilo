@@ -62,8 +62,11 @@ export default function FlagImage({
     setRatio(null);
     setFailed(false);
     const img = imgRef.current;
-    // The image may have finished loading before hydration attached onLoad.
-    if (img?.complete && img.naturalWidth > 0) measure(img);
+    // The image may have finished loading, or failed, before hydration attached onLoad and onError.
+    if (img?.complete) {
+      if (img.naturalWidth > 0) measure(img);
+      else setFailed(true);
+    }
   }, [src, measure]);
 
   const style = {
@@ -75,12 +78,13 @@ export default function FlagImage({
   if (failed) {
     return (
       <div
-        className={cn('flag-img grid place-items-center rounded-[3px] text-muted-foreground shadow-[inset_0_0_0_1px_var(--border)]', fixed && 'flag-img--fixed', className)}
+        className={cn('flag-img flag-img--missing rounded-[3px] text-muted-foreground shadow-[inset_0_0_0_1px_var(--border)]', fixed && 'flag-img--fixed', className)}
         style={style}
         role='img'
         aria-label={`${alt} (image unavailable)`}
       >
         <FlagIcon className='size-6 opacity-60' />
+        {maxHeight >= 120 && <span className='text-sm'>Image unavailable</span>}
       </div>
     );
   }
