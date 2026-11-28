@@ -227,6 +227,14 @@
 .flag-img--fixed {
     height: var(--hmax);
 }
+/* Shown when the image won't load. A class here because unlayered .flag-img beats Tailwind's grid. */
+.flag-img--missing {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.5rem;
+    filter: none;
+}
 .dark .flag-img {
     filter: brightness(0.95) drop-shadow(0 0 0.6px rgb(0 0 0 / 0.7)) drop-shadow(0 10px 14px rgb(0 0 0 / 0.4));
 }
