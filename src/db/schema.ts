@@ -376,6 +376,8 @@ export const flagColors = createTable(
  * shape was found on. `sourceKey` (catalogue index + position) lets re-imports update rows in place.
  * `box` is where the emblem sat on its source flag, as fractions of the flag's width and height;
  * `placements` has the same for every flag it appears on, so the flag maker can rebuild remixes.
+ * Clip art from other libraries (`collection` 'game-icons' or 'phylopic') has no source flag and
+ * carries its artist's `credit` instead.
  */
 export const flagEmblems = createTable(
   'flag_emblem',
@@ -388,9 +390,8 @@ export const flagEmblems = createTable(
     rank: integer('rank').notNull().default(0),
     // Retired drawings remain available to existing designs and remix placements.
     isActive: boolean('is_active').notNull().default(true),
-    flagId: uuid('flag_id')
-      .notNull()
-      .references(() => flags.id, { onDelete: 'cascade' }),
+    flagId: uuid('flag_id').references(() => flags.id, { onDelete: 'cascade' }),
+    credit: varchar('credit', { length: 160 }),
     image: varchar('image', { length: 1000 }).notNull(),
     svg: varchar('svg', { length: 1000 }),
     width: integer('width').notNull(),

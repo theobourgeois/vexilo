@@ -187,7 +187,7 @@ export function EmblemsPanel({
             <button
               key={emblem.id}
               type='button'
-              title={emblem.name.replace(/^the /, '')}
+              title={[emblem.name.replace(/^the /, ''), emblem.credit].filter(Boolean).join(' · ')}
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData(EMBLEM_MIME, emblem.id);
@@ -212,6 +212,14 @@ export function EmblemsPanel({
           </div>
         ) : (
           matches.length === 0 && <p className='py-10 text-center text-[13px] text-muted-foreground'>No emblems found</p>
+        )}
+        {!hasMore && shown.some((e) => e.credit) && (
+          <p className='pt-4 text-center text-[11.5px] leading-relaxed text-muted-foreground'>
+            Some drawings by Lorc, Delapouite &amp; others from{' '}
+            <a href='https://game-icons.net' target='_blank' rel='noreferrer' className='underline hover:text-foreground'>game-icons.net</a>{' '}
+            (<a href='https://creativecommons.org/licenses/by/3.0/' target='_blank' rel='noreferrer' className='underline hover:text-foreground'>CC BY 3.0</a>, recoloured)
+            {' '}and from <a href='https://www.phylopic.org' target='_blank' rel='noreferrer' className='underline hover:text-foreground'>PhyloPic</a>. Hover a drawing for its artist.
+          </p>
         )}
       </div>
     </div>
